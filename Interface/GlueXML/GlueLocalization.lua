@@ -84,6 +84,10 @@ function Localize()
 	
 	VISITABLE_URL3 = "http://enGB.nydus.battle.net/wow/enGB/client/item-restoration";
 	VISITABLE_URL4 = "http://enGB.nydus.battle.net/wow/enGB/client/challenge/%d/%d";
+	VISITABLE_URL6 = "https://eu.battle.net/support/en/ticket/submit?loc";
+	VISITABLE_URL5 = "https://eu.battle.net/support/en/games/wow?loc";
+	VISITABLE_URL7 = "https://eu.battle.net/support/en/ticket/status?loc";
+	
 
 end
 
