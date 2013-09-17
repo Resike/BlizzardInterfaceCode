@@ -87,7 +87,8 @@ function Localize()
 	VISITABLE_URL6 = "https://eu.battle.net/support/en/ticket/submit?loc";
 	VISITABLE_URL5 = "https://eu.battle.net/support/en/games/wow?loc";
 	VISITABLE_URL7 = "https://eu.battle.net/support/en/ticket/status?loc";
-	
+	VISITABLE_URL11 = "https://nydus.battle.net/WoW/enGB/client/add-payment?targetRegion=EU";
+
 
 end
 
