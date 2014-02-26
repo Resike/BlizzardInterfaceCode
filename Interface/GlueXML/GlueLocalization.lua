@@ -81,6 +81,15 @@ function Localize()
 
 	LOGIN_CONVERSION_REQUIRED = "<html><body><p align=\"CENTER\">This account needs to be converted to a Battle.net account. Please <a href=\"https://eu.battle.net/account/creation/landing.xml\">Click Here</a>|nor go to:|n<a href=\"https://eu.battle.net/account/creation/landing.xml\">https://eu.battle.net/account/creation/landing.xml</a>|nto begin the conversion.</p></body></html>";
 	CLIENT_TRIAL = "<html><body><p>Your account is a full retail account, and is not compatible with the World of Warcraft Trial version. Please install the retail version of World of Warcraft. If you need more help, see <a href=\"http://www.wow-europe.com/en/info/faq/trial.html\">www.wow-europe.com/en/info/faq/trial.html</a></p></body></html>";
+
+	DRIVER_BLACKLISTED = "<html><body><p align=\"CENTER\">Your device driver is not compatiple. Please see <a href=\"http://nydus.battle.net/WoW/enGB/launcher/driver-unsupported\">http://nydus.battle.net/WoW/enGB/launcher/driver-unsupported</a> for more information.</p></body></html>";
+	DRIVER_OUTOFDATE = "<html><body><p align=\"CENTER\">Your device driver is out of date. Please see <a href=\"http://nydus.battle.net/WoW/enGB/launcher/driverupdates\">http://nydus.battle.net/WoW/enGB/launcher/driverupdates</a> for more information.</p></body></html>";
+	DEVICE_BLACKLISTED = "<html><body><p align=\"CENTER\">Your video device is not compatiple. Please see <a href=\"http://nydus.battle.net/WoW/enGB/launcher/video-unsupported\">http://nydus.battle.net/WoW/enGB/launcher/video-unsupported</a> for more information.</p></body></html>";
+	SYSTEM_INCOMPATIBLE_SSE = "<html><body><p align=\"CENTER\">This system will not be supported in future versions of World of Warcraft. Please see <a href=\"http://nydus.battle.net/WoW/enGB/launcher/sse1-unsupported\">http://nydus.battle.net/WoW/enGB/launcher/sse1-unsupported</a> for more information.</p></body></html>";
+	FIXEDFUNCTION_UNSUPPORTED = "<html><body><p align=\"CENTER\">This video card will not be supported in future versions of World of Warcraft. Please see <a href=\"http://nydus.battle.net/WoW/enGB/launcher/fixedfunction-unsupported\">http://nydus.battle.net/WoW/enGB/launcher/fixedfunction-unsupported</a> for more information.</p></body></html>";
+
+
+
 	
 	VISITABLE_URL3 = "http://enGB.nydus.battle.net/wow/enGB/client/item-restoration";
 	VISITABLE_URL4 = "http://enGB.nydus.battle.net/wow/enGB/client/challenge/%d/%d";
@@ -95,8 +104,4 @@ end
 
 function LocalizeFrames()
 	-- Put all locale specific UI adjustments here
-	WorldOfWarcraftRating:SetTexture("Interface\\Glues\\Login\\Glues-FrenchRating");
-	WorldOfWarcraftRating:ClearAllPoints();
-	WorldOfWarcraftRating:SetPoint("BOTTOMLEFT", "AccountLoginUI", "BOTTOMLEFT", 20, 45);
-	WorldOfWarcraftRating:Show();
 end
