@@ -15,6 +15,7 @@ function Localize()
 	HELPFRAME_ACCOUNT_ENDTEXT = "For assistance with any similar issues, please contact Billing & Account Services:\n\nBy phone: you will find the number for your country on this Web page |cffffd200www.wow-europe.com/en/support/accountbilling.html|r\nBy Web at: |cffffd200www.wow-europe.com/en/support/accountbilling.html|r\nBy Webform at: |cffffd200www.wow-europe.com/support/webform/billingDefault.html?lan=en|r\n\nWe also recommend that you check the Account Management section at: \n\n|cffffd200 www.wow-europe.com/account|r \n\nIn the Account Management section, you can view your subscription information, add game cards, and access other important account functions and options.";
     KBASE_ERROR_LOAD_FAILURE = "The Knowledge Base is currently unavailable. Please refer to http://www.wow-europe.com/en/support/ for help with support issues, or submit a petition using the button below.";
 	ACHIEVEMENT_TOOLTIP_COMPLETE = "Achievement earned by %1$s on %3$d/%2$d/20%4$02d";
+	SOCIAL_ITEM_ARMORY_LINK = "http://eu.battle.net/wow/en/item";
 end
 
 function LocalizeFrames()
