@@ -138,7 +138,7 @@
 				if ( self.selection:IsShown() ) then
 					CharacterSelectButton_ShowMoveButtons(self);
 				end
-				if ( self.isVeteranLocked ) then
+				if ( self.isVeteranLocked and CharSelectAccountUpgradeButton:IsEnabled()) then
 					GlueTooltip:SetText(CHARSELECT_CHAR_LIMITED_TOOLTIP, nil, nil, nil, nil, true);
 					GlueTooltip:Show();
 					GlueTooltip:SetOwner(self, "ANCHOR_LEFT", -16, -5);
@@ -167,6 +167,23 @@
 	</Button>
 	<Button name="CharSelectPaidServiceTemplate" virtual="true" hidden="true" motionScriptsWhileDisabled="true">
 		<Size x="64" y="64"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="VASIcon" hidden="true">
+					<Size x="46" y="46"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="GoldBorder" atlas="services-icon-goldborder" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
 		<Scripts>
 			<OnClick>
 				CharacterSelect_PaidServiceOnClick(self, button, down, self.serviceType);
@@ -435,6 +452,7 @@
 								end
 							</OnEvent>
 							<OnClick>
+								PlaySound("gsTitleOptionOK");
 								if ( IsVeteranTrialAccount() ) then
 									SubscriptionRequestDialog_Open();
 								else
