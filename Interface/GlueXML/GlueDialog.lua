@@ -57,6 +57,17 @@ GlueDialogTypes["DRIVER_OUTOFDATE"] = {
 	end
 }
 
+GlueDialogTypes["SHADER_MODEL_TO_BE_UNSUPPORTED"] = {
+	text = SHADER_MODEL_TO_BE_UNSUPPORTED,
+	button1 = OKAY,
+	html = 1,
+	showAlert = 1,
+	escapeHides = true,
+	OnAccept = function ()
+		CheckSystemRequirements("SHADERMODEL_TOBEUNSUPPORTED");
+	end
+}
+
 GlueDialogTypes["ERROR_CINEMATIC"] = {
 	text = ERROR_CINEMATIC,
 	button1 = OKAY,
@@ -565,6 +576,15 @@ GlueDialogTypes["BOOST_NOT_RECOMMEND_SPEC_WARNING"] = {
 	end,
 }
 
+GlueDialogTypes["LEGION_PURCHASE_READY"] = {
+	text = BLIZZARD_STORE_LEGION_PURCHASE_READY_DESCRIPTION,
+	button1 = BLIZZARD_STORE_LOG_OUT_NOW,
+	button2 = CANCEL,
+	OnAccept = function()
+		DisconnectFromServer();
+		SetGlueScreen("login");
+	end,
+}
 
 function GlueDialog_Show(which, text, data, errorNumber)
 	local dialogInfo = GlueDialogTypes[which];
