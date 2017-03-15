@@ -141,7 +141,7 @@ SPEC_SPELLS_DISPLAY[262] = { 188389,10,	51505,10,	188196,10,	8042,10,	188443,10,
 SPEC_SPELLS_DISPLAY[263] = { 193786,10,	193796,10,	17364,10,	60103,10,	201845,10,	187880,10	}; --Enhancement
 SPEC_SPELLS_DISPLAY[264] = { 8004,10,	77472,10,	61295,10,	1064,10,	73920,10,	51564,10	}; --Restoration
 
-SPEC_SPELLS_DISPLAY[265] = { 172,10,	980,10,		30108,10,	689,10,		27243,10,	691,10		}; --Affliction
+SPEC_SPELLS_DISPLAY[265] = { 172,10,	980,10,		30108,10,	198590,10,		27243,10,	691,10		}; --Affliction
 SPEC_SPELLS_DISPLAY[266] = { 686,10,	603,10,		105174,10,	104316,10,	193396,10,	30146,10	}; --Demonology
 SPEC_SPELLS_DISPLAY[267] = { 348,10,	17962,10,	116858,10,	29722,10,	80240,10,	688,10		}; --Destruction
 
@@ -150,7 +150,7 @@ SPEC_SPELLS_DISPLAY[269] = { 100780,10,	107428,10,	100784,10,	113656,10,	109132,
 SPEC_SPELLS_DISPLAY[270] = { 116694,10,	115151,10,	124682,10,	116670,10,	191837,10,	193884,10	}; --Mistweaver
 
 SPEC_SPELLS_DISPLAY[577] = { 162243,10,	162794,10,	198013,10,	188499,10,	195072,10,	191427,10	}; --Havoc
-SPEC_SPELLS_DISPLAY[581] = { 203782,10,	203798,10,	203720,10,	204021,10,	178740,10,	187827,10	}; --Vengeance
+SPEC_SPELLS_DISPLAY[581] = { 203782,10,	228477,10,	203720,10,	204021,10,	178740,10,	187827,10	}; --Vengeance
 
 -- Core Abilities text prefix for spec page
 SPEC_CORE_ABILITY_TEXT = {}
@@ -731,9 +731,7 @@ end
 
 -- PlayerTalentFrameTalents
 function PlayerTalentFrameTalent_OnClick(self, button)
-	if ( IsModifiedClick("CHATLINK") ) then
-		HandleTalentFrameChatLink(self);
-	elseif ( selectedSpec and (activeSpec == selectedSpec)) then
+	if ( selectedSpec and (activeSpec == selectedSpec)) then
         local talentID = self:GetID()
 		local _, _, _, _, available, _, _, _, _, known = GetTalentInfoByID(talentID, specs[selectedSpec].talentGroup, true);
 		if ( available and not known and button == "LeftButton") then
@@ -1293,7 +1291,7 @@ function PlayerTalentFrame_UpdateSpecFrame(self, spec)
 
 	-- display spec info in the scrollframe
 	local scrollChild = self.spellsScroll.child;
-	local id, name, description, icon, background, _, primaryStat = GetSpecializationInfo(shownSpec, nil, self.isPet, nil, sex);
+	local id, name, description, icon, _, primaryStat = GetSpecializationInfo(shownSpec, nil, self.isPet, nil, sex);
 	local primarySpecID = GetPrimarySpecialization();
 	self.previewSpecCost = (id ~= primarySpecID) and GetSpecChangeCost() or nil;
 	SetPortraitToTexture(scrollChild.specIcon, icon);
@@ -1428,8 +1426,9 @@ function PlayerTalentFrame_UpdateSpecFrame(self, spec)
 			else
 				frame.icon:SetAlpha(1);
 				local level = GetSpellLevelLearned(bonuses[i]);
-				local spellLocked = level and level > UnitLevel("player");
-				if ( spellLocked ) then
+				local futureSpell = level and level > UnitLevel("player");
+				local spellLocked = futureSpell or not FindSpellBookSlotBySpellID(bonuses[i]);
+				if ( futureSpell ) then
 					frame.subText:SetFormattedText(SPELLBOOK_AVAILABLE_AT, level);
 				else
 					frame.subText:SetText("");
@@ -1441,7 +1440,7 @@ function PlayerTalentFrame_UpdateSpecFrame(self, spec)
 					frame.ring:SetDesaturated(true);
 					frame.subText:SetTextColor(0.75, 0.75, 0.75);
 				else
-					frame.disabled = false;
+					frame.disabled = spellLocked;
 					if ( spellLocked ) then
 						frame.icon:SetDesaturated(true);
 						frame.icon:SetAlpha(0.5);
@@ -1624,9 +1623,7 @@ function PlayerTalentFramePVPTalentsTalent_OnLeave(self)
 end
 
 function PlayerTalentFramePVPTalentsTalent_OnClick(self, button)
-	if ( IsModifiedClick("CHATLINK") ) then
-		HandlePVPTalentFrameChatLink(self);
-	elseif ( selectedSpec and (activeSpec == selectedSpec)) then
+	if ( selectedSpec and (activeSpec == selectedSpec)) then
 		local id, _, _, selected, available, _, _, _, _, known = GetPvpTalentInfoByID(self.pvpTalentID);
 		if ( button == "LeftButton" and not selected ) then
 			local talentsFrame = PlayerTalentFramePVPTalents;
@@ -1769,11 +1766,35 @@ function PlayerTalentFramePVPTalents_ShowTutorial(tutorial)
     end
 end
 
+function PlayerTalentButton_OnLoad(self)
+	self.icon:ClearAllPoints();
+	self.name:ClearAllPoints();
+	if (EXTEND_TALENT_FRAME_TALENT_DISPLAY) then
+		self.icon:SetPoint("LEFT", 29, 0);
+		self.name:SetSize(104, 35);
+		self.name:SetPoint("LEFT", self.icon, "RIGHT", 8, 0);
+	else
+		self.icon:SetPoint("LEFT", 35, 0);
+		self.name:SetSize(90, 35);
+		self.name:SetPoint("LEFT", self.icon, "RIGHT", 10, 0);
+	end
+
+	self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+	self:RegisterEvent("PREVIEW_TALENT_POINTS_CHANGED");
+	self:RegisterEvent("PLAYER_TALENT_UPDATE");
+	self:RegisterForDrag("LeftButton");
+end
+
 function PlayerTalentButton_OnClick(self, button)
 	-- With 1-click talent selection, there is a significant amount of lag between clicking the talent and
 	-- getting the server message back saying that your talents have been updated. To make the UI feel more
 	-- responsive, we update the UI immediately as if we got the server response. Then we lock that row so
 	-- that the user cannot try and update that talent row until we receive a response back from the server.
+
+	if (IsModifiedClick("CHATLINK")) then
+		HandleTalentFrameChatLink(self);
+		return;
+	end
 
 	local talentRow = self:GetParent();
 	local talentsFrame = talentRow:GetParent();
@@ -1781,8 +1802,6 @@ function PlayerTalentButton_OnClick(self, button)
 		-- We recently clicked on a talent and are waiting for the server response; don't let the user click again
 		UIErrorsFrame:AddMessage(TALENT_CLICK_TOO_FAST, 1.0, 0.1, 0.1, 1.0);
 		return;
-	elseif (self.disabled and IsModifiedClick("CHATLINK")) then
-		HandleTalentFrameChatLink(self);
 	elseif (not self.disabled) then
 		if (UnitAffectingCombat("player")) then
 			-- Disallow selecting a talent while in combat
@@ -1816,8 +1835,19 @@ function PlayerTalentButton_OnClick(self, button)
 	end
 end
 
+function PlayerPVPTalentButton_OnLoad(self)
+	if (EXTEND_TALENT_FRAME_TALENT_DISPLAY) then
+		self.Name:SetSize(102, 35);
+	else
+		self.Name:SetSize(90, 35);
+	end
+
+	self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+	self:RegisterForDrag("LeftButton");
+end
+
 function PlayerPVPTalentButton_OnClick(self, button)
-	if (self.disabled and IsModifiedClick("CHATLINK")) then
+	if ( IsModifiedClick("CHATLINK") ) then
 		HandlePVPTalentFrameChatLink(self);
 	elseif (not self.disabled) then
 		PlayerTalentFramePVPTalentsTalent_OnClick(self, button);

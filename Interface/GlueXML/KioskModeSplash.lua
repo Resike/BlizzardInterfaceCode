@@ -30,7 +30,7 @@ local kioskModeData = {
 			["DEMONHUNTER"] = true,
 			["DEATHKNIGHT"] = true,
 		},
-		["template"] = { ["enabled"] = true, ["index"] = 1, ["ignoreClasses"] = { "DEMONHUNTER" } },
+		["trial"] = { ["enabled"] = true, ["ignoreClasses"] = { "DEMONHUNTER" } },
 	},
 	["newcharacter"] = {
 		["races"] = {
@@ -72,6 +72,12 @@ end
 
 function KioskModeSplash_OnShow(self)
 	self.mode = nil;
+end
+
+function KioskModeSplash_OnKeyDown(self,key)
+	if (CheckKioskModeRealmKey()) then
+		C_RealmList.RequestChangeRealmList();
+	end
 end
 
 function KioskModeSplash_SetMode(mode)

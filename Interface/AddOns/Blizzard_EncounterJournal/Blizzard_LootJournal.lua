@@ -133,6 +133,7 @@ function LootJournalListMixin:ShowItemTooltip(button)
 		GameTooltip:SetItemByID(button.itemID);
 	end
 	self.tooltipItemID = button.itemID;
+	GameTooltip_ShowCompareItem();
 end
 
 function LootJournalListMixin:CheckItemButtonTooltip(button)
@@ -155,6 +156,7 @@ function LootJournalListMixin:SetClassAndSpecFilters(newClassFilter, newSpecFilt
 	local classFilter, specFilter = C_LootJournal.GetClassAndSpecFilters();
 	if not self.classAndSpecFiltersSet or classFilter ~= newClassFilter or specFilter ~= newSpecFilter then
 		C_LootJournal.SetClassAndSpecFilters(newClassFilter, newSpecFilter);
+		self.ScrollBar:SetValue(0);
 		self:Refresh();
 	end
 
@@ -165,14 +167,6 @@ end
 do
 	function LootJournalItemButton_OnUpdate(self)
 		if GameTooltip:IsOwned(self) then
-			if IsModifiedClick("COMPAREITEMS") or
-					 (GetCVarBool("alwaysCompareItems") and not IsEquippedItem(self.itemID)) then
-				GameTooltip_ShowCompareItem();
-			else
-				ShoppingTooltip1:Hide();
-				ShoppingTooltip2:Hide();
-			end
-
 			if IsModifiedClick("DRESSUP") then
 				ShowInspectCursor();
 			else
@@ -374,6 +368,7 @@ function LootJournalLegendariesMixin:ShowItemTooltip(button)
 	GameTooltip:SetOwner(button, "ANCHOR_RIGHT");
 	GameTooltip:SetItemByID(button.itemID);
 	self.tooltipItemID = button.itemID;
+	GameTooltip_ShowCompareItem();
 end
 
 function LootJournalLegendariesMixin:GetInvTypeFilter()
@@ -397,8 +392,8 @@ function LootJournalLegendariesMixin:UpdateSlotButtonText()
 	if invTypeFilter ~= NO_INV_TYPE_FILTER then
 		local invTypes = C_LootJournal.GetLegendaryInventoryTypes();
 		for i = 1, #invTypes do
-			if ( invTypes[i].invTypeIndex == invTypeFilter ) then
-				text = _G[invTypes[i].invType];
+			if ( invTypes[i].invType == invTypeFilter ) then
+				text = _G[invTypes[i].invTypeName];
 				break;
 			end
 		end
