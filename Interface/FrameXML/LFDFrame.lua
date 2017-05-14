@@ -74,7 +74,8 @@ function LFDFrame_OnEvent(self, event, ...)
 	elseif ( event == "LFG_BOOT_PROPOSAL_UPDATE" ) then
 		local voteInProgress, didVote, myVote, targetName, totalVotes, bootVotes, timeLeft, reason = GetLFGBootProposal();
 		if ( voteInProgress and not didVote and targetName ) then
-			StaticPopup_Show("VOTE_BOOT_PLAYER", targetName, reason);
+			-- Person who started the vote voted yes, the person being voted against voted no, so weve seen this before if we have more than 2 votes.
+			StaticPopup_Show("VOTE_BOOT_PLAYER", targetName, reason, { seen = totalVotes > 2 });
 		else
 			StaticPopup_Hide("VOTE_BOOT_PLAYER");
 		end
@@ -123,8 +124,6 @@ function LFDFrame_DisplayDungeonByID(dungeonID)
 	else
 		LFDQueueFrame_SetType("specific");
 	end
-	
-	return typeID;
 end
 
 --Role-related functions
@@ -690,6 +689,23 @@ function LFDPopupRoleCheckButton_OnEnter(self)
 	LFGFrameRoleCheckButton_OnEnter(self);
 end
 
+function LFDRoleCheckPopup_OnShow(self)
+	PlaySound("ReadyCheck");
+	FlashClientIcon();
+	LFDRoleCheckPopup_Update();
+	self:RegisterEvent("PVP_BRAWL_INFO_UPDATED");
+end
+
+function LFDRoleCheckPopup_OnHide(self)
+	self:UnregisterEvent("PVP_BRAWL_INFO_UPDATED");
+end
+
+function LFDRoleCheckPopup_OnEvent(self, event)
+	if (event == "PVP_BRAWL_INFO_UPDATED") then
+		LFDRoleCheckPopup_Update();
+	end
+end
+
 function LFDRoleCheckPopup_Update()
 	LFGDungeonList_Setup();
 	
@@ -713,7 +729,7 @@ function LFDRoleCheckPopup_Update()
 	else
 		displayName = MULTIPLE_DUNGEONS;
 	end
-	displayName = NORMAL_FONT_COLOR_CODE..displayName.."|r";
+	displayName = displayName and NORMAL_FONT_COLOR:WrapTextInColorCode(displayName) or "";
 	
 	if ( isLFGList ) then
 		LFDRoleCheckPopupDescriptionText:SetFormattedText(LFG_LIST_APPLYING_TO, displayName);
@@ -785,3 +801,4 @@ function LFDRoleCheckPopup_UpdateAcceptButton()
 		button.tooltipText = INSTANCE_ROLE_WARNING_TITLE;
 	end
 end
+
