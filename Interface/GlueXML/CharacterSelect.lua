@@ -77,6 +77,7 @@ function CharacterSelect_OnLoad(self)
     self:RegisterEvent("STORE_STATUS_CHANGED");
     self:RegisterEvent("CHARACTER_UNDELETE_STATUS_CHANGED");
     self:RegisterEvent("CLIENT_FEATURE_STATUS_CHANGED)");
+	self:RegisterEvent("CHARACTER_COPY_STATUS_CHANGED")
     self:RegisterEvent("CHARACTER_UNDELETE_FINISHED");
     self:RegisterEvent("TOKEN_CAN_VETERAN_BUY_UPDATE");
     self:RegisterEvent("TOKEN_DISTRIBUTIONS_UPDATED");
@@ -530,6 +531,9 @@ function CharacterSelect_OnEvent(self, event, ...)
         end
     elseif ( event == "CLIENT_FEATURE_STATUS_CHANGED" ) then
         AccountUpgradePanel_Update(CharSelectAccountUpgradeButton.isExpanded);
+		CopyCharacterButton_UpdateButtonState();
+	elseif ( event == "CHARACTER_COPY_STATUS_CHANGED" ) then
+		CopyCharacterButton_UpdateButtonState();
     elseif ( event == "CHARACTER_UNDELETE_FINISHED" ) then
         GlueDialog_Hide("UNDELETING_CHARACTER");
         CharacterSelect_EndCharacterUndelete();
@@ -2538,24 +2542,24 @@ function CopyCharacterFromLive()
 end
 
 function CopyCharacter_AccountDataFromLive()
-    local allowed = CopyAccountCharactersAllowed();
-    if ( allowed >= 2 ) then
+    if ( not IsGMClient() ) then
         CopyAccountDataFromLive(GlueDropDownMenu_GetSelectedValue(CopyCharacterFrame.RegionID));
-    elseif ( allowed == 1 ) then
+    else
         CopyAccountDataFromLive(GlueDropDownMenu_GetSelectedValue(CopyCharacterFrame.RegionID), CopyCharacterFrame.RealmName:GetText(), CopyCharacterFrame.CharacterName:GetText());
     end
     GlueDialog_Show("COPY_IN_PROGRESS");
 end
 
 function CopyCharacterButton_OnLoad(self)
-    if (IsGMClient() and HideGMOnly()) then
-        return;
-    end
-    self:SetShown( CopyAccountCharactersAllowed() > 0 );
+	CopyCharacterButton_UpdateButtonState();
 end
 
 function CopyCharacterButton_OnClick(self)
     CopyCharacterFrame:SetShown( not CopyCharacterFrame:IsShown() );
+end
+
+function CopyCharacterButton_UpdateButtonState()
+	CopyCharacterButton:SetShown(C_CharacterServices.IsLiveRegionCharacterListEnabled() or C_CharacterServices.IsLiveRegionCharacterCopyEnabled() or C_CharacterServices.IsLiveRegionAccountCopyEnabled());
 end
 
 function CopyCharacterSearch_OnClick(self)
@@ -2589,7 +2593,7 @@ function CopyCharacterEntry_OnClick(self)
     self:LockHighlight();
     CopyCharacterFrame.SelectedButton = self;
     CopyCharacterFrame.SelectedIndex = self:GetID() + FauxScrollFrame_GetOffset(CopyCharacterFrame.scrollFrame);
-    CopyCharacterFrame.CopyButton:SetEnabled(true);
+    CopyCharacterFrame.CopyButton:SetEnabled(C_CharacterServices.IsLiveRegionCharacterCopyEnabled());
 end
 
 function CopyCharacterEntry_Highlight(self)
@@ -2651,17 +2655,18 @@ function CopyCharacterFrame_OnShow(self)
     ClearAccountCharacters();
     CopyCharacterFrame_Update(self.scrollFrame);
 
-    if ( CopyAccountCharactersAllowed() >= 2 ) then
+    if ( not IsGMClient() ) then
         self.RealmName:Hide();
         self.CharacterName:Hide();
         self.SearchButton:Hide();
         RequestAccountCharacters(GlueDropDownMenu_GetSelectedValue(CopyCharacterFrame.RegionID));
-    elseif ( CopyAccountCharactersAllowed() == 1) then
+    else
         self.RealmName:Show();
         self.RealmName:SetFocus();
         self.CharacterName:Show();
         self.SearchButton:Show();
     end
+	self.CopyAccountData:SetEnabled(C_CharacterServices.IsLiveRegionAccountCopyEnabled());
 end
 
 function CopyCharacterFrameRegionIDDropdown_Initialize()
@@ -2697,7 +2702,7 @@ end
 
 function CopyCharacterFrameRegionIDDropdown_OnClick(button)
     GlueDropDownMenu_SetSelectedValue(CopyCharacterFrame.RegionID, button.value);
-    if ( CopyAccountCharactersAllowed() >= 2 ) then
+    if ( not IsGMClient() ) then
         RequestAccountCharacters(button.value);
     end
 end
