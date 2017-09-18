@@ -1,0 +1,5 @@
+## Interface: 60200
+## Title: Blizzard Auth Challenge UI
+## Secure: 1
+## LoadOnDemand: 0
+Blizzard_AuthChallengeUI.xml

@@ -1,0 +1,143 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<Script file="HealthBar.lua"/>
+	<Script file="GameTooltip.lua"/>
+	<Include file="GameTooltipTemplate.xml"/>
+	<GameTooltip name="ShoppingTooltip1" clampedToScreen="true" frameStrata="TOOLTIP" hidden="true" parent="UIParent" inherits="ShoppingTooltipTemplate"/>
+	<GameTooltip name="ShoppingTooltip2" clampedToScreen="true" frameStrata="TOOLTIP" hidden="true" parent="UIParent" inherits="ShoppingTooltipTemplate"/>
+	<GameTooltip name="GameTooltip" frameStrata="TOOLTIP" hidden="true" parent="UIParent" inherits="GameTooltipTemplate">
+		<Scripts>
+			<OnLoad>
+				GameTooltip_OnLoad(self);
+				self.shoppingTooltips = { ShoppingTooltip1, ShoppingTooltip2 };
+				if (BattlePetTooltip) then
+					BattlePetTooltip:Hide();
+				end
+			</OnLoad>
+			<OnTooltipSetUnit>
+				if ( self:IsUnit("mouseover") ) then
+					_G[self:GetName().."TextLeft1"]:SetTextColor(GameTooltip_UnitColor("mouseover"));
+				end
+				if (BattlePetTooltip) then
+					BattlePetTooltip:Hide();
+				end
+			</OnTooltipSetUnit>
+			<OnTooltipSetItem>
+				if ( IsModifiedClick("COMPAREITEMS") or
+				     (GetCVarBool("alwaysCompareItems") and not self:IsEquippedItem()) ) then
+					GameTooltip_ShowCompareItem(self);
+				else
+					local shoppingTooltip1, shoppingTooltip2 = unpack(self.shoppingTooltips);
+					shoppingTooltip1:Hide();
+					shoppingTooltip2:Hide();
+				end
+				if (BattlePetTooltip) then
+					BattlePetTooltip:Hide();
+				end
+			</OnTooltipSetItem>
+			<OnHide>
+				GameTooltip_OnHide(self);
+				ShoppingTooltip1:Hide();
+				ShoppingTooltip2:Hide();
+				if (BattlePetTooltip) then
+					BattlePetTooltip:Hide();
+				end
+			</OnHide>
+			<OnUpdate function="GameTooltip_OnUpdate"/>
+		</Scripts>
+	</GameTooltip>
+	<Frame name="SmallTextTooltip" frameStrata="TOOLTIP" hidden="true" parent="UIParent">
+		<Size>
+			<AbsDimension x="10" y="32"/>
+		</Size>
+		<Anchors>
+			<Anchor point="BOTTOM"/>
+		</Anchors>
+		<Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
+			<EdgeSize>
+				<AbsValue val="16"/>
+			</EdgeSize>
+			<TileSize>
+				<AbsValue val="16"/>
+			</TileSize>
+			<BackgroundInsets>
+				<AbsInset left="5" right="5" top="5" bottom="5"/>
+			</BackgroundInsets>
+		</Backdrop>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString name="SmallTextTooltipText" inherits="GameFontHighlightSmall">
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="10" y="-10"/>
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				self:SetBackdropBorderColor(TOOLTIP_DEFAULT_COLOR.r, TOOLTIP_DEFAULT_COLOR.g, TOOLTIP_DEFAULT_COLOR.b);
+				self:SetBackdropColor(TOOLTIP_DEFAULT_BACKGROUND_COLOR.r, TOOLTIP_DEFAULT_BACKGROUND_COLOR.g, TOOLTIP_DEFAULT_BACKGROUND_COLOR.b);
+			</OnLoad>
+			<OnShow>
+				self:SetWidth(SmallTextTooltipText:GetWidth() + 20);
+			</OnShow>
+		</Scripts>
+	</Frame>
+	<Frame name="EmbeddedItemTooltip" virtual="true">
+		<Size x="100" y="100"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon">
+					<Size x="28" y="28"/>
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="Count" inherits="NumberFontNormalSmall" justifyH="RIGHT" hidden="true">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Icon" x="5" y="2"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Text" inherits="GameTooltipText" justifyV="MIDDLE">
+					<Size x="128" y="28"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Icon" relativePoint="TOPRIGHT" x="8" y="0"/>
+						<Anchor point="RIGHT" x="-10" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="IconBorder" file="Interface\Common\WhiteIconFrame" hidden="true">
+					<Size x="28" y="28"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeKey="$parent.Icon"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<GameTooltip name="$parentTooltip" parentKey="Tooltip" inherits="GameTooltipTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.Icon" relativePoint="TOPRIGHT" x="0" y="10"/>
+				</Anchors>
+				<Scripts>
+					<OnLoad inherit="prepend">
+						self:SetBackdrop(nil);
+					</OnLoad>
+					<OnSizeChanged>
+						local itemTooltipExtraBorderHeight = 22;
+						self:GetParent():SetSize(self:GetWidth() + self:GetParent().Icon:GetWidth(), self:GetHeight() - itemTooltipExtraBorderHeight);
+					</OnSizeChanged>
+					<OnTooltipSetItem>
+						local embeddedItemTooltip = self:GetParent();
+						EmbeddedItemTooltip_OnTooltipSetItem(embeddedItemTooltip);
+					</OnTooltipSetItem>
+				</Scripts>
+			</GameTooltip>
+		</Frames>
+	</Frame>
+</Ui>

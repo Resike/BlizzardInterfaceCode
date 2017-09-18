@@ -1,0 +1,6 @@
+## Interface: 60200
+## Title: Blizzard Store UI
+## Secure: 1
+Blizzard_StoreUI.xml
+Blizzard_StoreUIInsecure.xml
+Localization.lua

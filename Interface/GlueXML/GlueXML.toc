@@ -1,0 +1,55 @@
+##DebugHook.lua
+GlueStrings.lua
+Constants.lua
+GlueFonts.xml
+GlueFontStyles.xml
+GlueLocalization.xml
+..\SharedXML\SharedUIPanelTemplates.xml
+GlueTemplates.xml
+## add new files after here
+GlueButtons.xml
+GlueBasicControls.xml
+GlueDropDownMenuTemplates.xml
+GlueDropDownMenu.xml 
+
+## add C namespace augmentations here
+..\SharedXML\C_TimerAugment.lua
+
+..\SharedXML\Util.lua
+..\SharedXML\HybridScrollFrame.lua
+..\SharedXML\HybridScrollFrame.xml
+..\SharedXML\ModelFrames.xml
+..\SharedXML\ModelPreviewFrame.xml
+
+##New stuff!!!
+GlueParent.xml
+GlueDialog.xml
+GlueTooltip.xml
+..\SharedXML\AddonList.xml
+ServerAlert.xml
+AccountLogin.xml
+RealmList.xml
+CharacterServicesPatchwerk.xml
+CharacterSelect.xml
+AccountReactivate.xml
+CharacterServices.xml
+CharacterCreate.xml
+PromotionFrame.xml
+StarterEditionPopUp.xml
+GlueOptions.xml
+OptionsFrameTemplates.xml
+OptionsPanelTemplates.xml
+VideoOptionsFrame.xml
+..\SharedXML\VideoOptionsPanels.xml
+AudioOptionsFrame.xml
+AudioOptionsPanels.xml
+MovieFrame.xml
+CinematicsFrame.xml
+CreditsFrame.xml
+GlueMenuFrame.xml
+
+## Should only load internally
+DesignerMenu.xml
+
+## This Always Runs Last, Add New Items above it.
+GlueLocalizationPost.xml
