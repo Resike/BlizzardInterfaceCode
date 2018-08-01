@@ -27,16 +27,20 @@ local NumUpgradeDistributions = 0;
 local JustOrderedBoost = false;
 local JustOrderedLegion = false;
 local BoostType = nil;
+local BoostDeliveredUsageGUID = nil;
+local BoostDeliveredUsageReason = nil;
 local VASReady = false;
 local UnrevokeWaitingForProducts = false;
 local WaitingOnVASToComplete = 0;
 local WaitingOnVASToCompleteToken = nil;
 local WasVeteran = false;
+local StoreFrameHasBeenShown = false;
 
 --Imports
 Import("bit");
 Import("C_StoreSecure");
 Import("C_PetJournal");
+Import("C_CharacterServices");
 Import("C_SharedCharacterServices");
 Import("C_ClassTrial");
 Import("C_AuthChallenge");
@@ -80,6 +84,7 @@ Import("CreateFromSecureMixins");
 Import("ShrinkUntilTruncateFontStringMixin");
 Import("IsTrialAccount");
 Import("IsVeteranTrialAccount");
+Import("PortraitFrameTemplateMixin");
 
 --GlobalStrings
 Import("BLIZZARD_STORE");
@@ -1140,7 +1145,9 @@ local vasErrorData = {
 	[Enum.VasError.TooMuchMoneyForLevel] = {
 		msg = function(character)
 			local str = "";
-			if (character.level >= 100) then
+			if (character.level >= 110) then
+				str = GetSecureMoneyString(1000000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
+			elseif (character.level >= 100) then
 				str = GetSecureMoneyString(250000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
 			elseif (character.level > 80) then
 				str = GetSecureMoneyString(50000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
@@ -1417,8 +1424,6 @@ function StoreFrame_UpdateCard(card, entryID, discountReset, forceModelUpdate)
 		if not bullets or not card.DescriptionBulletPointContainer then
 			if (card ~= StoreFrame.SplashSingle) then
 				card.Description:SetJustifyH("CENTER");
-			else
-				card.Description:SetJustifyH("LEFT");
 			end
 
 			card.Description:SetText(description);
@@ -1650,9 +1655,9 @@ end
 
 function StoreFrame_SetCategory(forceModelUpdate)
 	local productGroupInfo = C_StoreSecure.GetProductGroupInfo(selectedCategoryID);
-	if productGroupInfo.displayType == Enum.BattlepayGroupDisplayType.Splash then
+	if productGroupInfo and productGroupInfo.displayType == Enum.BattlepayGroupDisplayType.Splash then
 		StoreFrame_SetSplashCategory(forceModelUpdate);
-	elseif productGroupInfo.displayType == Enum.BattlepayGroupDisplayType.DoubleWide then
+	elseif productGroupInfo and productGroupInfo.displayType == Enum.BattlepayGroupDisplayType.DoubleWide then
 		StoreFrame_SetCardStyle(StoreFrame, "double-wide", NUM_STORE_PRODUCT_CARDS_PER_ROW / 2);
 		StoreFrame_SetNormalCategory(forceModelUpdate, NUM_STORE_PRODUCT_CARDS / 2);
 	else
@@ -1824,6 +1829,10 @@ end
 
 function StoreFrame_IsProductGroupDisabled(groupID)
 	local productGroupInfo = C_StoreSecure.GetProductGroupInfo(groupID);
+	if not productGroupInfo then
+		return true;
+	end
+
 	local displayAsDisabled = productGroupInfo.disabledTooltip ~= nil and not StoreFrame_DoesProductGroupHavePurchasableItems(groupID);
 	local enabledForTrial = bit.band(productGroupInfo.flags, Enum.BattlepayProductGroupFlag.EnabledForTrial) == Enum.BattlepayProductGroupFlag.EnabledForTrial;
 	local trialRestricted = IsTrialAccount() and not enabledForTrial;
@@ -1871,7 +1880,7 @@ function StoreFrame_UpdateCategories(self)
 			--[[
 							WARNING: ScopeModifiers don't work for templates!
 				These functions will fail to load properly if this template is instantiated outside
-				of the initial LoadAddon call becuase we'll have lost the scoped modifiers and the
+				of the initial LoadAddon call because we'll have lost the scoped modifiers and the
 				reference to the addon environment if we instantiate them later.
 
 				We have to manually set these scripts (below) for them to work properly.
@@ -1989,11 +1998,12 @@ local JustFinishedOrdering = false;
 
 function StoreFrame_GetDefaultCategory()
 	local productGroups = C_StoreSecure.GetProductGroups();
+	local needsNewCategory = not selectedCategoryID or StoreFrame_IsProductGroupDisabled(selectedCategoryID);
 	local isTrial = IsTrialAccount();
 	for i = 1, #productGroups do
 		local groupID = productGroups[i];
 		if not StoreFrame_IsProductGroupDisabled(groupID) then
-			if isTrial or groupID == selectedCategoryID then
+			if needsNewCategory or isTrial or groupID == selectedCategoryID then
 				return groupID;
 			end
 		end
@@ -2043,7 +2053,8 @@ function StoreFrame_OnEvent(self, event, ...)
 		StoreFrame_OnError(self, err, false, internalErr);
 		StoreFrame_UpdateActivePanel(self);
 	elseif ( event == "PRODUCT_DISTRIBUTIONS_UPDATED" ) then
-		if (JustOrderedBoost) then
+		local isNewBoost = ...;
+		if isNewBoost then
 			StoreFrame_OnCharacterBoostDelivered(self);
 		end
 	elseif ( event == "AUTH_CHALLENGE_FINISHED" ) then
@@ -2107,10 +2118,12 @@ function StoreFrame_OnShow(self)
 		Outbound.UpdateMicroButtons();
 	end
 
+	BoostType = nil;
 	BoostDeliveredUsageReason = nil;
 	BoostDeliveredUsageGUID = nil;
 	WaitingOnVASToComplete = 0;
 	WaitingOnVASToCompleteToken = nil;
+	StoreFrameHasBeenShown = true;
 
 	StoreFrame_UpdateCoverState();
 	PlaySound(SOUNDKIT.UI_IG_STORE_WINDOW_OPEN_BUTTON);
@@ -2145,11 +2158,11 @@ function StoreFrame_OnMouseWheel(self, value)
 end
 
 function StoreFrame_OnCharacterBoostDelivered(self)
-	if (IsOnGlueScreen() and not _G.CharacterSelect.undeleting) then
+	if (IsOnGlueScreen() and BoostDeliveredUsageReason and not _G.CharacterSelect.undeleting) then
 		self:Hide();
 
 		_G.CharacterUpgradePopup_OnCharacterBoostDelivered(BoostType, BoostDeliveredUsageGUID, BoostDeliveredUsageReason);
-	elseif (not IsOnGlueScreen()) then
+	elseif (not IsOnGlueScreen() and StoreFrameHasBeenShown and not Outbound.IsExpansionTrialUpgradeDialogShowing()) then
 		self:Hide();
 
 		local showReason = "forBoost";
@@ -2254,6 +2267,7 @@ end
 local function SelectBoostForPurchase(category, boostType, boostReason, characterToApplyToGUID)
 	SetStoreCategoryFromAttribute(category);
 	StoreFrame_SelectBoostForPurchase(boostType);
+	BoostType = boostType;
 	BoostDeliveredUsageReason = boostReason;
 	BoostDeliveredUsageGUID = characterToApplyToGUID;
 end
@@ -2556,6 +2570,17 @@ function StoreFrameBuyButton_OnLeave(self)
 		StoreSplashPairCard_OnLeave(parent);
 	end
 end
+
+function SplashSingleBuyButton_OnEnter(self)
+	local parent = self:GetParent();
+	StoreSplashSingleCard_OnEnter(parent);
+end
+
+function SplashSingleBuyButton_OnLeave(self)
+	local parent = self:GetParent();
+	StoreProductCard_OnLeave(parent);
+end
+
 
 function StoreFrame_BeginPurchase(entryID)
 	local entryInfo = C_StoreSecure.GetEntryInfo(entryID);
@@ -3351,6 +3376,19 @@ function StoreProductCard_UpdateAllStates()
 	StoreProductCard_UpdateState(StoreFrame.SplashSecondary2);
 end
 
+function StoreSplashSingleCard_OnEnter(self)
+	if self.productTooltipTitle then
+		StoreTooltip:ClearAllPoints();
+		if self.anchorRight then
+			StoreTooltip:SetPoint("BOTTOMLEFT", self, "TOPRIGHT", -7, -6);
+		else
+			StoreTooltip:SetPoint("BOTTOMRIGHT", self, "TOPLEFT", 7, -6);
+		end
+
+		StoreTooltip_Show(self.productTooltipTitle, self.productTooltipDescription);
+	end
+end
+
 function StoreProductCard_OnEnter(self)
 	local entryInfo = C_StoreSecure.GetEntryInfo(self:GetID());
 	if (entryInfo.sharedData.productDecorator ~= Enum.BattlepayProductDecorator.VasService or IsOnGlueScreen()) then
@@ -3682,7 +3720,7 @@ function StoreProductCard_ShowDiscount(card, discountText)
 		local normalWidth = card.NormalPrice:GetStringWidth();
 		local totalWidth = normalWidth + card.SalePrice:GetStringWidth();
 		card.NormalPrice:ClearAllPoints();
-		card.NormalPrice:SetPoint("TOP", card.ProductName, "BOTTOM", (normalWidth - totalWidth) / 2, -18);
+		card.NormalPrice:SetPoint("TOP", card.ProductName, "BOTTOM", (normalWidth - totalWidth) / 2, -12);
 	elseif (card ~= StoreFrame.SplashSingle and card ~= StoreFrame.SplashPrimary) then
 		local width = card.NormalPrice:GetStringWidth() + card.SalePrice:GetStringWidth();
 
@@ -4902,7 +4940,7 @@ function ServicesLogoutPopupConfirmButton_OnClick(self)
 
 	if (showReason == "forClassTrialUnlock") then
 		doLogoutOnConfirm = false;
-		Outbound.ConfirmClassTrialApplyToken();
+		Outbound.ConfirmClassTrialApplyToken(BoostDeliveredUsageGUID, BoostType);
 	elseif (showReason == "forBoost") then
 		C_CharacterServices.SetAutomaticBoost(BoostType);
 	elseif (showReason == "forVasService") then
@@ -5038,6 +5076,7 @@ function StoreFrameSplashSingle_SetStyle(self, style, overrideBackground)
 		self.Description:SetPoint("TOP", self.CurrentPrice, "BOTTOM", 0, -12);
 		self.Description:SetFontObject("GameFontNormalMed1");
 		self.Description:SetWidth(490);
+		self.Description:SetJustifyH("CENTER");
 
 		self.SalePrice:SetFontObject("GameFontNormalLarge2");
 
@@ -5076,6 +5115,7 @@ function StoreFrameSplashSingle_SetStyle(self, style, overrideBackground)
 		self.Description:SetPoint("TOPLEFT", self.ProductName, "BOTTOMLEFT", 0, -16);
 		self.Description:SetFontObject("GameFontNormalLarge");
 		self.Description:SetWidth(340);
+		self.Description:SetJustifyH("LEFT");
 
 		self.SalePrice:SetFontObject("GameFontNormalLarge2");
 
