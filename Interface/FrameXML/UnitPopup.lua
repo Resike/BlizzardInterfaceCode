@@ -21,7 +21,7 @@ UnitPopupButtons = {
 	["CANCEL"] = { text = CANCEL, space = 1, isCloseCommand = true, },
 	["CLOSE"] = { text = CLOSE, space = 1, isCloseCommand = true, },
 	["TRADE"] = { text = TRADE, dist = 2 },
-	["INSPECT"] = { text = INSPECT, disabledInKioskMode = false },
+	["INSPECT"] = { text = INSPECT, dist = 1, disabledInKioskMode = false },
 	["TARGET"] = { text = TARGET, },
 	["IGNORE"]	= {
 		text = function(dropdownMenu)
@@ -997,9 +997,9 @@ function UnitPopup_HideButtons ()
 				shown = false;
 			end
 		elseif ( value == "REPORT_PLAYER" ) then
---			if not playerLocation or not playerLocation:IsValid() or not C_ChatInfo.CanReportPlayer(playerLocation) then
+			if not playerLocation or not playerLocation:IsValid() or not C_ChatInfo.CanReportPlayer(playerLocation) then
 				shown = false;
---			end
+			end
 		elseif ( value == "REPORT_SPAM" ) then
 			if not playerLocation:IsChatLineID() and not playerLocation:IsCommunityInvitation() then
 				shown = false;

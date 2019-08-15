@@ -502,10 +502,18 @@ function ToggleTalentFrame()
 	end
 end
 
+function BattlefieldMapAllowed()
+	return UIWidgetManager.widgetPools:GetNumActive() > 0 or (MiniMapBattlefieldFrame and MiniMapBattlefieldFrame.status == "active");
+end
+
 function ToggleBattlefieldMap()
 	BattlefieldMap_LoadUI();
 	if ( BattlefieldMapFrame ) then
-		BattlefieldMapFrame:Toggle();
+		if (BattlefieldMapAllowed()) then
+			BattlefieldMapFrame:Toggle();
+		else
+			BattlefieldMapFrame:Hide();
+		end
 	end
 end
 
@@ -617,10 +625,10 @@ function SetStoreUIShown(shown)
 end
 
 function OpenDeathRecapUI(id)
-	if (not DeathRecapFrame) then
+	--[[if (not DeathRecapFrame) then
 		DeathRecap_LoadUI();
 	end
-	DeathRecapFrame_OpenRecap(id);
+	DeathRecapFrame_OpenRecap(id);]]
 end
 
 function InspectUnit(unit)
@@ -1231,7 +1239,7 @@ function UIParent_OnEvent(self, event, ...)
 			if ( lockExpireTime == 0 ) then
 				message = format(RAID_INSTANCE_WELCOME_EXTENDED, dungeonName);
 			else
-				message = format(RAID_INSTANCE_WELCOME_LOCKED, dungeonName, daysLeft, hoursLeft, minutesLeft);
+				message = format(RAID_INSTANCE_WELCOME, dungeonName, daysLeft, hoursLeft, minutesLeft);
 
 			end
 		end
@@ -3702,10 +3710,10 @@ function RefreshBuffs(frame, unit, numBuffs, suffix, checkCVar)
 			buffIcon:SetTexture(icon);
 
 			-- setup the cooldown
-			local coolDown = _G[buffName.."Cooldown"];
+			--[[local coolDown = _G[buffName.."Cooldown"];
 			if ( coolDown ) then
 				CooldownFrame_Set(coolDown, expirationTime - duration, duration, true);
-			end
+			end]]
 
 			-- show the aura
 			_G[buffName]:Show();
@@ -3760,10 +3768,10 @@ function RefreshDebuffs(frame, unit, numDebuffs, suffix, checkCVar)
 			debuffTotal = debuffTotal + 1;
 
 			-- setup the cooldown
-			local coolDown = _G[debuffName.."Cooldown"];
+			--[[local coolDown = _G[debuffName.."Cooldown"];
 			if ( coolDown ) then
 				CooldownFrame_Set(coolDown, expirationTime - duration, duration, true);
-			end
+			end]]
 
 			-- show the aura
 			_G[debuffName]:Show();
