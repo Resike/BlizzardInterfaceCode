@@ -82,6 +82,11 @@ local function HasNewClubApplications(clubId)
 	return false;
 end
 
+function CommunitiesFrameMixin:RequestSubscribedClubFinderPostingInfo()
+	if(C_ClubFinder.IsEnabled()) then 
+		C_ClubFinder.RequestSubscribedClubPostingIDs();
+	end
+end 
 
 function CommunitiesFrameMixin:OnLoad()
 	CallbackRegistryBaseMixin.OnLoad(self);
@@ -96,6 +101,8 @@ function CommunitiesFrameMixin:OnLoad()
 
 	self:UpdateCommunitiesButtons();
 
+	self:RequestSubscribedClubFinderPostingInfo();
+
 	self:RegisterEvent("ADDON_LOADED");
 end
 
@@ -109,7 +116,7 @@ function CommunitiesFrameMixin:OnShow()
 		HideUIPanel(ChannelFrame);
 	end
 
-	self.PostingExpirationText:Hide(); 
+	self.PostingExpirationText:Hide();
 
 	local clubId = GuildMicroButton:GetNewClubId() or self:GetSelectedClubId();
 	if clubId then
@@ -121,6 +128,8 @@ function CommunitiesFrameMixin:OnShow()
 	end
 
 	self:UpdatePortrait();
+	
+	self:RequestSubscribedClubFinderPostingInfo(); -- In case something has changed in the status of our posting since loading in. 
 
 	FrameUtil.RegisterFrameForEvents(self, COMMUNITIES_FRAME_EVENTS);
 	FrameUtil.RegisterFrameForEvents(self, CLUB_FINDER_APPLICANT_LIST_EVENTS);
@@ -134,8 +143,6 @@ function CommunitiesFrameMixin:OnShow()
 	if self.CommunitiesList:IsShown() then
 		self.CommunitiesList:ScrollToClub(self:GetSelectedClubId());
 	end
-
-	C_ClubFinder.RequestSubscribedClubPostingIDs();
 
 	local function OnMemberListDropDownShown()
 		HelpTip:Acknowledge(self, CLUB_FINDER_TUTORIAL_APPLICANT_LIST);
@@ -217,6 +224,7 @@ function CommunitiesFrameMixin:OnEvent(event, ...)
 			self:SetPrivilegesForClub(clubId, nil);
 		end
 		self:UpdateCommunitiesButtons();
+		self:ValidateDisplayMode();
 		self.ApplicantList:CommunitiesMemberUpdate();
 	elseif event == "STREAM_VIEW_MARKER_UPDATED" then
 		if self.StreamDropDownMenu:IsShown() then
@@ -278,6 +286,7 @@ function CommunitiesFrameMixin:OnEvent(event, ...)
 				end
 			end
 		end
+		self:ValidateDisplayMode(); 
 	elseif event == "CLUB_FINDER_ENABLED_OR_DISABLED" then
 		StaticPopup_Show("CLUB_FINDER_ENABLED_DISABLED");
 		HideUIPanel(self);
@@ -437,6 +446,11 @@ function CommunitiesFrameMixin:UpdateSelectedClubInfo(clubId)
 end
 
 function CommunitiesFrameMixin:ClubFinderHyperLinkClicked(clubFinderId)
+	if IsCommunitiesUIDisabledByTrialAccount() then
+		UIErrorsFrame:AddMessage(ERR_RESTRICTED_ACCOUNT_TRIAL, RED_FONT_COLOR:GetRGBA());
+		return;
+	end
+
 	if not C_ClubFinder.IsEnabled() then
 		return;
 	end
@@ -527,6 +541,18 @@ COMMUNITIES_FRAME_DISPLAY_MODES = {
 	},
 };
 
+function CommunitiesFrameMixin:HasCommunityFinderPermissions(clubId, clubInfo)
+	local privileges = C_Club.GetClubPrivileges(clubId);
+	local myMemberInfo = C_Club.GetMemberInfoForSelf(clubId);
+
+	if (not privileges or not myMemberInfo or not clubInfo) then
+		return false; 
+	end 
+
+	local hasCommunityFinderPermissions = myMemberInfo.role and (myMemberInfo.role == Enum.ClubRoleIdentifier.Owner or myMemberInfo.role == Enum.ClubRoleIdentifier.Leader);
+	return C_ClubFinder.IsEnabled() and hasCommunityFinderPermissions and privileges.canSendInvitation and clubInfo.clubType == Enum.ClubType.Character;
+end 
+
 function CommunitiesFrameMixin:SetDisplayMode(displayMode)
 	if self.displayMode == displayMode then
 		return;
@@ -551,7 +577,7 @@ function CommunitiesFrameMixin:SetDisplayMode(displayMode)
 		self[subframe]:SetShown(shouldShow);
 	end
 
-	self.PostingExpirationText:Hide(); 
+	self.PostingExpirationText:Hide();
 
 	local clubId = self:GetSelectedClubId();
 	local clubInfo;
@@ -570,12 +596,7 @@ function CommunitiesFrameMixin:SetDisplayMode(displayMode)
 			C_GuildInfo.GuildRoster();
 		end
 		self.GuildMemberListDropDownMenu:SetShown(isGuildCommunitySelected);
-		if (clubId) then
-			local privileges = C_Club.GetClubPrivileges(clubId);
-			if (clubInfo) then
-				self.CommunityMemberListDropDownMenu:SetShown(not isGuildCommunitySelected and privileges.canSendInvitation and clubInfo.clubType == Enum.ClubType.Character);
-			end
-		end
+		self.CommunityMemberListDropDownMenu:SetShown(self:HasCommunityFinderPermissions(clubId, clubInfo));
 	end
 
 	if (displayMode == COMMUNITIES_FRAME_DISPLAY_MODES.CHAT and C_ClubFinder.IsEnabled()) then
@@ -600,6 +621,7 @@ function CommunitiesFrameMixin:SetDisplayMode(displayMode)
 
 	self:TriggerEvent(CommunitiesFrameMixin.Event.DisplayModeChanged, displayMode);
 
+	self:DisplayReportedAlerts(clubId);
 	self:UpdateCommunitiesButtons();
 	self:UpdateCommunitiesTabs();
 	self:CheckForTutorials();
@@ -627,7 +649,7 @@ function CommunitiesFrameMixin:HideClubFinderPostingExpirationStrings()
 	self.PostingExpirationText.DaysUntilExpire:Hide();
 	self.PostingExpirationText.ExpiredText:Hide();
 	self.PostingExpirationText.InfoButton:Hide();
-end 
+end
 
 function CommunitiesFrameMixin:SetClubFinderPostingExpirationText(clubId, isGuildCommunitySelected)
 	local failure = false;
@@ -636,39 +658,60 @@ function CommunitiesFrameMixin:SetClubFinderPostingExpirationText(clubId, isGuil
 
 	if (not C_ClubFinder.IsEnabled()) then
 		failure = true;
-	elseif(isGuildCommunitySelected) then 
+	elseif(isGuildCommunitySelected) then
 		if(not IsGuildLeader() and not C_GuildInfo.IsGuildOfficer()) then
 			failure = true;
-		end 
-	else 
+		end
+	else
 		local myMemberInfo = C_Club.GetMemberInfoForSelf(clubId);
 
-		if(not myMemberInfo or not myMemberInfo.role) then 
+		if(not myMemberInfo or not myMemberInfo.role) then
 			failure = true;
-		end 
+		end
 
 		if (myMemberInfo.role ~= Enum.ClubRoleIdentifier.Owner and myMemberInfo.role ~= Enum.ClubRoleIdentifier.Leader) then
 			failure = true;
-		end 
+		end
 	end
 
 	if failure then
-		self.PostingExpirationText:Hide(); 
+		self.PostingExpirationText:Hide();
 		return;
 	end
-	self.PostingExpirationText:Show(); 
+	self.PostingExpirationText:Show();
 
 	local expirationTime = ClubFinderGetClubPostingExpirationTime(clubId);
-	local clubFinderInfo = C_ClubFinder.GetRecruitingClubInfoFromClubID(clubId);
-	if(clubFinderInfo and clubFinderInfo.clubForceRemoved) then 
-		if (isGuildCommunitySelected) then 
+	if(C_ClubFinder.HasPostingBeenDelisted(clubId)) then
+		if (isGuildCommunitySelected) then
 			self.PostingExpirationText.ExpiredText:SetText(CLUB_FINDER_GUILD_POSTING_REMOVED_TEXT_SRRS);
-		else 
+		else
 			self.PostingExpirationText.ExpiredText:SetText(CLUB_FINDER_COMMUNITY_POSTING_REMOVED_TEXT_SRRS);
-		end 
+		end
+		local clubInfo = C_Club.GetClubInfo(clubId);
+		local isGuildType = clubInfo and clubInfo.clubType == Enum.ClubType.Guild; 
+		local isCommunityType = clubInfo and clubInfo.clubType == Enum.ClubType.Character;
+
+		local isPostingBanned = C_ClubFinder.IsPostingBanned(clubId);
+		local hasForceDescriptionChange = clubInfo and self:ClubFinderPostingHasActiveFlag(clubId, Enum.ClubFinderClubPostingStatusFlags.ForceDescriptionChange);
+		local hasForceNameChange = clubInfo and ((clubInfo.clubType == Enum.ClubType.Guild and self:GetNeedsGuildNameChange()) or self:ClubFinderPostingHasActiveFlag(clubId, Enum.ClubFinderClubPostingStatusFlags.ForceNameChange));
+		if (isPostingBanned) then 
+			if (isGuildType) then
+				self.PostingExpirationText.InfoButton.tooltipText = CLUB_FINDER_BANNED_POSTING_WARNING:format(CLUB_FINDER_TYPE_GUILD);
+			elseif(isCommunityType) then
+				self.PostingExpirationText.InfoButton.tooltipText = CLUB_FINDER_BANNED_POSTING_WARNING:format(CLUB_FINDER_COMMUNITY_TYPE);
+			end
+		elseif(hasForceNameChange) then 
+			if (isGuildType) then
+				self.PostingExpirationText.InfoButton.tooltipText = ERR_CLUB_FINDER_ERROR_TYPE_FLAGGED_RENAME:format(CLUB_FINDER_TYPE_GUILD);
+			elseif(isCommunityType) then
+				self.PostingExpirationText.InfoButton.tooltipText = ERR_CLUB_FINDER_ERROR_TYPE_FLAGGED_RENAME:format(CLUB_FINDER_COMMUNITY_TYPE);
+			end
+		elseif (hasForceDescriptionChange) then 
+			self.PostingExpirationText.InfoButton.tooltipText = CLUB_FINDER_GUILD_POSTING_ALERT_REMOVED_DESC; 
+		end
 		self.PostingExpirationText.ExpiredText:Show();
-		self.PostingExpirationText.InfoButton:Show(); 
-	elseif (expirationTime) then 
+		self.PostingExpirationText.InfoButton:SetShown(hasForceNameChange or isPostingBanned or hasForceDescriptionChange);
+	elseif (expirationTime) then
 		if (expirationTime > 0) then
 			if (isGuildCommunitySelected) then
 				self.PostingExpirationText.ExpirationTimeText:SetText(GUILD_FINDER_POSTING_GOING_TO_EXPIRE);
@@ -686,7 +729,7 @@ function CommunitiesFrameMixin:SetClubFinderPostingExpirationText(clubId, isGuil
 			self.PostingExpirationText.ExpirationTimeText:Show();
 			self.PostingExpirationText.DaysUntilExpire:Show();
 		else
-			if (isGuildCommunitySelected) then 
+			if (isGuildCommunitySelected) then
 				self.PostingExpirationText.ExpiredText:SetText(GUILD_FINDER_POSTING_EXPIRED);
 			else
 				self.PostingExpirationText.ExpiredText:SetText(COMMUNITY_FINDER_POSTING_EXPIRED);
@@ -702,57 +745,83 @@ function CommunitiesFrameMixin:ResetAllReportAlerts()
 	self.GuildPostingChangeFrame:Hide();
 	self.CommunityPostingChangeFrame:Hide();
 	self.GuildNameAlertFrame:Hide();
-end 
+end
 
+function CommunitiesFrameMixin:ClubFinderPostingHasActiveFlag(clubId, flag)
+	local postingStatusFlags = C_ClubFinder.GetStatusOfPostingFromClubId(clubId);
+	for _, statusFlag in ipairs(postingStatusFlags) do
+		if (flag == statusFlag) then
+			return true;
+		end
+	end
+	return false;
+end 
 function CommunitiesFrameMixin:DisplayReportedAlerts(clubId)
+	self:ResetAllReportAlerts();
+	if(not clubId) then 
+		return; 
+	end 
 	local recruitingClubInfo = C_ClubFinder.GetRecruitingClubInfoFromClubID(clubId);
 	local clubInfo = C_Club.GetClubInfo(clubId);
-	if (not clubInfo) then 
-		return; 
+	if (not clubInfo) then
+		return;
 	end
 
-	self:ResetAllReportAlerts();
+	local hasCommunityFinderPermissions = self:HasCommunityFinderPermissions(clubId, clubInfo);
+	local finderEnabled = C_ClubFinder.IsEnabled();
+	local isPostingBanned = C_ClubFinder.IsPostingBanned(clubId);
+	local hasForceDescriptionChange = self:ClubFinderPostingHasActiveFlag(clubId, Enum.ClubFinderClubPostingStatusFlags.ForceDescriptionChange);
+	local hasForceNameChange = self:ClubFinderPostingHasActiveFlag(clubId, Enum.ClubFinderClubPostingStatusFlags.ForceNameChange);
+	local isGuildOfficer = C_GuildInfo.IsGuildOfficer();
+	local isGuildLeader = IsGuildLeader();
 
-	local myMemberInfo = C_Club.GetMemberInfoForSelf(clubId);
-	local hasCommunityFinderPermissions = myMemberInfo and myMemberInfo.role and (myMemberInfo.role == Enum.ClubRoleIdentifier.Owner or myMemberInfo.role == Enum.ClubRoleIdentifier.Leader);
-	local finderEnabled = C_ClubFinder.IsEnabled(); 
-
-	local needsGuildNameChange = clubInfo.clubType == Enum.ClubType.Guild and self:GetNeedsGuildNameChange() and (IsGuildLeader() or C_GuildInfo.IsGuildOfficer());
-	local needsGuildPostingMessageChange = finderEnabled and clubInfo.clubType == Enum.ClubType.Guild and recruitingClubInfo and recruitingClubInfo.clubForceRemoved and (IsGuildLeader() or C_GuildInfo.IsGuildOfficer());
-	local needsCommunityPostingMessageChange = finderEnabled and clubInfo.clubType == Enum.ClubType.Character and recruitingClubInfo and recruitingClubInfo.clubForceRemoved and hasCommunityFinderPermissions; 
-	local needsCommunityNameChange = false; --TO DO: Club Finder - For this we need some kind of hook that the community you're looking at needs a name change.. 
+	local needsGuildNameChange = clubInfo.clubType == Enum.ClubType.Guild and (self:GetNeedsGuildNameChange() or hasForceNameChange) and (isGuildLeader or isGuildOfficer);
+	local needsGuildPostingMessageChange = finderEnabled and clubInfo.clubType == Enum.ClubType.Guild and recruitingClubInfo and (isGuildLeader or isGuildOfficer) and hasForceDescriptionChange and not isPostingBanned;
+	local needsCommunityPostingMessageChange = finderEnabled and clubInfo.clubType == Enum.ClubType.Character and recruitingClubInfo and hasCommunityFinderPermissions and hasForceDescriptionChange and not isPostingBanned;
+	local needsCommunityNameChange = finderEnabled and clubInfo.clubType == Enum.ClubType.Character and recruitingClubInfo and hasCommunityFinderPermissions and hasForceNameChange and not isPostingBanned; 
 	local displayMode = self:GetDisplayMode();
 
 	if(not needsGuildNameChange and not needsGuildPostingMessageChange and not needsCommunityPostingMessageChange and not needsCommunityNameChange) then
-		return; 
-	end 
+		return;
+	end
 
 	if self.GuildNameAlertFrame.topAnchored == nil then
-		self.GuildNameAlertFrame.topAnchored = not IsGuildLeader();
+		self.GuildNameAlertFrame.topAnchored = not isGuildLeader;
 	end
 
 	local ReportedDisplayFrame = nil;
 
-	--We only want to show one alert at a time. Once the other alert is cleared, it will show the next in the case of numerous. 
+	--We only want to show one alert at a time. Once the other alert is cleared, it will show the next in the case of numerous.
 	if needsGuildNameChange then
-		ReportedDisplayFrame = self.GuildNameChangeFrame; 
+		ReportedDisplayFrame = self.GuildNameChangeFrame;
+		if(not isGuildLeader) then 
+			ReportedDisplayFrame.GMText:SetText(GUILD_NAME_ALERT_MEMBER_HELP); 
+		else 
+			ReportedDisplayFrame.GMText:SetText(GUILD_NAME_ALERT_GM_HELP); 
+		end
+
+		ReportedDisplayFrame.EditBox:SetShown(isGuildLeader);
+		ReportedDisplayFrame.Button:SetShown(isGuildLeader);
+		ReportedDisplayFrame.RenameText:SetShown(isGuildLeader);
 		self.GuildNameAlertFrame.Alert:SetText(GUILD_NAME_ALERT);
 		self.GuildNameAlertFrame:SetShown(true);
 	elseif needsCommunityNameChange then
-		ReportedDisplayFrame = self.CommunityNameChangeFrame; 
+		ReportedDisplayFrame = self.CommunityNameChangeFrame;
 		self.GuildNameAlertFrame.Alert:SetText(CLUB_FINDER_COMMUNITY_NAME_CHANGE_ALERT);
 		self.GuildNameAlertFrame:SetShown(true);
 	elseif needsGuildPostingMessageChange then
-		ReportedDisplayFrame = self.GuildPostingChangeFrame; 
+		ReportedDisplayFrame = self.GuildPostingChangeFrame;
 		self.GuildNameAlertFrame.Alert:SetText(CLUB_FINDER_GUILD_POSTING_ALERT);
 		self.GuildNameAlertFrame:SetShown(true);
 	elseif needsCommunityPostingMessageChange then
-		ReportedDisplayFrame = self.CommunityPostingChangeFrame; 
+		ReportedDisplayFrame = self.CommunityPostingChangeFrame;
 		self.GuildNameAlertFrame.Alert:SetText(CLUB_FINDER_COMMUNITY_POSTING_ALERT);
 		self.GuildNameAlertFrame:SetShown(true);
+	else 
+		self.GuildNameAlertFrame:SetShown(false);
 	end
 
-	if(ReportedDisplayFrame) then 
+	if(ReportedDisplayFrame) then
 		ReportedDisplayFrame:ClearAllPoints();
 		if displayMode == COMMUNITIES_FRAME_DISPLAY_MODES.MINIMIZED then
 			ReportedDisplayFrame:SetPoint("TOPLEFT", self.Inset, "TOPRIGHT", 3, -3);
@@ -770,7 +839,7 @@ function CommunitiesFrameMixin:DisplayReportedAlerts(clubId)
 		end
 
 		ReportedDisplayFrame:SetShown(not self.GuildNameAlertFrame.topAnchored);
-	end 
+	end
 
 
 
@@ -791,7 +860,7 @@ function CommunitiesFrameMixin:DisplayReportedAlerts(clubId)
 		self.GuildNameAlertFrame:Disable();
 		self.GuildNameAlertFrame.ClickText:Hide();
 	end
-end 
+end
 
 function CommunitiesFrameMixin:ValidateDisplayMode()
 	local clubId = self:GetSelectedClubId();
@@ -820,9 +889,8 @@ function CommunitiesFrameMixin:ValidateDisplayMode()
 
 		local shouldShowGuildMemberList = isRosterOrApplicantList and isGuildCommunitySelected;
 		self.GuildMemberListDropDownMenu:SetShown(shouldShowGuildMemberList);
-
-		local privileges = C_Club.GetClubPrivileges(clubId);
-		local shouldShowCommunityMemberList = isRosterOrApplicantList and not isGuildCommunitySelected and privileges.canSendInvitation and clubInfo.clubType == Enum.ClubType.Character and C_ClubFinder.IsEnabled();
+	
+		local shouldShowCommunityMemberList = isRosterOrApplicantList and self:HasCommunityFinderPermissions(clubId, clubInfo);
 		self.CommunityMemberListDropDownMenu:SetShown(shouldShowCommunityMemberList);
 		self:DisplayReportedAlerts(clubId);
 		self.ChatTab:SetEnabled(not self.chatDisabled);
@@ -833,6 +901,7 @@ function CommunitiesFrameMixin:ValidateDisplayMode()
 			self.ChatTab.tooltip2 = nil;
 		end
 		self:UpdateMaximizeMinimizeButton();
+		self:CheckForTutorials();
 	end
 end
 
@@ -932,7 +1001,7 @@ function CommunitiesFrameMixin:CheckForTutorials()
 		return;
 	end
 
-	if self.CommunitiesControlFrame.CommunitiesSettingsButton:IsShown() or self.CommunitiesControlFrame.GuildRecruitmentButton:IsShown() then
+	if (displayMode == COMMUNITIES_FRAME_DISPLAY_MODES.CHAT) and (self.CommunitiesControlFrame.CommunitiesSettingsButton:IsShown() or self.CommunitiesControlFrame.GuildRecruitmentButton:IsShown()) then
 		local isGuildSelected = self:IsGuildSelected();
 		local flag = isGuildSelected and LE_FRAME_TUTORIAL_CLUB_FINDER_NEW_GUILD_LEADER or LE_FRAME_TUTORIAL_CLUB_FINDER_NEW_COMMUNITY_LEADER;
 		if not GetCVarBitfield("closedInfoFrames", flag) then
@@ -959,6 +1028,7 @@ function CommunitiesFrameMixin:ShowClubFinderTutorial()
 		bitfieldFlag = LE_FRAME_TUTORIAL_ACCCOUNT_CLUB_FINDER_NEW_FEATURE,
 		targetPoint = HelpTip.Point.BottomEdgeCenter,
 		alignment = HelpTip.Alignment.Left,
+		onHideCallback = function(acknowledged, closeFlag) self:CheckForTutorials(); end;
 		offsetX = -4,
 	};
 
@@ -1065,7 +1135,7 @@ function CommunitiesFrameMixin:OnClubSelected(clubId)
 	local clubSelected = clubId ~= nil;
 	self:CloseActiveDialogs();
 	self.ChatEditBox:SetEnabled(clubSelected);
-	self.PostingExpirationText:Hide(); 
+	self.PostingExpirationText:Hide();
 	if clubSelected then
 		SetCVar("lastSelectedClubId", clubId)
 
@@ -1091,10 +1161,13 @@ function CommunitiesFrameMixin:OnClubSelected(clubId)
 				self:SetPrivilegesForClub(clubId, C_Club.GetClubPrivileges(clubId));
 			end
 
+			self:DisplayReportedAlerts(clubId);
+
 			self:ValidateDisplayMode();
 			local displayMode = self:GetDisplayMode();
 			if clubInfo.clubType == Enum.ClubType.Guild then
 				C_GuildInfo.GuildRoster();
+				QueryGuildRecipes();
 				if (C_GuildInfo.IsGuildOfficer() or IsGuildLeader()) then
 					if (displayMode == COMMUNITIES_FRAME_DISPLAY_MODES.CHAT or self:IsShowingApplicantList()) then
 						self:SetClubFinderPostingExpirationText(clubId, true);
@@ -1112,7 +1185,7 @@ function CommunitiesFrameMixin:OnClubSelected(clubId)
 					end
 					C_ClubFinder.RequestApplicantList(Enum.ClubFinderRequestType.Community);
 					self.ApplicantList:SetApplicantRefreshTicker(Enum.ClubFinderRequestType.Community);
-				else 
+				else
 					self.ApplicantList:CancelRefreshTicker();
 				end
 			else
@@ -1216,24 +1289,24 @@ function CommunitiesFrameMixin:UpdateCommunitiesButtons()
 		if clubInfo and clubInfo.clubType == Enum.ClubType.Guild then
 			local hasGuildPermissions = CanGuildInvite();
 			inviteButton:SetEnabled(hasGuildPermissions and not isClubAtCapacity);
-			local isButtonEnabled = inviteButton:IsEnabled(); 
-			if(hasGuildPermissions and not isButtonEnabled) then 
-				if(isClubAtCapacity) then 
+			local isButtonEnabled = inviteButton:IsEnabled();
+			if(hasGuildPermissions and not isButtonEnabled) then
+				if(isClubAtCapacity) then
 					inviteButton.disabledTooltip = CLUB_INVITER_FAIL_GUILD_CAPACITY;
 				end
 			elseif(not isButtonEnabled) then
-				inviteButton.disabledTooltip = ERR_CLUB_FINDER_ERROR_TYPE_NO_INVITE_PERMISSIONS; 
+				inviteButton.disabledTooltip = ERR_CLUB_FINDER_ERROR_TYPE_NO_INVITE_PERMISSIONS;
 			end
-		elseif clubInfo and clubInfo.clubType == Enum.ClubType.Character then
+		elseif clubInfo and (clubInfo.clubType == Enum.ClubType.Character or clubInfo.clubType == Enum.ClubType.BattleNet) then
 			local privileges = self:GetPrivilegesForClub(clubId);
 			inviteButton:SetEnabled(not isClubAtCapacity and privileges.canSendInvitation);
-			local isButtonEnabled = inviteButton:IsEnabled(); 
-			if(privileges.canSendInvitation and not isButtonEnabled) then 
-				if(isClubAtCapacity) then 
+			local isButtonEnabled = inviteButton:IsEnabled();
+			if(privileges.canSendInvitation and not isButtonEnabled) then
+				if(isClubAtCapacity) then
 					inviteButton.disabledTooltip = CLUB_INVITER_FAIL_COMMUNITY_CAPACITY;
 				end
 			elseif(not isButtonEnabled) then
-				inviteButton.disabledTooltip = ERR_CLUB_FINDER_ERROR_TYPE_NO_INVITE_PERMISSIONS; 
+				inviteButton.disabledTooltip = ERR_CLUB_FINDER_ERROR_TYPE_NO_INVITE_PERMISSIONS;
 			end
 		end
 		if self:GetDisplayMode() == COMMUNITIES_FRAME_DISPLAY_MODES.CHAT then
@@ -1338,7 +1411,7 @@ function CommunitiesFrameMixin:OnHide()
 	end
 
 	self.ApplicantList:CancelRefreshTicker();
-	C_ClubFinder.ClearClubFinderPostingsCache();
+
 	C_Club.ClearClubPresenceSubscription();
 	C_Club.ClearAutoAdvanceStreamViewMarker();
 	C_Club.Flush();
@@ -1495,16 +1568,21 @@ function CommunitiesControlFrameMixin:Update()
 					self.GuildRecruitmentButton:Show();
 
 					local canViewClubFinderSettings = IsGuildLeader() or C_GuildInfo.IsGuildOfficer() and C_ClubFinder.IsEnabled();
+					local isPostingBanned = C_ClubFinder.IsPostingBanned(clubId); 
 					local disabledReason = C_ClubFinder.GetClubFinderDisableReason();
 
-					self.GuildRecruitmentButton:SetEnabled(disabledReason == nil and canViewClubFinderSettings);
+					self.GuildRecruitmentButton:SetEnabled(disabledReason == nil and canViewClubFinderSettings and not isPostingBanned);
 
 					if disabledReason == Enum.ClubFinderDisableReason.Muted then
 						self.GuildRecruitmentButton.disabledTooltip = COMMUNITY_FEATURE_UNAVAILABLE_MUTED;
 					elseif disabledReason == Enum.ClubFinderDisableReason.Silenced then
 						self.GuildRecruitmentButton.disabledTooltip = COMMUNITY_FEATURE_UNAVAILABLE_SILENCED;
+					elseif disableReason == Enum.ClubFinderDisableReason.VeteranTrial then 
+						self.GuildRecruitmentButton.disabledTooltip = CLUB_FINDER_DISABLE_REASON_VETERAN_TRIAL;
 					elseif (C_ClubFinder.IsEnabled() and not canViewClubFinderSettings) then
 						self.GuildRecruitmentButton.disabledTooltip = CLUB_FINDER_NO_RECRUITING_PERMISSIONS;
+					elseif (isPostingBanned) then 
+						self.GuildRecruitmentButton.disabledTooltip = CLUB_FINDER_BANNED_POSTING_WARNING:format(CLUB_FINDER_TYPE_GUILD);
 					else
 						self.GuildRecruitmentButton.disabledTooltip = nil;
 					end

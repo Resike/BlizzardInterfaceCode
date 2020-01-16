@@ -1345,10 +1345,14 @@ StaticPopupDialogs["DEATH"] = {
 			self.button1:SetEnabled(false);
 			self.button1:SetText(DEATH_RELEASE);
 		else
-			local hasNoReleaseAura, noReleaseDuration = HasNoReleaseAura();
+			local hasNoReleaseAura, noReleaseDuration, hasUntilCancelledDuration = HasNoReleaseAura();
 			self.button1:SetEnabled(not hasNoReleaseAura);
 			if ( hasNoReleaseAura ) then
-				self.button1:SetText(math.floor(noReleaseDuration));
+				if hasUntilCancelledDuration then
+					self.button1:SetText(DEATH_RELEASE);
+				else
+					self.button1:SetText(math.floor(noReleaseDuration));
+				end
 			else
 				self.button1:SetText(DEATH_RELEASE);
 			end
@@ -2465,7 +2469,7 @@ StaticPopupDialogs["CONFIRM_DESTROY_COMMUNITY"] = {
 	end,
 	EditBoxOnTextChanged = function (self)
 		local parent = self:GetParent();
-		if ( strupper(parent.editBox:GetText()) ==  DELETE_ITEM_CONFIRM_STRING ) then
+		if ( strupper(parent.editBox:GetText()) == COMMUNITIES_DELETE_CONFIRM_STRING ) then
 			parent.button1:Enable();
 		else
 			parent.button1:Disable();
@@ -2509,6 +2513,15 @@ StaticPopupDialogs["ADD_IGNORE"] = {
 	whileDead = 1,
 	hideOnEscape = 1
 };
+
+local function ClubInviteDisabledOnEnter(self) 
+	if(not self:IsEnabled()) then 
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT");
+		GameTooltip_AddColoredLine(GameTooltip, CLUB_FINDER_MAX_MEMBER_COUNT_HIT, RED_FONT_COLOR, true);
+		GameTooltip:Show();
+	end
+end 
+
 StaticPopupDialogs["ADD_GUILDMEMBER"] = {
 	text = ADD_GUILDMEMBER_LABEL,
 	button1 = ACCEPT,
@@ -2520,12 +2533,43 @@ StaticPopupDialogs["ADD_GUILDMEMBER"] = {
 	OnAccept = function(self)
 		GuildInvite(self.editBox:GetText());
 	end,
-	OnShow = function(self)
+	OnShow = function(self, data)
 		self.editBox:SetFocus();
+
+		self.button1:SetMotionScriptsWhileDisabled(true);
+		self.button1:SetScript("OnEnter", function(self)
+			ClubInviteDisabledOnEnter(self);
+		end );
+		self.button1:SetScript("OnLeave", GameTooltip_Hide);
+		if (self.extraButton) then 
+			self.extraButton:SetMotionScriptsWhileDisabled(true);
+			self.extraButton:SetScript("OnEnter", function(self)
+				ClubInviteDisabledOnEnter(self);
+			end );
+			self.extraButton:SetScript("OnLeave", GameTooltip_Hide);
+		end
+		local clubInfo = C_Club.GetClubInfo(data.clubId);
+		if(clubInfo and clubInfo.memberCount and clubInfo.memberCount >= C_Club.GetClubCapacity()) then
+			self.button1:Disable();
+			if (self.extraButton) then 
+				self.extraButton:Disable();
+			end
+		else 
+			self.button1:Enable(); 
+			if (self.extraButton) then 
+				self.extraButton:Enable();
+			end
+		end
 	end,
 	OnHide = function(self)
 		ChatEdit_FocusActiveWindow();
 		self.editBox:SetText("");
+		self.button1:SetScript("OnEnter", nil );
+		self.button1:SetScript("OnLeave", nil);
+		if (self.extraButton) then 
+			self.extraButton:SetScript("OnEnter", nil );
+			self.extraButton:SetScript("OnLeave", nil);
+		end
 	end,
 	EditBoxOnEnterPressed = function(self)
 		local parent = self:GetParent();
@@ -4121,7 +4165,6 @@ StaticPopupDialogs["CLUB_FINDER_ENABLED_DISABLED"] = {
 	hideOnEscape = 1,
 }
 
-
 StaticPopupDialogs["INVITE_COMMUNITY_MEMBER"] = {
 	text = INVITE_COMMUNITY_MEMBER_POPUP_INVITE_TEXT,
 	subText = INVITE_COMMUNITY_MEMBER_POPUP_INVITE_SUB_TEXT_BTAG,
@@ -4153,10 +4196,40 @@ StaticPopupDialogs["INVITE_COMMUNITY_MEMBER"] = {
 			self.SubText:SetText(INVITE_COMMUNITY_MEMBER_POPUP_INVITE_SUB_TEXT_CHARACTER);
 			self.editBox.Instructions:SetText("");
 		end
+		self.button1:SetMotionScriptsWhileDisabled(true);
+		self.button1:SetScript("OnEnter", function(self)
+			ClubInviteDisabledOnEnter(self);
+		end );
+		self.button1:SetScript("OnLeave", GameTooltip_Hide);
+		if (self.extraButton) then 
+			self.extraButton:SetMotionScriptsWhileDisabled(true);
+			self.extraButton:SetScript("OnEnter", function(self)
+				ClubInviteDisabledOnEnter(self);
+			end );
+			self.extraButton:SetScript("OnLeave", GameTooltip_Hide);
+		end
+
+		if(clubInfo and clubInfo.memberCount and clubInfo.memberCount >= C_Club.GetClubCapacity()) then
+			self.button1:Disable();
+			if (self.extraButton) then 
+				self.extraButton:Disable();
+			end
+		else 
+			self.button1:Enable(); 
+			if (self.extraButton) then 
+				self.extraButton:Enable();
+			end
+		end
 	end,
 	OnHide = function(self)
 		ChatEdit_FocusActiveWindow();
 		self.editBox:SetText("");
+		self.button1:SetScript("OnEnter", nil );
+		self.button1:SetScript("OnLeave", nil);
+		if (self.extraButton) then 
+			self.extraButton:SetScript("OnEnter", nil );
+			self.extraButton:SetScript("OnLeave", nil);
+		end
 	end,
 	EditBoxOnEnterPressed = function(self)
 		self:GetParent().button1:Click();
@@ -4169,6 +4242,7 @@ StaticPopupDialogs["INVITE_COMMUNITY_MEMBER"] = {
 
 StaticPopupDialogs["INVITE_COMMUNITY_MEMBER_WITH_INVITE_LINK"] = Mixin({
 	extraButton = INVITE_COMMUNITY_MEMBER_POPUP_OPEN_INVITE_MANAGER,
+
 	OnExtraButton = function(self, data)
 		CommunitiesTicketManagerDialog_Open(data.clubId, data.streamId);
 	end,
@@ -4178,8 +4252,8 @@ StaticPopupDialogs["CONFIRM_RAF_REMOVE_RECRUIT"] = {
 	text = RAF_REMOVE_RECRUIT_CONFIRM,
 	button1 = YES,
 	button2 = NO,
-	OnAccept = function(self)
-		C_RecruitAFriend.RemoveRAFRecruit(self:GetParent().data);
+	OnAccept = function(self, data)
+		C_RecruitAFriend.RemoveRAFRecruit(data);
 	end,
 	timeout = 0,
 	whileDead = 1,
@@ -4197,9 +4271,9 @@ StaticPopupDialogs["CONFIRM_RAF_REMOVE_RECRUIT"] = {
 		ChatEdit_FocusActiveWindow();
 		self.editBox:SetText("");
 	end,
-	EditBoxOnEnterPressed = function(self)
+	EditBoxOnEnterPressed = function(self, data)
 		if ( self:GetParent().button1:IsEnabled() ) then
-			C_RecruitAFriend.RemoveRAFRecruit(self:GetParent().data);
+			C_RecruitAFriend.RemoveRAFRecruit(data);
 			self:GetParent():Hide();
 		end
 	end,
@@ -4747,6 +4821,9 @@ function StaticPopup_Hide(which, data)
 	end
 end
 
+local SpellConfirmationFormatter = CreateFromMixins(SecondsFormatterMixin);
+SpellConfirmationFormatter:Init(0, SecondsFormatter.Abbreviation.None, true, true);
+
 function StaticPopup_OnUpdate(dialog, elapsed)
 	if ( dialog.timeleft > 0 ) then
 		local which = dialog.which;
@@ -4797,13 +4874,8 @@ function StaticPopup_OnUpdate(dialog, elapsed)
 					text:SetFormattedText(StaticPopupDialogs[which].text, text.text_arg1, ceil(timeleft / 60), MINUTES);
 				end
 			elseif ( which == "SPELL_CONFIRMATION_PROMPT") then
-				local time = "";
-				if ( timeleft < 60 ) then
-					text:SetFormattedText(ERR_SPELL_FAILED_S, timeleft, SECONDS);
-				else
-					text:SetFormattedText(ERR_SPELL_FAILED_S, ceil(timeleft / 60), MINUTES);
-				end
-				text:SetText(StaticPopupDialogs[which].text .. " " ..TIME_REMAINING .. text:GetText());
+				local time = SpellConfirmationFormatter:Format(timeleft);
+				text:SetText(StaticPopupDialogs[which].text .. " " ..TIME_REMAINING .. " " .. time);
 			else
 				if ( timeleft < 60 ) then
 					text:SetFormattedText(StaticPopupDialogs[which].text, timeleft, SECONDS);

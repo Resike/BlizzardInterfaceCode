@@ -37,6 +37,7 @@
 		<Scripts>
 			<OnClick>
 				self:GetParent().GuildNameAlertFrame.topAnchored = false;
+				PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON);
 				self:GetParent():ValidateDisplayMode();
 			</OnClick>
 		</Scripts>
@@ -92,6 +93,7 @@
 				<Scripts>
 					<OnClick>
 						self:GetParent():GetParent():SetGuildNameAlertBannerMode(true);
+						PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON);
 					</OnClick>
 				</Scripts>
 			</Button>
@@ -137,6 +139,7 @@
 						else
 							self:GetParent():GetParent():SetGuildNameAlertBannerMode(true);
 						end
+						PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN);
 					</OnClick>
 				</Scripts>
 			</Button>
@@ -149,27 +152,19 @@
 		</Scripts>
 	</Frame>
 	<Frame name="CommunityNameChangeFrameTemplate" inherits="ReportedGuildOrCommunityChangeTemplate" virtual="true">
-		<Layers>
-			<Layer level="OVERLAY">
-				<FontString parentKey="RenameText" inherits="GameFontNormalMed3" text="CLUB_FINDER_COMMUNITY_NAME_CHANGE_ENTER_NEW">
-					<Size x="240" y="0"/>
-					<Anchors>
-						<Anchor point="BOTTOM" x="0" y="90"/>
-					</Anchors>
-				</FontString>
-			</Layer>
-		</Layers>
 		<Frames>
-			<EditBox parentKey="EditBox" inherits="NameChangeEditBoxTemplate">
+			<Button parentKey="Button" inherits="UIPanelButtonTemplate" text="CLUB_FINDER_COMMUNITY_RENAME_BUTTON">
+				<Size x="180" y="22"/>
 				<Anchors>
-					<Anchor point="TOP" relativeKey="$parent.RenameText" relativePoint="BOTTOM" x="0" y="-10"/>
+					<Anchor point="TOP" relativeKey="$parent.GMText" relativePoint="BOTTOM" x="0" y="-140"/>
 				</Anchors>
-			</EditBox>
-			<Button parentKey="Button" inherits="UIPanelButtonTemplate" text="ACCEPT">
-				<Size x="80" y="22"/>
-				<Anchors>
-					<Anchor point="TOP" relativeKey="$parent.EditBox" relativePoint="BOTTOM" x="0" y="-10"/>
-				</Anchors>
+				<Scripts>
+					<OnClick>
+						local communitiesFrame = self:GetParent():GetParent();
+						OpenCommunitiesSettingsDialog(communitiesFrame:GetSelectedClubId());
+						PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN);
+					</OnClick>
+				</Scripts>
 			</Button>
 		</Frames>
 		<Scripts>
@@ -196,6 +191,7 @@
 							recruitmentDialog:OnUpdatedPostingInformationRecieved();
 							recruitmentDialog:Hide();
 						end
+						PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN);
 					</OnClick>
 				</Scripts>
 			</Button>
@@ -219,6 +215,7 @@
 					<OnClick>
 						local communitiesFrame = self:GetParent():GetParent();
 						OpenCommunitiesSettingsDialog(communitiesFrame:GetSelectedClubId());
+						PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN);
 					</OnClick>
 				</Scripts>
 			</Button>

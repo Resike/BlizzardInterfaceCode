@@ -266,6 +266,7 @@ function FriendsFrame_OnLoad(self)
 	self:RegisterEvent("GUILD_ROSTER_UPDATE");
 	self:RegisterEvent("GROUP_JOINED");
 	self:RegisterEvent("GROUP_LEFT");
+	self:RegisterEvent("PLAYER_GUILD_UPDATE");
 	self.selectedFriend = 1;
 
 	-- friends list
@@ -281,6 +282,7 @@ function FriendsFrame_OnLoad(self)
 	IgnoreListFrameScrollFrame.update = IgnoreList_Update;
 	HybridScrollFrame_CreateButtons(IgnoreListFrameScrollFrame, "IgnoreListButtonTemplate");
 
+	WhoListScrollFrame.Slider:SetPoint("BOTTOMLEFT", WhoListScrollFrame, "BOTTOMRIGHT", 0, -1);
 	WhoListScrollFrame.update = WhoList_Update;
 	HybridScrollFrame_CreateButtons(WhoListScrollFrame, "WhoListButtonTemplate");
 
@@ -763,7 +765,9 @@ function IgnoreList_Update()
 			button:UnlockHighlight();
 		end
 	end
-	HybridScrollFrame_Update(scrollFrame, usedHeight, scrollFrame:GetHeight());
+
+	local totalHeight = totalNumEntries * FRIENDS_FRAME_IGNORE_HEIGHT;
+	HybridScrollFrame_Update(scrollFrame, totalHeight, usedHeight);
 end
 
 function IgnoreList_SetHeader(header, parent)
@@ -832,7 +836,9 @@ function WhoList_Update()
 			button:UnlockHighlight();
 		end
 	end
-	HybridScrollFrame_Update(scrollFrame, usedHeight, scrollFrame:GetHeight());
+
+	local totalHeight = numWhos * FRIENDS_FRAME_WHO_HEIGHT;
+	HybridScrollFrame_Update(scrollFrame, totalHeight, usedHeight);
 
 	if not WhoFrame.selectedWho then
 		WhoFrameGroupInviteButton:Disable();
@@ -950,6 +956,8 @@ function FriendsFrame_OnEvent(self, event, ...)
 				C_GuildInfo.GuildRoster();
 			end
 		end
+	elseif ( event == "PLAYER_GUILD_UPDATE") then 
+		C_GuildInfo.GuildRoster();
 	end
 end
 
@@ -1333,7 +1341,7 @@ local function ShowRichPresenceOnly(client, wowProjectID, faction, realmID)
 end
 
 local function GetOnlineInfoText(client, isMobile, rafLinkType, locationText)
-	if not locationText or locationText == "" then
+	if not locationText then
 		return UNKNOWN;
 	end
 	if isMobile then
@@ -2185,7 +2193,9 @@ function FriendsFriendsFrameMixin:Update()
 		end
 
 	end
-	HybridScrollFrame_Update(scrollFrame, usedHeight, scrollFrame:GetHeight());
+
+	local totalHeight = numFriendsFriends * FRIENDS_FRAME_FRIENDS_FRIENDS_HEIGHT;
+	HybridScrollFrame_Update(scrollFrame, totalHeight, usedHeight);
 
 	if haveSelection then
 		self.SendRequestButton:Enable();
@@ -2477,52 +2487,4 @@ function BattleTagInviteFrame_Show(name)
 	if ( not BattleTagInviteFrame:IsShown() ) then
 		StaticPopupSpecial_Show(BattleTagInviteFrame);
 	end
-end
-
-function OldRAFRewardsButton_OnLoad(self)
-	OldRAFRewardsButton_Update(self);
-	self:RegisterEvent("PLAYER_ENTERING_WORLD");
-	self:RegisterEvent("PRODUCT_CHOICE_UPDATE");
-end
-
-function OldRAFRewardsButton_Update(self)
-	self.productChoices = C_ProductChoice.GetChoices();
-	self.suppressedRewards = nil;
-
-	if #self.productChoices > 0 then
-		self:Show();
-		self:Enable();
-		self.Icon:SetDesaturated(false);
-	else
-		self:Disable();
-		self.Icon:SetDesaturated(true);
-
-		self.suppressedRewards = C_ProductChoice.GetNumSuppressed();
-
-		if self.suppressedRewards and self.suppressedRewards > 0 then
-			self:Show();
-		else
-			self:Hide();
-		end
-	end
-end
-
-function OldRAFRewardsButton_OnEnter(self)
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-	GameTooltip_SetTitle(GameTooltip, RAF_BUTTON_REWARD_TOOLTIP_TITLE);
-
-	local wrapText = true;
-	if #self.productChoices > 0 then
-		GameTooltip_AddNormalLine(GameTooltip, RAF_BUTTON_REWARD_TOOLTIP_DESCRIPTION, wrapText);
-	elseif self.suppressedRewards and self.suppressedRewards > 0 then
-		local text = string.format(RAF_REWARD_SUPPRESSED, self.suppressedRewards);
-		GameTooltip_AddErrorLine(GameTooltip, text, wrapText);
-	end
-
-	GameTooltip:Show();
-end
-
-function OldRAFRewardsButton_OnClick(self)
-	ProductChoiceFrame_SetUp(ProductChoiceFrame);
-	ProductChoiceFrame:Show();
 end

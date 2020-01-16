@@ -176,6 +176,11 @@ local function ProcessAndSortRecruits(recruits)
 			recruitInfo.nameColor = FRIENDS_GRAY_COLOR;
 		end
 
+		if recruitInfo.nameText == "" and RAF_PENDING_RECRUIT then
+			recruitInfo.nameText = RAF_PENDING_RECRUIT;
+			recruitInfo.plainName = RAF_PENDING_RECRUIT;
+		end
+
 		recruitInfo.accountInfo = accountInfo;
 
 		if not seenAccounts[recruitInfo.bnetAccountID] then
@@ -290,7 +295,7 @@ function RecruitAFriendFrameMixin:UpdateNextReward(nextReward)
 		self.pendingNextReward = nil;
 	end
 
-	self.RewardClaiming.ClaimOrViewRewardButton:Update(nextReward);
+	self.RewardClaiming.ClaimOrViewRewardButton:Update(nextReward, self.claimInProgress);
 
 	if not nextReward then
 		self.RewardClaiming.EarnInfo:Hide();
@@ -348,10 +353,14 @@ function RecruitAFriendFrameMixin:UpdateRAFInfo(rafInfo)
 		else
 			self.RewardClaiming.MonthCount:SetText(RAF_MONTHS_EARNED:format(rafInfo.lifetimeMonths));
 		end
+
+		self.claimInProgress = rafInfo.claimInProgress;
 		self:UpdateNextReward(rafInfo.nextReward);
 
 		RecruitAFriendRewardsFrame:UpdateRewards(rafInfo.rewards);
-		RecruitAFriendRecruitmentFrame:UpdateRecruitmentInfo(rafInfo.recruitmentInfo);
+
+		local recruitsAreMaxed = (#rafInfo.recruits >= maxRecruits);
+		RecruitAFriendRecruitmentFrame:UpdateRecruitmentInfo(rafInfo.recruitmentInfo, recruitsAreMaxed);
 
 		self.rafInfo = rafInfo;
 	end
@@ -728,15 +737,37 @@ function RecruitAFriendClaimOrViewRewardButtonMixin:OnClick()
 	end
 end
 
-function RecruitAFriendClaimOrViewRewardButtonMixin:Update(nextReward)
+function RecruitAFriendClaimOrViewRewardButtonMixin:OnEnter()
+	if not self:IsEnabled() then
+		local wrap = true;
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		GameTooltip_SetTitle(GameTooltip, BLIZZARD_STORE_PROCESSING, RED_FONT_COLOR, wrap);
+		self.disabledTooltipShowing = true;
+	end
+end
+
+function RecruitAFriendClaimOrViewRewardButtonMixin:OnLeave()
+	GameTooltip_Hide();
+	self.disabledTooltipShowing = false;
+end
+
+function RecruitAFriendClaimOrViewRewardButtonMixin:Update(nextReward, claimInProgress)
 	self.nextReward = nextReward;
 	self.haveUnclaimedReward = nextReward and nextReward.canClaim;
 
 	if self.haveUnclaimedReward then
+		self:SetEnabled(not claimInProgress);
 		self:SetText(CLAIM_REWARD);
 		RecruitAFriendRewardsFrame:Hide();
 	else
+		self:SetEnabled(true);
 		self:SetText(RAF_VIEW_ALL_REWARDS);
+	end
+
+	if self:IsMouseOver() and not self:IsEnabled() and not self.disabledTooltipShowing then
+		self:OnEnter();
+	elseif self:IsEnabled() and self.disabledTooltipShowing then
+		self:OnLeave();
 	end
 end
 
@@ -1065,7 +1096,7 @@ end
 local PLAYER_REALM_NAME = GetRealmName();
 local _, PLAYER_FACTION_NAME = UnitFactionGroup("player");
 
-function RecruitAFriendRecruitmentFrameMixin:UpdateRecruitmentInfo(recruitmentInfo)
+function RecruitAFriendRecruitmentFrameMixin:UpdateRecruitmentInfo(recruitmentInfo, recruitsAreMaxed)
 	if recruitmentInfo then
 		local expireDate = date("*t", recruitmentInfo.expireTime);
 		recruitmentInfo.expireDateString = FormatShortDate(expireDate.day, expireDate.month, expireDate.year)
@@ -1082,19 +1113,6 @@ function RecruitAFriendRecruitmentFrameMixin:UpdateRecruitmentInfo(recruitmentIn
 		self.EditBox.Instructions:Hide();
 		self.EditBox:SetText(recruitmentInfo.recruitmentURL);
 		self.EditBox:SetCursorPosition(0);
-
-		local timesUsed = recruitmentInfo.totalUses - recruitmentInfo.remainingUses;
-		self.LinkUses:SetText(RAF_LINK_REMAINING_USES:format(timesUsed, recruitmentInfo.totalUses));
-		self.LinkUses:Show();
-
-		if recruitmentInfo.remainingUses > 0 then
-			self.LinkUses:SetTextColor(WHITE_FONT_COLOR:GetRGB());
-			self.LinkExpires:SetText(RAF_ACTIVE_LINK_EXPIRE_DATE:format(recruitmentInfo.expireDateString));
-		else
-			self.LinkUses:SetTextColor(RED_FONT_COLOR:GetRGB());
-			self.LinkExpires:SetText(RAF_EXPENDED_LINK_EXPIRE_DATE:format(recruitmentInfo.expireDateString));
-		end
-		self.LinkExpires:Show();
 	else
 		self.Description:SetText(RAF_RECRUITMENT_DESC:format(maxRecruitLinkUses, daysInCycle));
 		self.FactionAndRealm:SetText(RAF_RECRUITS_FACTION_AND_REALM:format(PLAYER_FACTION_NAME, PLAYER_REALM_NAME));
@@ -1102,12 +1120,39 @@ function RecruitAFriendRecruitmentFrameMixin:UpdateRecruitmentInfo(recruitmentIn
 		self.EditBox.Instructions:SetText(RAF_NO_ACTIVE_LINK:format(daysInCycle));
 		self.EditBox.Instructions:Show();
 		self.EditBox:SetText("");
-
-		self.LinkUses:Hide();
-		self.LinkExpires:Hide();
 	end
 
-	self.GenerateOrCopyLinkButton:Update(recruitmentInfo);
+	if recruitsAreMaxed then
+		self.InfoText1:SetText(RAF_FULL_RECRUITS:format(maxRecruits, maxRecruits));
+		self.InfoText1:SetTextColor(RED_FONT_COLOR:GetRGB());
+		self.InfoText1:Show();
+		self.InfoText2:Hide();
+	elseif recruitmentInfo then
+		self.InfoText1:SetTextColor(WHITE_FONT_COLOR:GetRGB());
+
+		if recruitmentInfo.remainingUses > 0 then
+			self.InfoText1:SetText(RAF_ACTIVE_LINK_EXPIRE_DATE:format(recruitmentInfo.expireDateString));
+		else
+			self.InfoText1:SetText(RAF_EXPENDED_LINK_EXPIRE_DATE:format(recruitmentInfo.expireDateString));
+		end
+
+		if recruitmentInfo.remainingUses > 0 then
+			self.InfoText2:SetTextColor(WHITE_FONT_COLOR:GetRGB());
+		else
+			self.InfoText2:SetTextColor(RED_FONT_COLOR:GetRGB());
+		end
+
+		local timesUsed = recruitmentInfo.totalUses - recruitmentInfo.remainingUses;
+		self.InfoText2:SetText(RAF_LINK_REMAINING_USES:format(timesUsed, recruitmentInfo.totalUses));
+
+		self.InfoText1:Show();
+		self.InfoText2:Show();
+	else
+		self.InfoText1:Hide();
+		self.InfoText2:Hide();
+	end
+
+	self.GenerateOrCopyLinkButton:Update(recruitmentInfo, recruitsAreMaxed);
 end
 
 RecruitAFriendGenerateOrCopyLinkButtonMixin = {};
@@ -1125,10 +1170,16 @@ function RecruitAFriendGenerateOrCopyLinkButtonMixin:OnClick()
 end
 
 function RecruitAFriendGenerateOrCopyLinkButtonMixin:OnEnter()
-	if not self:IsEnabled() and not self.waitingForRecruitmentInfo then
+	if not self:IsEnabled() then
 		local wrap = true;
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-		GameTooltip_SetTitle(GameTooltip, RAF_EXPENDED_LINK_EXPIRE_DATE:format(self.recruitmentInfo.expireDateString), RED_FONT_COLOR, wrap);
+
+		if self.recruitsAreMaxed then
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+			GameTooltip_SetTitle(GameTooltip, RAF_FULL_RECRUITS:format(maxRecruits, maxRecruits), RED_FONT_COLOR, wrap);
+		elseif not self.waitingForRecruitmentInfo then
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+			GameTooltip_SetTitle(GameTooltip, RAF_EXPENDED_LINK_EXPIRE_DATE:format(self.recruitmentInfo.expireDateString), RED_FONT_COLOR, wrap);
+		end
 	end
 end
 
@@ -1136,15 +1187,16 @@ function RecruitAFriendGenerateOrCopyLinkButtonMixin:OnLeave()
 	GameTooltip_Hide();
 end
 
-function RecruitAFriendGenerateOrCopyLinkButtonMixin:Update(recruitmentInfo)
+function RecruitAFriendGenerateOrCopyLinkButtonMixin:Update(recruitmentInfo, recruitsAreMaxed)
 	self.recruitmentInfo = recruitmentInfo;
+	self.recruitsAreMaxed = recruitsAreMaxed;
 
 	if recruitmentInfo then
 		self.waitingForRecruitmentInfo = false;
 		self:SetText(RAF_COPY_LINK);
-		self:SetEnabled(recruitmentInfo.remainingUses > 0);
+		self:SetEnabled(recruitmentInfo.remainingUses > 0 and not recruitsAreMaxed);
 	else
 		self:SetText(RAF_GENERATE_LINK);
-		self:SetEnabled(not self.waitingForRecruitmentInfo);
+		self:SetEnabled(not self.waitingForRecruitmentInfo and not recruitsAreMaxed);
 	end
 end

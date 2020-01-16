@@ -661,6 +661,8 @@ function CommunitiesListEntryMixin:CheckForDisabledReason(clubType)
 			self:SetDisabledTooltip(COMMUNITY_FEATURE_UNAVAILABLE_MUTED);
 		elseif disabledReason == Enum.ClubFinderDisableReason.Silenced then
 			self:SetDisabledTooltip(COMMUNITY_FEATURE_UNAVAILABLE_SILENCED);
+		elseif disabledReason == Enum.ClubFinderDisableReason.VeteranTrial then 
+			self:SetDisabledTooltip(CLUB_FINDER_DISABLE_REASON_VETERAN_TRIAL);
 		else
 			self:SetDisabledTooltip(COMMUNITY_TYPE_UNAVAILABLE);
 		end
@@ -677,12 +679,12 @@ function CommunitiesListEntryMixin:SetFindCommunity()
 	self.overrideOnClick = function()
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON);
 		local communitiesFrame = self:GetCommunitiesFrame();
+		communitiesFrame:SelectClub(nil);
 		communitiesFrame:SetDisplayMode(COMMUNITIES_FRAME_DISPLAY_MODES.COMMUNITY_FINDER);
 
 		communitiesFrame.CommunityFinderFrame.isGuildType = false;
 		communitiesFrame.CommunityFinderFrame.selectedTab = 1; 
 		communitiesFrame.CommunityFinderFrame:UpdateType(); 
-		communitiesFrame:SelectClub(nil);
 	end;
 	
 	self.clubId = nil;
@@ -761,13 +763,13 @@ function CommunitiesListEntryMixin:SetGuildFinder()
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON);
 
 		local communitiesFrame = self:GetCommunitiesFrame();
+		communitiesFrame:SelectClub(nil);	
 		communitiesFrame:SetDisplayMode(COMMUNITIES_FRAME_DISPLAY_MODES.GUILD_FINDER);
 
 		communitiesFrame.GuildFinderFrame.isGuildType = true;
 		communitiesFrame.GuildFinderFrame.selectedTab = 1;
 		communitiesFrame.GuildFinderFrame:UpdateType(); 
 
-		communitiesFrame:SelectClub(nil);
 		communitiesFrame.Inset:Hide();
 	end;
 	
