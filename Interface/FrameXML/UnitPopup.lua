@@ -677,10 +677,10 @@ local function UnitPopup_TryCreatePlayerLocation(menu, guid)
 		return PlayerLocation:CreateFromCommunityInvitation(menu.communityClubID, guid);
 	elseif C_ChatInfo.IsValidChatLine(menu.lineID) then
 		return PlayerLocation:CreateFromChatLineID(menu.lineID);
-	elseif menu.unit then
-		return PlayerLocation:CreateFromUnit(menu.unit);
 	elseif guid then
 		return PlayerLocation:CreateFromGUID(guid);
+	elseif menu.unit then
+		return PlayerLocation:CreateFromUnit(menu.unit);
 	end
 
 	return nil;
@@ -1004,7 +1004,7 @@ function UnitPopup_HideButtons ()
 			if not playerLocation:IsChatLineID() and not playerLocation:IsCommunityInvitation() then
 				shown = false;
 			end
-		elseif ( value == "REPORT_CHEATING" or value == "REPORT_BATTLE_PET" or value == "REPORT_PET" ) then
+		elseif ( value == "REPORT_CHEATING" ) then
 			if dropdownMenu.bnetIDAccount or not playerLocation or playerLocation:IsBattleNetGUID() then
 				shown = false;
 			end
@@ -1433,7 +1433,7 @@ local function UnitPopup_IsEnabled(dropdownFrame, unitPopupButton)
 		return false;
 	end
 
-	if unitPopupButton.disabledInKioskMode and IsKioskModeEnabled() then
+	if unitPopupButton.disabledInKioskMode and Kiosk.IsEnabled() then
 		return false;
 	end
 
@@ -1790,7 +1790,7 @@ function UnitPopup_OnClick (self)
 		UIDropDownMenu_Refresh(dropdownFrame, nil, 1);
 	elseif ( button == "ROUND_ROBIN" ) then
 		SetLootMethod("roundrobin");
-		UIDropDownMenu_SetButtonText(1, 2, UnitPopupButtons[button].text);
+		UIDropDownMenu_SetButtonText(self:GetParent().parentLevel, self:GetParent().parentID, UnitPopupButtons[button].text);
 		UIDropDownMenu_Refresh(dropdownFrame, nil, 1);
 	elseif ( button == "MASTER_LOOTER" ) then
 		SetLootMethod("master", fullname, 2);
@@ -1802,7 +1802,7 @@ function UnitPopup_OnClick (self)
 		UIDropDownMenu_Refresh(dropdownFrame, nil, 1);
 	elseif ( button == "NEED_BEFORE_GREED" ) then
 		SetLootMethod("needbeforegreed");
-		UIDropDownMenu_SetButtonText(1, 2, UnitPopupButtons[button].text);
+		UIDropDownMenu_SetButtonText(self:GetParent().parentLevel, self:GetParent().parentID, UnitPopupButtons[button].text);
 		UIDropDownMenu_Refresh(dropdownFrame, nil, 1);
 	elseif ( button == "OPT_OUT_LOOT_ENABLE" ) then
 		SetOptOutOfLoot(1);

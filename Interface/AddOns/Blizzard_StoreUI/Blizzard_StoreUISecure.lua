@@ -13,6 +13,9 @@ Import("IsOnGlueScreen");
 if ( tbl.IsOnGlueScreen() ) then
 	tbl._G = _G;	--Allow us to explicitly access the global environment at the glue screens
 	Import("C_StoreGlue");
+	Import("C_Login");
+	Import("GlueParent_UpdateDialogs");
+	Import("LE_WOW_CONNECTION_STATE_NONE");
 end
 
 setfenv(1, tbl);
@@ -85,6 +88,7 @@ Import("ShrinkUntilTruncateFontStringMixin");
 Import("IsTrialAccount");
 Import("IsVeteranTrialAccount");
 Import("PortraitFrameTemplateMixin");
+Import("SecondsToTime");
 
 --GlobalStrings
 Import("BLIZZARD_STORE");
@@ -197,6 +201,7 @@ Import("BLIZZARD_STORE_VAS_ERROR_LAST_RENAME_TOO_RECENT");
 Import("BLIZZARD_STORE_VAS_ERROR_CUSTOMIZE_ALREADY_REQUESTED");
 Import("BLIZZARD_STORE_VAS_ERROR_LAST_CUSTOMIZE_TOO_SOON");
 Import("BLIZZARD_STORE_VAS_ERROR_FACTION_CHANGE_TOO_SOON");
+Import("BLIZZARD_STORE_VAS_ERROR_ALLIANCE_NOT_ELIGIBLE");
 Import("BLIZZARD_STORE_VAS_ERROR_RACE_CLASS_COMBO_INELIGIBLE");
 Import("BLIZZARD_STORE_VAS_ERROR_INELIGIBLE_MAP_ID");
 Import("BLIZZARD_STORE_VAS_ERROR_BATTLEPAY_DELIVERY_PENDING");
@@ -250,6 +255,7 @@ Import("STORE_CATEGORY_TRIAL_DISABLED_TOOLTIP");
 Import("STORE_CATEGORY_VETERAN_DISABLED_TOOLTIP");
 Import("TOOLTIP_DEFAULT_COLOR");
 Import("TOOLTIP_DEFAULT_BACKGROUND_COLOR");
+Import("CHAR_CREATE_PVP_TEAMS_VIOLATION");
 Import("CHARACTER_UPGRADE_LOG_OUT_NOW");
 Import("CHARACTER_UPGRADE_POPUP_LATER");
 Import("CHARACTER_UPGRADE_READY");
@@ -288,9 +294,13 @@ Import("VAS_QUEUE_FOUR_DAY");
 Import("VAS_QUEUE_FIVE_DAY");
 Import("VAS_QUEUE_SIX_DAY");
 Import("VAS_QUEUE_SEVEN_DAY");
+Import("VAS_PROCESSING_ESTIMATED_TIME");
+Import("VAS_SERVICE_PROCESSING");
 Import("BLIZZARD_STORE_VAS_SELECT_ACCOUNT");
 Import("BLIZZARD_STORE_VAS_DIFFERENT_BNET");
 Import("BLIZZARD_STORE_VAS_TRANSFER_REALM");
+Import("BLIZZARD_STORE_VAS_TRANSFER_REALM_CATEGORY_WARNING");
+Import("BLIZZARD_STORE_VAS_TRANSFER_INELIGIBLE_FACTION_WARNING");
 Import("BLIZZARD_STORE_VAS_REALM_NAME");
 Import("BLIZZARD_STORE_VAS_TRANSFER_ACCOUNT");
 Import("BLIZZARD_STORE_VAS_TRANSFER_FACTION_BUNDLE");
@@ -1130,6 +1140,9 @@ local vasErrorData = {
 	[Enum.VasError.MaxCharactersOnServer] = {
 		msg = BLIZZARD_STORE_VAS_ERROR_MAX_CHARACTERS_ON_SERVER,
 	},
+	[Enum.VasError.NoMixedAlliance] = {
+		msg = CHAR_CREATE_PVP_TEAMS_VIOLATION,
+	},
 	[Enum.VasError.DuplicateCharacterName] = {
 		msg = BLIZZARD_STORE_VAS_ERROR_DUPLICATE_CHARACTER_NAME,
 	},
@@ -1142,23 +1155,18 @@ local vasErrorData = {
 	[Enum.VasError.CharacterTransferTooSoon] = {
 		msg = BLIZZARD_STORE_VAS_ERROR_FACTION_CHANGE_TOO_SOON,
 	},
+	[Enum.VasError.AllianceNotEligible] = {
+		msg = BLIZZARD_STORE_VAS_ERROR_ALLIANCE_NOT_ELIGIBLE,
+	},
 	[Enum.VasError.TooMuchMoneyForLevel] = {
 		msg = function(character)
 			local str = "";
-			if (character.level >= 110) then
-				str = GetSecureMoneyString(1000000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
-			elseif (character.level >= 100) then
-				str = GetSecureMoneyString(250000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
-			elseif (character.level > 80) then
-				str = GetSecureMoneyString(50000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
-			elseif (character.level > 70) then
-				str = GetSecureMoneyString(20000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
-			elseif (character.level > 50) then
-				str = GetSecureMoneyString(5000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
+			if (character.level > 50) then
+				str = GetSecureMoneyString(2000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
 			elseif (character.level > 30) then
-				str = GetSecureMoneyString(1000 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
+				str = GetSecureMoneyString(500 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
 			elseif (character.level >= 10) then
-				str = GetSecureMoneyString(300 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
+				str = GetSecureMoneyString(100 * COPPER_PER_SILVER * SILVER_PER_GOLD, true, true);
 			end
 			return string.format(BLIZZARD_STORE_VAS_ERROR_TOO_MUCH_MONEY_FOR_LEVEL, str);
 		end
@@ -1925,6 +1933,7 @@ function StoreFrame_OnLoad(self)
 	self:RegisterEvent("TRIAL_STATUS_UPDATE");
 	self:RegisterEvent("SIMPLE_CHECKOUT_CLOSED");
 	self:RegisterEvent("SUBSCRIPTION_CHANGED_KICK_IMMINENT");
+	self:RegisterEvent("LOGIN_STATE_CHANGED");
 
 	-- We have to call this from CharacterSelect on the glue screen because the addon engine will load
 	-- the store addon more than once if we try to make it ondemand, forcing us to load it before we
@@ -1935,7 +1944,8 @@ function StoreFrame_OnLoad(self)
 
 	self.TitleText:SetText(BLIZZARD_STORE);
 
-	SetPortraitToTexture(self.portrait, "Interface\\Icons\\WoW_Store");
+	--SetPortraitToTexture(self.portrait, "Interface\\Icons\\WoW_Store");
+	SetPortraitToTexture(self.portrait, "Interface\\Icons\\Inv_Misc_Note_02");
 	StoreFrame_UpdateBuyButton();
 
 	if ( IsOnGlueScreen() ) then
@@ -2105,6 +2115,13 @@ function StoreFrame_OnEvent(self, event, ...)
 			self:Hide();
 			_G.GlueDialog_Show("SUBSCRIPTION_CHANGED_KICK_WARNING");
 		end
+	elseif (event == "LOGIN_STATE_CHANGED") then
+		if (IsOnGlueScreen()) then
+			local auroraState, connectedToWoW, wowConnectionState, hasRealmList, waitingForRealmList = C_Login.GetState();
+			if ( wowConnectionState == LE_WOW_CONNECTION_STATE_NONE ) then
+				self:Hide();
+			end
+		end
 	end
 end
 
@@ -2138,6 +2155,8 @@ function StoreFrame_OnHide(self)
 	Outbound.HidePreviewFrame();
 	if ( not IsOnGlueScreen() ) then
 		Outbound.UpdateMicroButtons();
+	else
+		GlueParent_UpdateDialogs();
 	end
 
 	StoreVASValidationFrame:Hide();
@@ -2678,7 +2697,7 @@ local RealmAutoCompleteList;
 local IsVasBnetTransferValidated = false;
 local RealmAutoCompleteIndexByKey = {};
 local RealmList = {};
-local RealmRpPvpMap = {};
+local RealmInfoMap = {};
 
 ------------------------------------------
 function StoreConfirmationFrame_OnLoad(self)
@@ -2956,6 +2975,7 @@ function StoreVASValidationFrame_OnLoad(self)
 	self:RegisterEvent("STORE_VAS_PURCHASE_COMPLETE");
 	self:RegisterEvent("VAS_TRANSFER_VALIDATION_UPDATE");
 	self:RegisterEvent("VAS_QUEUE_STATUS_UPDATE");
+	self:RegisterEvent("VAS_CHARACTER_QUEUE_STATUS_UPDATE");
 	self:RegisterEvent("STORE_OPEN_SIMPLE_CHECKOUT");
 end
 
@@ -3025,6 +3045,8 @@ function StoreVASValidationFrame_SetVASStart(self)
 	self.CharacterSelectionFrame.SelectedCharacterName:Hide();
 	self.CharacterSelectionFrame.SelectedCharacterDescription:Hide();
 	self.CharacterSelectionFrame.ValidationDescription:Hide();
+	self.CharacterSelectionFrame.TransferStatus:Hide();
+	self.CharacterSelectionFrame.TransferStatusEstimatedTime:Hide();
 	self.CharacterSelectionFrame.ChangeIconFrame:Hide();
 	self.CharacterSelectionFrame:Show();
 
@@ -3174,6 +3196,31 @@ function StoreVASValidationFrame_OnEvent(self, event, ...)
 		local currencyInfo = currencyInfo();
 		local vasDisclaimerData = currencyInfo.vasDisclaimerData;
 		self.Disclaimer:SetText(HTML_START_CENTERED..string.format(vasDisclaimerData[VASServiceType].disclaimer, _G["VAS_QUEUE_"..VasQueueStatusToString[queueTime]])..HTML_END);
+
+		-- More visible alert for Classic FCM.
+		if (VASServiceType == Enum.VasServiceType.CharacterTransfer) then
+
+			local stringColor;
+			if (queueTime > Enum.VasQueueStatus.UnderAnHour) then
+				stringColor = "|cffff1919";
+			else
+				stringColor = "|cff000000";
+			end
+
+			local timeString = _G["VAS_QUEUE_"..VasQueueStatusToString[queueTime]];
+			if (stringColor) then
+				timeString = stringColor .. timeString .. "|r";
+			end
+
+			if (timeString) then
+				self.EstimatedTime:SetText(VAS_PROCESSING_ESTIMATED_TIME:format(timeString));
+				self.EstimatedTime:Show();
+			end
+		end
+	elseif ( event == "VAS_CHARACTER_QUEUE_STATUS_UPDATE" ) then
+		local guid, minutes = ...;
+		self.CharacterSelectionFrame.TransferStatusEstimatedTime:SetText(VAS_PROCESSING_ESTIMATED_TIME:format("|cff000000"..SecondsToTime(minutes*60, true, false, 2, true).."|r"));
+		self.CharacterSelectionFrame.TransferStatusEstimatedTime:Show();
 	elseif ( event == "STORE_OPEN_SIMPLE_CHECKOUT" ) then
 		self:Hide();
 	end
@@ -4135,6 +4182,7 @@ function VASCharacterSelectionRealmSelector_Callback(value)
 	frame.SelectedCharacterFrame:Hide();
 	frame.TransferRealmCheckbox:Hide();
 	frame.TransferRealmCheckbox:SetChecked(false);
+	frame.TransferRealmCheckbox.Warning:SetText("");
 	frame.TransferRealmEditbox:Hide();
 	frame.TransferRealmEditbox:SetText("");
 	frame.TransferAccountCheckbox:Hide();
@@ -4146,6 +4194,8 @@ function VASCharacterSelectionRealmSelector_Callback(value)
 	frame.TransferBattlenetAccountEditbox:SetText("");
 	frame.TransferBnetWoWAccountDropDown:Hide();
 	frame.ValidationDescription:Hide();
+	frame.TransferStatus:Hide();
+	frame.TransferStatusEstimatedTime:Hide();
 	frame.NewCharacterName:SetText("");
 	frame.ContinueButton:Disable();
 	frame.NewCharacterName:Hide();
@@ -4250,6 +4300,10 @@ function VASCharacterSelectionCharacterSelector_Callback(value)
 	frame.ValidationDescription:SetTextColor(0, 0, 0);
 	frame.ValidationDescription:Hide();
 
+	-- Classic processing status text.
+	frame.TransferStatus:Hide();
+	frame.TransferStatusEstimatedTime:Hide();
+
 	StoreVASValidationState_Unlock();
 
 	local bottomWidget = frame.SelectedCharacterFrame;
@@ -4262,6 +4316,9 @@ function VASCharacterSelectionCharacterSelector_Callback(value)
 		frame.ValidationDescription:ClearAllPoints();
 		frame.ValidationDescription:SetPoint("TOPLEFT", bottomWidget, "BOTTOMLEFT", -5, -6);
 	elseif (VASServiceType == Enum.VasServiceType.CharacterTransfer) then
+		local guid = character.guid;
+		local productID, vasServiceState, vasServiceErrors = C_StoreGlue.GetVASPurchaseStateInfo(guid);
+
 		frame.TransferRealmCheckbox:Show();
 		frame.TransferRealmCheckbox.Label:ApplyFontObjects();
 		if (VASServiceCanChangeAccount) then
@@ -4274,6 +4331,8 @@ function VASCharacterSelectionCharacterSelector_Callback(value)
 			frame.TransferFactionCheckbox:SetPoint("TOPLEFT", frame.TransferRealmCheckbox, "BOTTOMLEFT", 0, -4);
 		end
 		frame.TransferRealmCheckbox:SetChecked(false);
+		frame.TransferRealmCheckbox.Warning:Hide();
+		frame.TransferRealmCheckbox.Warning:SetText("");
 		frame.TransferRealmEditbox:SetText("");
 		frame.TransferRealmEditbox:Hide();
 		frame.TransferBattlenetAccountEditbox:Hide();
@@ -4312,6 +4371,18 @@ function VASCharacterSelectionCharacterSelector_Callback(value)
 		end
 
 		StoreVASValidationFrame_SyncFontHeights(frame.TransferRealmCheckbox.Label, frame.TransferAccountCheckbox.Label, frame.TransferFactionCheckbox.Label);
+
+		-- For Classic, show queue progress.
+		if (vasServiceState == Enum.VasPurchaseProgress.WaitingOnQueue) then
+			frame.TransferRealmCheckbox:Hide();
+			frame.TransferAccountCheckbox:Hide();
+
+			local productInfo = C_StoreSecure.GetProductInfo(productID);
+			frame.TransferStatus:SetText(VAS_SERVICE_PROCESSING:format(productInfo.sharedData.name));
+			frame.TransferStatus:Show();
+			C_StoreGlue.RequestCharacterQueueTime(guid);
+		end
+
 		frame.ContinueButton:Disable();
 	else
 		if (VASServiceType == Enum.VasServiceType.RaceChange or VASServiceType == Enum.VasServiceType.FactionChange) then
@@ -4360,7 +4431,10 @@ function VASRealmList_BuildAutoCompleteList()
 			local pvp = realms[i].pvp;
 			local rp = realms[i].rp;
 			local name = realms[i].realmName;
-			RealmRpPvpMap[name] = { rp=rp, pvp=pvp };
+			local categoryID = realms[i].categoryID;
+			local category = realms[i].category;
+			local factionRestriction = realms[i].factionRestriction;
+			RealmInfoMap[name] = { rp=rp, pvp=pvp, categoryID=categoryID, category=category, factionRestriction=factionRestriction };
 			infoTable[#infoTable + 1] = name;
 			DestinationRealmMapping[name] = realms[i].virtualRealmAddress;
 		end
@@ -4370,9 +4444,6 @@ function VASRealmList_BuildAutoCompleteList()
 end
 
 function VASRealmList_GetAutoCompleteEntries(text, cursorPosition)
-	if (text == "") then
-		return {};
-	end
 	local entries = {};
 	local str = string.lower(string.sub(text, 1, cursorPosition));
 	for i, v in ipairs(RealmAutoCompleteList) do
@@ -4397,6 +4468,27 @@ function VASCharacterSelectionTransferRealmEditBoxAutoCompleteButton_OnClick(sel
 
 	frame.TransferRealmEditbox:SetText(self.info);
 	frame.TransferRealmAutoCompleteBox:Hide();
+
+	local characters = C_StoreSecure.GetCharactersForRealm(SelectedRealm);
+	local character = characters[SelectedCharacter];
+
+	local realmInfo = RealmInfoMap[self.info];
+
+	if (character and realmInfo and realmInfo.factionRestriction >= 0 and realmInfo.factionRestriction ~= character.faction) then
+		frame.TransferRealmCheckbox.Warning:SetTextColor(_G.RED_FONT_COLOR:GetRGB());
+		frame.TransferRealmCheckbox.Warning:SetText(BLIZZARD_STORE_VAS_TRANSFER_INELIGIBLE_FACTION_WARNING);
+		frame.TransferRealmCheckbox.Warning:Show();
+	elseif (realmInfo and realmInfo.categoryID and realmInfo.category and
+			realmInfo.categoryID ~= C_StoreSecure.GetCurrentRealmCategory()) then
+		-- Show an informative realm category warning if the realm we're transferring to is in a different tab than our currently connected realm.
+		-- A better way to do this would be to get the realm category of the source realm we're transferring from, but that's actually a fair bit more work.
+		-- Just using our current realm connection should be adequate for the vast majority of cases.
+		frame.TransferRealmCheckbox.Warning:SetTextColor(0, 0, 0);
+		frame.TransferRealmCheckbox.Warning:SetText(BLIZZARD_STORE_VAS_TRANSFER_REALM_CATEGORY_WARNING:format("|cffA01919"..RealmInfoMap[self.info].category.."|r"));
+		frame.TransferRealmCheckbox.Warning:Show();
+	else
+		frame.TransferRealmCheckbox.Warning:Hide();
+	end
 end
 
 function VASCharacterSelectionTransferRealmEditBox_UpdateAutoComplete(self, text, cursorPosition)
@@ -4423,6 +4515,9 @@ function VASCharacterSelectionTransferRealmEditBox_UpdateAutoComplete(self, text
 		shownButtons = 1;
 	end
 
+	local characters = C_StoreSecure.GetCharactersForRealm(SelectedRealm);
+	local character = characters[SelectedCharacter];
+
 	local hasMore = (#VAS_AUTO_COMPLETE_ENTRIES - VAS_AUTO_COMPLETE_OFFSET) > VAS_AUTO_COMPLETE_MAX_ENTRIES;
 	for i = 1 + buttonOffset, math.min(VAS_AUTO_COMPLETE_MAX_ENTRIES, (#VAS_AUTO_COMPLETE_ENTRIES - VAS_AUTO_COMPLETE_OFFSET)) + buttonOffset do
 		local button = box.Buttons[i];
@@ -4433,7 +4528,7 @@ function VASCharacterSelectionTransferRealmEditBox_UpdateAutoComplete(self, text
 		local entryIndex = i + VAS_AUTO_COMPLETE_OFFSET - buttonOffset;
 		button:SetScript("OnClick", VASCharacterSelectionTransferRealmEditBoxAutoCompleteButton_OnClick);
 		button.info = VAS_AUTO_COMPLETE_ENTRIES[entryIndex];
-		local rpPvpInfo = RealmRpPvpMap[VAS_AUTO_COMPLETE_ENTRIES[entryIndex]];
+		local rpPvpInfo = RealmInfoMap[VAS_AUTO_COMPLETE_ENTRIES[entryIndex]];
 		local tag = _G.VAS_PVE_PARENTHESES;
 		if (rpPvpInfo.pvp and rpPvpInfo.rp) then
 			tag = _G.VAS_RPPVP_PARENTHESES;
@@ -4442,8 +4537,14 @@ function VASCharacterSelectionTransferRealmEditBox_UpdateAutoComplete(self, text
 		elseif (rpPvpInfo.rp) then
 			tag = _G.VAS_RP_PARENTHESES;
 		end
-		button:SetNormalFontObject("GameFontWhiteTiny2");
-		button:SetHighlightFontObject("GameFontWhiteTiny2");
+		if (character and rpPvpInfo.factionRestriction >= 0 and rpPvpInfo.factionRestriction ~= character.faction) then
+			-- This source-destination pair doesn't allow our current faction. Gray it out.
+			button:SetNormalFontObject("GameFontDisableTiny2");
+			button:SetHighlightFontObject("GameFontDisableTiny2");
+		else
+			button:SetNormalFontObject("GameFontWhiteTiny2");
+			button:SetHighlightFontObject("GameFontWhiteTiny2");
+		end
 		button.Text:SetText(VAS_AUTO_COMPLETE_ENTRIES[entryIndex] .. " " .. tag);
 		button:Show();
 		if (i - buttonOffset == VAS_AUTO_COMPLETE_SELECTION) then
@@ -4560,8 +4661,10 @@ function TransferRealmCheckbox_OnClick(self)
 		SelectedDestinationRealm = nil;
 		self:GetParent().TransferRealmEditbox:SetText("");
 		self:GetParent().TransferRealmAutoCompleteBox:Hide();
+		self:GetParent().TransferRealmCheckbox.Warning:SetText("");
 	end
 	self:GetParent().TransferRealmEditbox:SetShown(self:GetChecked());
+	self:GetParent().TransferRealmCheckbox.Warning:SetShown(self:GetChecked());
 	VASCharacterSelectionTransferGatherAndValidateData();
 end
 
@@ -4878,6 +4981,16 @@ function VASCharacterSelectionTransferGatherAndValidateData()
 
 	if (noCheck) then
 		return;
+	end
+
+	-- If the realm transfer has a faction restriction, validate it.
+	SelectedDestinationRealm = frame.TransferRealmEditbox:GetText();
+	if (SelectedDestinationRealm) then
+		local realmInfo = RealmInfoMap[SelectedDestinationRealm];
+		if (character and realmInfo and realmInfo.factionRestriction >= 0 and realmInfo.factionRestriction ~= character.faction) then
+			-- Error message is shown in VASCharacterSelectionTransferRealmEditBoxAutoCompleteButton_OnClick.
+			return;
+		end
 	end
 
 	button:Enable();

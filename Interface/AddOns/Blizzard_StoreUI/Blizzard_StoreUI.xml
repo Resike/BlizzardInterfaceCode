@@ -1819,7 +1819,7 @@
 						</OnShow>
 					</Scripts>
 				</Frame>
-				<Frame parentKey="Notice" enableMouse="false" hidden="true">
+				<Frame parentKey="Notice" frameLevel="1001" enableMouse="false" hidden="true">
 					<Size x="320" y="210" />
 					<Anchors>
 						<Anchor point="CENTER" x="0" y="20" />
@@ -1871,7 +1871,6 @@
 					<Scripts>
 						<OnShow>
 							StoreFrame_UpdateCoverState();
-							self:SetFrameLevel(self:GetParent():GetFrameLevel()+4);
 						</OnShow>
 						<OnHide function="StoreFrame_UpdateCoverState" />
 					</Scripts>
@@ -2419,6 +2418,13 @@
 						</Anchors>
 						<Color r="0" b="0" g="0"/>
 					</FontString>
+					<FontString parentKey="EstimatedTime" inherits="GameFontBlack" wordwrap="true" justifyH="LEFT" hidden="true">
+						<Size x="280" y="0"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeKey="$parent.ProductDescription" relativePoint="BOTTOMLEFT" x="8" y="-6"/>
+						</Anchors>
+						<Color r="0" b="0" g="0"/>
+					</FontString>
 				</Layer>
 			</Layers>
 			<Frames>
@@ -2465,6 +2471,20 @@
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeKey="$parent.SelectedCharacterFrame" relativePoint="BOTTOMLEFT" x="0" y="-16"/>
 								</Anchors>
+							</FontString>
+							<FontString parentKey="TransferStatus" inherits="GameTooltipHeaderText" hidden="true" wordwrap="true" justifyH="LEFT">
+								<Size x="280" y="0"/>
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.SelectedCharacterFrame" relativePoint="BOTTOMLEFT" x="12" y="-30"/>
+								</Anchors>
+								<Color r="0" b="0" g="0"/>
+							</FontString>
+							<FontString parentKey="TransferStatusEstimatedTime" inherits="GameTooltipHeaderText" hidden="true" wordwrap="true" justifyH="LEFT">
+								<Size x="280" y="0"/>
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.TransferStatus" relativePoint="BOTTOMLEFT" x="0" y="-6"/>
+								</Anchors>
+								<Color r="0" b="0" g="0"/>
 							</FontString>
 						</Layer>
 						<Layer level="ARTWORK">
@@ -2519,7 +2539,7 @@
 						<Frame parentKey="RealmSelector" inherits="StoreDropDownMenuTemplate" enableMouse="true">
 							<Size x="150" y="22"/>
 							<Anchors>
-								<Anchor point="TOPLEFT" relativeKey="$parent.$parent.ProductDescription" relativePoint="BOTTOMLEFT" x="-16" y="-38"/>
+								<Anchor point="TOPLEFT" relativeKey="$parent.$parent.EstimatedTime" relativePoint="BOTTOMLEFT" x="-16" y="-38"/>
 							</Anchors>
 							<Scripts>
 								<OnLoad>
@@ -2592,6 +2612,12 @@
 										<Size x="124" y="14"/>
 										<Anchors>
 											<Anchor point="LEFT" relativePoint="RIGHT" x="4" y="0"/>
+										</Anchors>
+									</FontString>
+									<FontString parentKey="Warning" inherits="GameTooltipHeaderText" hidden="true">
+										<Size x="300" y="0"/>
+										<Anchors>
+											<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="4" y="-8"/>
 										</Anchors>
 									</FontString>
 								</Layer>

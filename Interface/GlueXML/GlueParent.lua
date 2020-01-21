@@ -62,6 +62,9 @@ function GlueParent_OnLoad(self)
 	self:RegisterEvent("DISPLAY_SIZE_CHANGED");
 	self:RegisterEvent("LUA_WARNING");
 	self:RegisterEvent("SUBSCRIPTION_CHANGED_KICK_IMMINENT");
+	self:RegisterEvent("KIOSK_SESSION_SHUTDOWN");
+	self:RegisterEvent("KIOSK_SESSION_EXPIRED");
+	self:RegisterEvent("KIOSK_SESSION_EXPIRATION_CHANGED");
 
 	OnDisplaySizeChanged(self);
 end
@@ -91,6 +94,10 @@ function GlueParent_OnEvent(self, event, ...)
 		if not StoreFrame_IsShown() then
 			GlueDialog_Show("SUBSCRIPTION_CHANGED_KICK_WARNING");
 		end
+	elseif (event == "KIOSK_SESSION_SHUTDOWN" or event == "KIOSK_SESSION_EXPIRED") then
+		GlueParent_SetScreen("kioskmodesplash");
+	elseif (event == "KIOSK_SESSION_EXPIRATION_CHANGED") then
+		GlueDialog_Show("OKAY", KIOSK_SESSION_TIMER_CHANGED);
 	end
 end
 
@@ -231,18 +238,32 @@ function GlueParent_UpdateDialogs()
 	elseif ( wowConnectionState == LE_WOW_CONNECTION_STATE_CONNECTING ) then
 		GlueDialog_Show("CANCEL", GAME_SERVER_LOGIN);
 	elseif ( wowConnectionState == LE_WOW_CONNECTION_STATE_IN_QUEUE ) then
+		local serverName, pvp, rp, down = GetServerName();
 		local waitPosition, waitMinutes, hasFCM = C_Login.GetWaitQueueInfo();
 
-		if ( hasFCM ) then
-			GlueDialog_Show("QUEUED_WITH_FCM", _G["QUEUE_FCM"]);
-		elseif ( waitMinutes == 0 ) then
-			local queueString = string.format(_G["QUEUE_TIME_LEFT_UNKNOWN"], waitPosition);
-			GlueDialog_Show("QUEUED_NORMAL", queueString);
-		elseif (waitMinutes == 1) then
-			local queueString = string.format(_G["QUEUE_TIME_LEFT_SECONDS"], waitPosition);
-			GlueDialog_Show("QUEUED_NORMAL", queueString);
+		local queueString;
+		if (serverName) then
+			if ( waitMinutes == 0 ) then
+				queueString = string.format(_G["QUEUE_NAME_TIME_LEFT_UNKNOWN"], serverName, waitPosition);
+			elseif ( waitMinutes == 1 ) then
+				queueString = string.format(_G["QUEUE_NAME_TIME_LEFT_SECONDS"], serverName, waitPosition);
+			else
+				queueString = string.format(_G["QUEUE_NAME_TIME_LEFT"], serverName, waitPosition, waitMinutes);
+			end
 		else
-			local queueString = string.format(_G["QUEUE_TIME_LEFT"], waitPosition, waitMinutes);
+			if ( waitMinutes == 0 ) then
+				queueString = string.format(_G["QUEUE_TIME_LEFT_UNKNOWN"], waitPosition);
+			elseif ( waitMinutes == 1 ) then
+				queueString = string.format(_G["QUEUE_TIME_LEFT_SECONDS"], waitPosition);
+			else
+				queueString = string.format(_G["QUEUE_TIME_LEFT"], waitPosition, waitMinutes);
+			end
+		end
+
+		if ( hasFCM ) then
+			queueString = queueString .. "\n\n" .. _G["QUEUE_FCM"];
+			GlueDialog_Show("QUEUED_WITH_FCM", queueString);
+		else
 			GlueDialog_Show("QUEUED_NORMAL", queueString);
 		end
 	else
@@ -661,7 +682,7 @@ function HideUIPanel(self)
 end
 
 function IsKioskGlueEnabled()
-	return IsKioskModeEnabled() and not IsCompetitiveModeEnabled();
+	return Kiosk.IsEnabled() and not IsCompetitiveModeEnabled();
 end
 
 function GetDisplayedExpansionLogo(expansionLevel)

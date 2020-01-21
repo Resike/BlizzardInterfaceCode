@@ -65,11 +65,11 @@ function RealmList_Update()
 			if ( populationState == "OFFLINE" ) then
 				button.Load:SetText(REALM_DOWN);
 				button.Load:SetTextColor(GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b);
-			elseif ( populationState == "LOCKED" ) then
-				button.Load:SetText(REALM_LOCKED);
-				button.Load:SetTextColor(RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b);
 			elseif ( versionMismatch ) then --not a population state
 				button.Load:SetText(ADDON_INCOMPATIBLE);
+				button.Load:SetTextColor(RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b);
+			elseif ( populationState == "LOCKED" ) then
+				button.Load:SetText(REALM_LOCKED);
 				button.Load:SetTextColor(RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b);
 			elseif ( populationState == "LOW" ) then
 				button.Load:SetText(LOAD_LOW);
@@ -78,10 +78,13 @@ function RealmList_Update()
 				button.Load:SetText(LOAD_HIGH);
 				button.Load:SetTextColor(RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b);
 			elseif ( populationState == "NEW" ) then
-				button.Load:SetText(LOAD_NEW);
+				--button.Load:SetText(LOAD_NEW);
+				-- CLASSIC TODO: Overriding the "NEW" state here to show a server as "Layered". This makes the hotfix a lot simpler, but ideally we should do this with a new population state.
+				button.Load:SetText(REALM_LAYERED);
 				button.Load:SetTextColor(BLUE_FONT_COLOR.r, BLUE_FONT_COLOR.g, BLUE_FONT_COLOR.b);
 			elseif ( populationState == "RECOMMENDED" ) then
-				button.Load:SetText(LOAD_RECOMMENDED);
+				--button.Load:SetText(LOAD_RECOMMENDED);
+				button.Load:SetText(RECOMMENDED);
 				button.Load:SetTextColor(BLUE_FONT_COLOR.r, BLUE_FONT_COLOR.g, BLUE_FONT_COLOR.b);
 			elseif ( populationState == "FULL" ) then
 				button.Load:SetText(LOAD_FULL);

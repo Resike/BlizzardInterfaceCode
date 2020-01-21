@@ -375,7 +375,9 @@ function CharacterSelect_UpdateState(fromLoginState)
                     CharacterSelectUI:Show();
                 end
             end
-            GetCharacterListUpdate();
+			if (not IsCharacterListUpdateRequested()) then
+	            GetCharacterListUpdate();
+			end
         else
             UpdateCharacterList();
         end
@@ -528,7 +530,6 @@ function CharacterSelect_OnEvent(self, event, ...)
         CharSelectCharacterName:SetText(GetCharacterInfo(GetCharIDFromIndex(self.selectedIndex)));
         KioskMode_CheckAutoRealm();
         KioskMode_CheckEnterWorld();
-        KioskMode_CheckCompetitiveMode();
         CharacterServicesMaster_OnCharacterListUpdate();
     elseif ( event == "UPDATE_SELECTED_CHARACTER" ) then
         local charID = ...;
@@ -1307,7 +1308,7 @@ function CharacterSelect_AllowedToEnterWorld()
         return false;
     elseif (CharSelectServicesFlowFrame:IsShown()) then
         return false;
-	elseif (IsKioskModeEnabled() and (CharacterSelect.hasPendingTrialBoost or KioskMode_IsWaitingOnTrial())) then
+	elseif (Kiosk.IsEnabled() and (CharacterSelect.hasPendingTrialBoost or KioskMode_IsWaitingOnTrial())) then
 		return false;
 	elseif (IsNameReservationOnly()) then
 		return false;
@@ -1766,6 +1767,11 @@ function CharacterTemplatesFrameDropDown_Initialize()
 end
 
 function ToggleStoreUI()
+	if (not STORE_IS_LOADED) then
+		STORE_IS_LOADED = LoadAddOn("Blizzard_StoreUI")
+		LoadAddOn("Blizzard_AuthChallengeUI");
+	end
+
     if (STORE_IS_LOADED) then
         local wasShown = StoreFrame_IsShown();
         if ( not wasShown ) then
@@ -1777,6 +1783,11 @@ function ToggleStoreUI()
 end
 
 function SetStoreUIShown(shown)
+	if (not STORE_IS_LOADED) then
+		STORE_IS_LOADED = LoadAddOn("Blizzard_StoreUI")
+		LoadAddOn("Blizzard_AuthChallengeUI");
+	end
+
 	if (STORE_IS_LOADED) then
 		local wasShown = StoreFrame_IsShown();
 		if ( not wasShown and shown ) then
@@ -1830,7 +1841,7 @@ function CharacterSelect_IsStoreAvailable()
 end
 
 function CharacterSelect_UpdateStoreButton()
-    if ( CharacterSelect_IsStoreAvailable() and not IsKioskModeEnabled()) then
+    if ( CharacterSelect_IsStoreAvailable() and not Kiosk.IsEnabled()) then
         StoreButton:Show();
     else
         StoreButton:Hide();
@@ -1875,6 +1886,7 @@ function CharacterSelect_UpdateButtonState()
     local undeleteEnabled, undeleteOnCooldown = GetCharacterUndeleteStatus();
     local redemptionInProgress = AccountReactivationInProgressDialog:IsShown() or GoldReactivateConfirmationDialog:IsShown() or TokenReactivateConfirmationDialog:IsShown();
     local inCompetitiveMode = IsCompetitiveModeEnabled();
+	local inKioskMode = Kiosk.IsEnabled();
 
     local boostInProgress = select(19,GetCharacterInfo(GetCharacterSelection()));
     CharSelectEnterWorldButton:SetEnabled(CharacterSelect_AllowedToEnterWorld());
@@ -1882,7 +1894,7 @@ function CharacterSelect_UpdateButtonState()
     CharacterSelectDeleteButton:SetEnabled(hasCharacters and servicesEnabled and not undeleting and not redemptionInProgress and not CharacterSelect_IsRetrievingCharacterList());
     CharSelectChangeRealmButton:SetEnabled(servicesEnabled and not undeleting and not redemptionInProgress);
     CharSelectUndeleteCharacterButton:SetEnabled(servicesEnabled and undeleteEnabled and not undeleteOnCooldown and not redemptionInProgress);
-    CharacterSelectAddonsButton:SetEnabled(servicesEnabled and not undeleting and not redemptionInProgress and not IsKioskModeEnabled());
+    CharacterSelectAddonsButton:SetEnabled(servicesEnabled and not undeleting and not redemptionInProgress and not inKioskMode);
     CopyCharacterButton:SetEnabled(servicesEnabled and not undeleting and not redemptionInProgress);
     ActivateFactionChange:SetEnabled(servicesEnabled and not undeleting and not redemptionInProgress);
     ActivateFactionChange.texture:SetDesaturated(not (servicesEnabled and not undeleting and not redemptionInProgress));
@@ -1897,7 +1909,7 @@ function CharacterSelect_UpdateButtonState()
         end
     end
 
-    CharSelectAccountUpgradeButton:SetEnabled(not redemptionInProgress and not undeleting and not inCompetitiveMode);
+    CharSelectAccountUpgradeButton:SetEnabled(not redemptionInProgress and not undeleting and not inCompetitiveMode and not inKioskMode);
 end
 
 function CharacterSelect_DeleteCharacter(charID)
@@ -1940,12 +1952,12 @@ function KioskMode_IsWaitingOnTrial()
 end
 
 function KioskMode_CheckEnterWorld()
-    if (not IsKioskModeEnabled()) then
+    if (not Kiosk.IsEnabled()) then
         return;
     end
 
 	if (not KioskMode_IsWaitingOnTrial()) then
-        if (KioskModeSplash_GetAutoEnterWorld()) then
+        if (KioskModeSplash:GetAutoEnterWorld()) then
             EnterWorld();
         else
 			if (not IsGMClient()) then
@@ -1954,23 +1966,6 @@ function KioskMode_CheckEnterWorld()
             if (IsKioskGlueEnabled()) then
                 GlueParent_SetScreen("kioskmodesplash");
             end
-        end
-    end
-end
-
-function KioskMode_CheckCompetitiveMode()
-    if (IsCompetitiveModeEnabled()) then
-        CharSelectAccountUpgradeButton:SetText(KIOSK_MODE_COMPETITIVE_MODE);
-        CharSelectAccountUpgradeButton:Show();
-        CharSelectAccountUpgradeButton:Disable();
-        CharSelectAccountUpgradeButtonExpandCollapseButton:Hide();
-        local featureTable = GetExpansionDisplayInfo(LE_EXPANSION_LEVEL_PREVIOUS);
-        if (featureTable) then
-            CharSelectAccountUpgradeMiniPanel.logo:SetTexture(featureTable.logo);
-			CharSelectAccountUpgradeMiniPanel.banner:SetAtlas(featureTable.banner, true);
-			CharSelectAccountUpgradeMiniPanel:Show();
-		else
-			CharSelectAccountUpgradeMiniPanel:Hide();
         end
     end
 end
