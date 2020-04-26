@@ -45,7 +45,7 @@ function Localize()
 	AUTH_PARENTAL_CONTROL_URL = "http://www.wow-europe.com/en/account/";
 	REALM_TYPE_TOURNAMENT_WARNING = "This account is currently not flagged to participate in the tournament realms.\n\nFor more information regarding the World of Warcraft Arena Tournament, please visit: www.wow-europe.com.";
 	REALM_HELP_FRAME_URL = "<a href=\"http://www.wow-europe.com\">www.wow-europe.com</a>";
-	SERVER_ALERT_URL = "http://status.wow-europe.com/en/alert";
+	SERVER_ALERT_URL = "http://eu.launcher.battle.net/service/classic-client/alert/en-gb";
 	SERVER_ALERT_BETA_URL = "http://beta.wow-europe.com/en/alert";
 	LOGIN_GAME_ACCOUNT_LOCKED = "<html><body><p align=\"CENTER\">Access to your account has been temporarily disabled. Please contact support for more information at: <a href=\"https://www.wow-europe.com/account/account-error.html\">https://www.wow-europe.com/account/account-error.html</a></p></body></html>";
 
