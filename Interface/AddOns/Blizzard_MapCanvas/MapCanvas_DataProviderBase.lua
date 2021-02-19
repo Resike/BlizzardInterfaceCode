@@ -100,6 +100,11 @@ function MapCanvasDataProviderMixin:SignalEvent(event, ...)
 	end
 end
 
+function MapCanvasDataProviderMixin:HandleMouseAction(button, action)
+	local overriden = self:GetMap():ProcessGlobalPinOverrideMouseHandlers(button, action);
+	return not overriden;
+end
+
 -- A base template for data providers that are enabled or disabled with a CVar, e.g. archaeology digsites.
 CVarMapCanvasDataProviderMixin = CreateFromMixins(MapCanvasDataProviderMixin);
 
@@ -144,8 +149,13 @@ function MapCanvasPinMixin:OnReleased()
 	-- Override in your mixin, called when this pin is being released by a data provider and is no longer on the map
 end
 
-function MapCanvasPinMixin:OnClick(button)
-	-- Override in your mixin, called when this pin is clicked
+function MapCanvasPinMixin:OnClick(...)
+	if self:GetMap():ProcessGlobalPinMouseActionHandlers(MapCanvasMixin.MouseAction.Click, ...) then
+		return;
+	end
+	if self.OnMouseClickAction then
+		self:OnMouseClickAction(...);
+	end	
 end
 
 function MapCanvasPinMixin:OnMouseEnter()
@@ -156,12 +166,22 @@ function MapCanvasPinMixin:OnMouseLeave()
 	-- Override in your mixin, called when the mouse leaves this pin
 end
 
-function MapCanvasPinMixin:OnMouseDown()
-	-- Override in your mixin, called when the mouse is pressed on this pin
+function MapCanvasPinMixin:OnMouseDown(...)
+	if self:GetMap():ProcessGlobalPinMouseActionHandlers(MapCanvasMixin.MouseAction.Down, ...) then
+		return;
+	end
+	if self.OnMouseDownAction then
+		self:OnMouseDownAction(...);
+	end
 end
 
-function MapCanvasPinMixin:OnMouseUp()
-	-- Override in your mixin, called when the mouse is released
+function MapCanvasPinMixin:OnMouseUp(...)
+	if self:GetMap():ProcessGlobalPinMouseActionHandlers(MapCanvasMixin.MouseAction.Up, ...) then
+		return;
+	end
+	if self.OnMouseUpAction then
+		self:OnMouseUpAction(...);
+	end
 end
 
 function MapCanvasPinMixin:OnMapInsetSizeChanged(mapInsetIndex, expanded)
@@ -174,6 +194,15 @@ end
 
 function MapCanvasPinMixin:OnMapInsetMouseLeave(mapInsetIndex)
 	-- Optionally override in your mixin, called when a map inset loses mouse focus
+end
+
+function MapCanvasPinMixin:ClearNudgeSettings()
+	self.nudgeTargetFactor = nil;
+	self.nudgeSourceRadius = nil;
+	self.nudgeSourceZoomedOutMagnitude = nil;
+	self.nudgeSourceZoomedInMagnitude = nil;
+	self.zoomedInNudge = nil;
+	self.zoomedOutNudge = nil;
 end
 
 function MapCanvasPinMixin:SetNudgeTargetFactor(newFactor)

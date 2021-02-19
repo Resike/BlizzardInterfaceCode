@@ -83,7 +83,7 @@ function BankFrameItemButton_Update (button)
 	local texture = button.icon;
 	local inventoryID = button:GetInventorySlot();
 	local textureName = GetInventoryItemTexture("player",inventoryID);
-	local _, _, _, quality, _, _, _, isFiltered, _, itemID = GetContainerItemInfo(container, buttonID);
+	local _, _, _, quality, _, _, _, isFiltered, _, itemID, isBound = GetContainerItemInfo(container, buttonID);
 	local slotName = button:GetName();
 	local id;
 	local slotTextureName;
@@ -122,7 +122,8 @@ function BankFrameItemButton_Update (button)
 	button:UpdateItemContextMatching();
 	button:SetMatchesSearch(not isFiltered);
 
-	SetItemButtonQuality(button, quality, itemID);
+	local doNotSuppressOverlays = false;
+	SetItemButtonQuality(button, quality, itemID, doNotSuppressOverlays, isBound);
 
 	BankFrameItemButton_UpdateLocked(button);
 	BankFrame_UpdateCooldown(container, button);
@@ -322,12 +323,16 @@ function BankFrame_OnShow (self)
 	if(not GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_REAGENT_BANK_UNLOCK)) then
 		local numSlots,full = GetNumBankSlots();
 		if (full and not IsReagentBankUnlocked()) then
-			ReagentBankHelpBox:Show();
-		else
-			ReagentBankHelpBox:Hide();
+			local helpTipInfo = {
+				text = REAGENT_BANK_HELP,
+				buttonStyle = HelpTip.ButtonStyle.Close,
+				cvarBitfield = "closedInfoFrames",
+				bitfieldFlag = LE_FRAME_TUTORIAL_REAGENT_BANK_UNLOCK,
+				targetPoint = HelpTip.Point.RightEdgeCenter,
+				offsetX = -2,
+			};
+			HelpTip:Show(self, helpTipInfo, BankFrameTab2);
 		end
-	else
-		ReagentBankHelpBox:Hide();
 	end
 end
 
@@ -466,7 +471,7 @@ function ReagentBankFrame_OnEvent(self, event, ...)
 end
 
 function ReagentBankFrame_OnShow(self)
-	ReagentBankHelpBox:Hide();
+	HelpTip:Hide(BankFrame, REAGENT_BANK_HELP);
 	SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_REAGENT_BANK_UNLOCK, true);
 
 	if(not IsReagentBankUnlocked()) then		

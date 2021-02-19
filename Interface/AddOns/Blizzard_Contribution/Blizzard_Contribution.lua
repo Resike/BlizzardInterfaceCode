@@ -183,11 +183,13 @@ function ContributeButtonMixin:UpdateTooltip()
 			EmbeddedItemTooltip:SetText(CONTRIBUTION_REWARD_TOOLTIP_TITLE, HIGHLIGHT_FONT_COLOR:GetRGBA());
 			GameTooltip_AddQuestRewardsToTooltip(EmbeddedItemTooltip, self.questID, TOOLTIP_QUEST_REWARDS_STYLE_CONTRIBUTION);
 
-			local rcName, rcAvailable, rcFormatString;
+			local rcName, rcAvailable, rcFormatString, rcAmount;
 			local currencyID, currencyAmount = C_ContributionCollector.GetRequiredContributionCurrency(self.contributionID);
 			local itemID, itemCount = C_ContributionCollector.GetRequiredContributionItem(self.contributionID);
 			if currencyID then
-				rcName, rcAvailable = GetCurrencyInfo(currencyID);
+				local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(currencyID);
+				rcName = currencyInfo.name;
+				rcAvailable = currencyInfo.quantity > 0;
 				rcAmount = currencyAmount;
 				rcFormatString = CONTRIBUTION_TOOLTIP_PLAYER_CURRENCY_AMOUNT;
 			elseif itemID then
@@ -233,7 +235,7 @@ function ContributeButtonMixin:SetContributionID(contributionID)
 		self:UnregisterEvent("CURRENCY_DISPLAY_UPDATE");
 		return;
 	end
-	
+
 	-- failed to find anything
 	self.requiredCurrencyID = nil;
 	self:UnregisterEvent("CURRENCY_DISPLAY_UPDATE");
@@ -250,7 +252,7 @@ function ContributeButtonMixin:Update()
 	self.questID = C_ContributionCollector.GetRewardQuestID(self.contributionID);
 
 	if canContribute or (result == Enum.ContributionResult.FailedConditionCheck) then
-		local colorCode = canContribute and HIGHLIGHT_FONT_COLOR_CODE or DISABLED_FONT_COLOR_CODE;	
+		local colorCode = canContribute and HIGHLIGHT_FONT_COLOR_CODE or DISABLED_FONT_COLOR_CODE;
 		local currencyID, currencyAmount = C_ContributionCollector.GetRequiredContributionCurrency(self.contributionID);
 		local itemID, itemCount = C_ContributionCollector.GetRequiredContributionItem(self.contributionID);
 		if currencyID then
@@ -398,7 +400,7 @@ function ContributionCollectionMixin:OnLoad()
 	self.rewardPool = CreateFramePool("FRAME", self, "ContributionRewardTemplate");
 end
 
-function ContributionCollectionMixin:OnShow()
+function ContributionCollectionMixin:OnShowCollection()
 	PlaySound(SOUNDKIT.UI_72_BUILDING_CONTRIBUTION_TABLE_OPEN);
 
 	self:RegisterEvent("CONTRIBUTION_COLLECTOR_UPDATE");

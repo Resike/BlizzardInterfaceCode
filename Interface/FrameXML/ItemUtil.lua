@@ -3,8 +3,12 @@ ItemButtonUtil = {};
 
 ItemButtonUtil.ItemContextEnum = {
 	Scrapping = 1,
-	CleanseCorruption = 2, 
-	ApplyCorruption = 3,
+	CleanseCorruption = 2,
+	PickRuneforgeBaseItem = 3,
+	ReplaceBonusTree = 4,
+	SelectRuneforgeItem = 5,
+	SelectRuneforgeUpgradeItem = 6,
+	Soulbinds = 7,
 };
 
 ItemButtonUtil.ItemContextMatchResult = {
@@ -13,7 +17,7 @@ ItemButtonUtil.ItemContextMatchResult = {
 	DoesNotApply = 3,
 };
 
-local ItemButtonUtilRegistry = CreateFromMixins(CallbackRegistryBaseMixin);
+local ItemButtonUtilRegistry = CreateFromMixins(CallbackRegistryMixin);
 ItemButtonUtilRegistry:OnLoad();
 ItemButtonUtilRegistry:GenerateCallbackEvents(
 {
@@ -39,10 +43,13 @@ function ItemButtonUtil.GetItemContext()
 		return ItemButtonUtil.ItemContextEnum.Scrapping;
 	elseif ItemInteractionFrame and ItemInteractionFrame:IsShown() and ItemInteractionFrame:GetFrameType() == Enum.ItemInteractionFrameType.CleanseCorruption then
 		return ItemButtonUtil.ItemContextEnum.CleanseCorruption;
-	elseif TargetSpellHasApplyCorruption() then
-		return ItemButtonUtil.ItemContextEnum.ApplyCorruption;
+	elseif RuneforgeFrame and RuneforgeFrame:IsShown() then
+		return RuneforgeFrame:GetItemContext();
+	elseif TargetSpellReplacesBonusTree() then
+		return ItemButtonUtil.ItemContextEnum.ReplaceBonusTree;
+	elseif SoulbindViewer and SoulbindViewer:IsShown() then
+		return ItemButtonUtil.ItemContextEnum.Soulbinds;
 	end
-	
 	return nil;
 end
 
@@ -62,8 +69,20 @@ function ItemButtonUtil.GetItemContextMatchResultForItem(itemLocation)
 			return C_Item.CanScrapItem(itemLocation) and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch;
 		elseif itemContext == ItemButtonUtil.ItemContextEnum.CleanseCorruption then 
 			return C_Item.IsItemCorrupted(itemLocation) and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch;
-		elseif itemContext == ItemButtonUtil.ItemContextEnum.ApplyCorruption then 
-			return C_Item.IsItemCorruptable(itemLocation) and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch;
+		elseif itemContext == ItemButtonUtil.ItemContextEnum.PickRuneforgeBaseItem then 
+			return C_LegendaryCrafting.IsValidRuneforgeBaseItem(itemLocation) and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch;
+		elseif itemContext == ItemButtonUtil.ItemContextEnum.ReplaceBonusTree then 
+			return C_Item.DoesItemMatchBonusTreeReplacement(itemLocation) and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch;
+		elseif itemContext == ItemButtonUtil.ItemContextEnum.SelectRuneforgeItem then 
+			return RuneforgeUtil.IsUpgradeableRuneforgeLegendary(itemLocation) and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch;
+		elseif itemContext == ItemButtonUtil.ItemContextEnum.SelectRuneforgeUpgradeItem then 
+			return RuneforgeFrame:IsUpgradeItemValidForRuneforgeLegendary(itemLocation) and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch;
+		elseif itemContext == ItemButtonUtil.ItemContextEnum.Soulbinds then
+			local CONDUIT_UPGRADE_ITEM = 184359;
+			if C_Item.IsItemConduit(itemLocation) or (C_Item.GetItemID(itemLocation) == CONDUIT_UPGRADE_ITEM) then
+				return ItemButtonUtil.ItemContextMatchResult.Match;
+			end
+			return ItemButtonUtil.ItemContextMatchResult.Mismatch;
 		else
 			return ItemButtonUtil.ItemContextMatchResult.DoesNotApply;
 		end
@@ -93,7 +112,10 @@ function ItemUtil.GetItemDetails(itemLink, quantity, isCurrency, lootSource)
 	local itemName, itemRarity, itemTexture, _;
 	if (isCurrency) then
 		local currencyID = C_CurrencyInfo.GetCurrencyIDFromLink(itemLink);
-		itemName, _, itemTexture, _, _, _, _, itemRarity = GetCurrencyInfo(itemLink);
+		local currencyInfo = C_CurrencyInfo.GetCurrencyInfoFromLink(itemLink);
+		itemName = currencyInfo.name;
+		itemTexture = currencyInfo.iconFileID;
+		itemRarity = currencyInfo.quality;
 		itemName, itemTexture, quantity, itemRarity = CurrencyContainerUtil.GetCurrencyContainerInfoForAlert(currencyID, quantity, itemName, itemTexture, itemRarity);
 		if ( lootSource == LOOT_SOURCE_GARRISON_CACHE ) then
 			itemName = format(GARRISON_RESOURCES_LOOT, quantity);
@@ -114,3 +136,11 @@ function ItemUtil.PickupBagItem(itemLocation)
 		PickupContainerItem(bag, slot);
 	end
 end
+
+function ItemUtil.GetOptionalReagentCount(itemID)
+	local includeBank = true;
+	local includeUses = false;
+	local includeReagentBank = true;
+	return GetItemCount(itemID, includeBank, includeUses, includeReagentBank);
+end
+

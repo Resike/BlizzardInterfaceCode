@@ -69,12 +69,13 @@ UIPanelWindows["CommunitiesGuildNewsFiltersFrame"] =		{ area = "left",			pushabl
 UIPanelWindows["ClubFinderGuildRecruitmentDialog"] =		{ area = "left",			pushable = 1,	whileDead = 1 };
 
 -- Frames NOT using the new Templates
+UIPanelWindows["AnimaDiversionFrame"] =			{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 0, allowOtherPanels = 1 };
 UIPanelWindows["CinematicFrame"] =				{ area = "full",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 1 };
 UIPanelWindows["ChatConfigFrame"] =				{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 1 };
+UIPanelWindows["ChromieTimeFrame"] =			{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 0, allowOtherPanels = 1 };
 UIPanelWindows["PVPMatchScoreboard"] =			{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 1,	ignoreControlLost = true, };
 UIPanelWindows["PVPMatchResults"] =				{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 1,	ignoreControlLost = true, };
-UIPanelWindows["QuestChoiceFrame"] =			{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 0, allowOtherPanels = 1 };
-UIPanelWindows["WarboardQuestChoiceFrame"] =	{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 0, allowOtherPanels = 1 };
+UIPanelWindows["PlayerChoiceFrame"] =			{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 0, allowOtherPanels = 1 };
 UIPanelWindows["GarrisonBuildingFrame"] =		{ area = "center",			pushable = 0,		whileDead = 1, 		width = 1002, 	allowOtherPanels = 1};
 UIPanelWindows["GarrisonMissionFrame"] =		{ area = "center",			pushable = 0,		whileDead = 1, 		checkFit = 1,	allowOtherPanels = 1, extraWidth = 20,	extraHeight = 100 };
 UIPanelWindows["GarrisonShipyardFrame"] =		{ area = "center",			pushable = 0,		whileDead = 1, 		checkFit = 1,	allowOtherPanels = 1, extraWidth = 20,	extraHeight = 100 };
@@ -86,33 +87,45 @@ UIPanelWindows["OrderHallMissionFrame"] =		{ area = "center",			pushable = 0,		w
 UIPanelWindows["OrderHallTalentFrame"] =		{ area = "left",			pushable = 0,		xoffset = 16};
 UIPanelWindows["ChallengesKeystoneFrame"] =		{ area = "center",			pushable = 0};
 UIPanelWindows["BFAMissionFrame"] =				{ area = "center",			pushable = 0,		whileDead = 1, 		checkFit = 1,	allowOtherPanels = 1, extraWidth = 20,	extraHeight = 100 };
+UIPanelWindows["CovenantMissionFrame"] =		{ area = "center",			pushable = 0,		whileDead = 1, 		checkFit = 1,	allowOtherPanels = 1, extraWidth = 20,	extraHeight = 100 };
+UIPanelWindows["BarberShopFrame"] =				{ area = "full",			pushable = 0,};
+UIPanelWindows["TorghastLevelPickerFrame"] =	{ area = "center",			pushable = 0, 		xoffset = -16, 		yoffset = 12,	whileDead = 0, allowOtherPanels = 1 };
 
-local function GetUIPanelWindowInfo(frame, name)
-	if ( not frame:GetAttribute("UIPanelLayout-defined") ) then
-	    local info = UIPanelWindows[frame:GetName()];
-	    if ( not info ) then
+local function SetFrameAttributes(frame, attributes)
+	frame:SetAttribute("UIPanelLayout-defined", true);
+	for name, value in pairs(attributes) do
+		frame:SetAttribute("UIPanelLayout-"..name, value);
+	end
+end
+
+function RegisterUIPanel(frame, attributes)
+	local name = frame:GetName();
+	if not UIPanelWindows[name] then
+		UIPanelWindows[name] = attributes;
+		--SetFrameAttributes(frame, attributes);
+	end
+end
+
+local function GetUIPanelAttribute(frame, name)
+	if not frame:GetAttribute("UIPanelLayout-defined") then
+	    local attributes = UIPanelWindows[frame:GetName()];
+	    if not attributes then
 			return;
 	    end
-		frame:SetAttribute("UIPanelLayout-defined", true);
-	    for name,value in pairs(info) do
-			frame:SetAttribute("UIPanelLayout-"..name, value);
-		end
+		SetFrameAttributes(frame, attributes);
 	end
 	return frame:GetAttribute("UIPanelLayout-"..name);
 end
 
 function SetUIPanelAttribute(frame, name, value)
-	local info = UIPanelWindows[frame:GetName()];
-	if ( not info ) then
+	local attributes = UIPanelWindows[frame:GetName()];
+	if not attributes then
 		return;
 	end
 
-	if ( not frame:GetAttribute("UIPanelLayout-defined") ) then
-		frame:SetAttribute("UIPanelLayout-defined", true);
-		for name,value in pairs(info) do
-			frame:SetAttribute("UIPanelLayout-"..name, value);
+	if not frame:GetAttribute("UIPanelLayout-defined") then
+		SetFrameAttributes(frame, attributes);
 		end
-	end
 
 	frame:SetAttribute("UIPanelLayout-"..name, value);
 end
@@ -126,11 +139,16 @@ UIChildWindows = {
 	"GearManagerDialog",
 };
 
+-- Hooked by DesignerBar.lua if that addon is loaded
+function GetOffsetForDebugMenu()
+	local debugMenuOffset = DebugMenu and DebugMenu.IsVisible() and DebugMenu.GetMenuHeight() or 0;
+	local revealTimeTrackOffset = C_Reveal and C_Reveal:IsCapturing() and C_Reveal:GetTimeTrackHeight() or 0;
+	return debugMenuOffset + revealTimeTrackOffset;
+end
+
 function UpdateUIParentRelativeToDebugMenu()
-	local debugMenuOffset = DebugMenu and DebugMenu.IsVisible() and -DebugMenu.GetMenuHeight() or 0;
-	local revealTimeTrackOffset = C_Reveal and C_Reveal:IsCapturing() and -C_Reveal:GetTimeTrackHeight() or 0;
-	local topOffset = debugMenuOffset + revealTimeTrackOffset;
-	UIParent:SetPoint("TOPLEFT", 0, topOffset);
+	local topOffset = GetOffsetForDebugMenu();
+	UIParent:SetPoint("TOPLEFT", 0, -topOffset);
 end
 
 UISpecialFrames = {
@@ -150,16 +168,16 @@ UIMenus = {
 };
 
 ITEM_QUALITY_COLORS = { };
-for i = 0, NUM_LE_ITEM_QUALITYS - 1 do
+for i = 0, Enum.ItemQualityMeta.NumValues - 1 do
 	local r, g, b = GetItemQualityColor(i);
 	local color = CreateColor(r, g, b, 1);
 	ITEM_QUALITY_COLORS[i] = { r = r, g = g, b = b, hex = color:GenerateHexColorMarkup(), color = color };
 end
 
 WORLD_QUEST_QUALITY_COLORS = {
-	[LE_WORLD_QUEST_QUALITY_COMMON] = ITEM_QUALITY_COLORS[LE_ITEM_QUALITY_COMMON];
-	[LE_WORLD_QUEST_QUALITY_RARE] = ITEM_QUALITY_COLORS[LE_ITEM_QUALITY_RARE];
-	[LE_WORLD_QUEST_QUALITY_EPIC] = ITEM_QUALITY_COLORS[LE_ITEM_QUALITY_EPIC];
+	[Enum.WorldQuestQuality.Common] = ITEM_QUALITY_COLORS[Enum.ItemQuality.Common];
+	[Enum.WorldQuestQuality.Rare] = ITEM_QUALITY_COLORS[Enum.ItemQuality.Rare];
+	[Enum.WorldQuestQuality.Epic] = ITEM_QUALITY_COLORS[Enum.ItemQuality.Epic];
 };
 
 -- Protecting from addons since we use this in GetScaledCursorDelta which is used in secure code.
@@ -187,6 +205,7 @@ function UIParent_OnLoad(self)
 	self:RegisterEvent("LOGOUT_CANCEL");
 	self:RegisterEvent("LOOT_BIND_CONFIRM");
 	self:RegisterEvent("EQUIP_BIND_CONFIRM");
+	self:RegisterEvent("EQUIP_BIND_REFUNDABLE_CONFIRM");
 	self:RegisterEvent("EQUIP_BIND_TRADEABLE_CONFIRM");
 	self:RegisterEvent("USE_BIND_CONFIRM");
 	self:RegisterEvent("USE_NO_REFUND_CONFIRM");
@@ -258,6 +277,8 @@ function UIParent_OnLoad(self)
 	self:RegisterEvent("AUCTION_HOUSE_SCRIPT_DEPRECATED");
 	self:RegisterEvent("LOADING_SCREEN_ENABLED");
 	self:RegisterEvent("LOADING_SCREEN_DISABLED");
+	self:RegisterEvent("CVAR_UPDATE");
+	self:RegisterEvent("LEAVING_TUTORIAL_AREA");
 
 	-- Events for auction UI handling
 	self:RegisterEvent("AUCTION_HOUSE_SHOW");
@@ -349,8 +370,8 @@ function UIParent_OnLoad(self)
 	-- Events for Wardrobe
 	self:RegisterEvent("TRANSMOG_COLLECTION_UPDATED");
 
-	-- Events for Quest Choice
-	self:RegisterEvent("QUEST_CHOICE_UPDATE");
+	-- Events for Player Choice
+	self:RegisterEvent("PLAYER_CHOICE_UPDATE");
 
 	-- Lua warnings
 	self:RegisterEvent("LUA_WARNING");
@@ -373,6 +394,9 @@ function UIParent_OnLoad(self)
 	self:RegisterEvent("GARRISON_MONUMENT_SHOW_UI");
 	self:RegisterEvent("GARRISON_RECRUITMENT_NPC_OPENED");
 	self:RegisterEvent("GARRISON_TALENT_NPC_OPENED");
+	self:RegisterEvent("SOULBIND_FORGE_INTERACTION_STARTED");
+	self:RegisterEvent("COVENANT_SANCTUM_INTERACTION_STARTED");
+	self:RegisterEvent("COVENANT_RENOWN_INTERACTION_STARTED");
 
 	-- Shop (for Asia promotion)
 	self:RegisterEvent("PRODUCT_DISTRIBUTIONS_UPDATED");
@@ -430,6 +454,21 @@ function UIParent_OnLoad(self)
 
 	-- Event(s) for Item Interaction
     self:RegisterEvent("ITEM_INTERACTION_OPEN");
+
+	-- Event(s) for Chromie Time UI
+	self:RegisterEvent("CHROMIE_TIME_OPEN");
+
+	-- Event(s) for Covenant Preview UI
+	self:RegisterEvent("COVENANT_PREVIEW_OPEN");
+
+	-- Event(s) for Anima Diversion UI
+	self:RegisterEvent("ANIMA_DIVERSION_OPEN");
+
+	-- Event(s) for Runeforge UI
+	self:RegisterEvent("RUNEFORGE_LEGENDARY_CRAFTING_OPENED");
+
+	-- Event(s) for Weekly Rewards UI
+	self:RegisterEvent("WEEKLY_REWARDS_SHOW");
 end
 
 function UIParent_OnShow(self)
@@ -441,11 +480,19 @@ function UIParent_OnShow(self)
 	if ( LowHealthFrame ) then
 		LowHealthFrame:EvaluateVisibleState();
 	end
+
+	if ActionStatus then
+		ActionStatus:UpdateParent();
+	end
 end
 
 function UIParent_OnHide(self)
 	if ( LowHealthFrame ) then
 		LowHealthFrame:EvaluateVisibleState();
+	end
+
+	if ActionStatus then
+		ActionStatus:UpdateParent();
 	end
 end
 
@@ -552,10 +599,6 @@ function ScrappingMachineFrame_LoadUI()
 	UIParentLoadAddOn("Blizzard_ScrappingMachineUI");
 end
 
-function GMSurveyFrame_LoadUI()
-	UIParentLoadAddOn("Blizzard_GMSurveyUI");
-end
-
 function ItemSocketingFrame_LoadUI()
 	UIParentLoadAddOn("Blizzard_ItemSocketingUI");
 end
@@ -635,12 +678,8 @@ function ItemUpgrade_LoadUI()
 	UIParentLoadAddOn("Blizzard_ItemUpgradeUI");
 end
 
-function QuestChoice_LoadUI()
-	UIParentLoadAddOn("Blizzard_QuestChoice");
-end
-
-function WarboardQuestChoice_LoadUI()
-	UIParentLoadAddOn("Blizzard_WarboardUI");
+function PlayerChoice_LoadUI()
+	UIParentLoadAddOn("Blizzard_PlayerChoiceUI");
 end
 
 function Store_LoadUI()
@@ -671,6 +710,18 @@ function APIDocumentation_LoadUI()
 	UIParentLoadAddOn("Blizzard_APIDocumentation");
 end
 
+function CovenantSanctum_LoadUI()
+	UIParentLoadAddOn("Blizzard_CovenantSanctum");
+end
+
+function CovenantRenown_LoadUI()
+	UIParentLoadAddOn("Blizzard_CovenantRenown");
+end
+
+function WeeklyRewards_LoadUI()
+	UIParentLoadAddOn("Blizzard_WeeklyRewards");
+end
+
 --[[
 function MovePad_LoadUI()
 	UIParentLoadAddOn("Blizzard_MovePad");
@@ -678,8 +729,27 @@ end
 ]]
 
 function Tutorial_LoadUI()
-	if ( GetTutorialsEnabled() and UnitLevel("player") < NPE_TUTORIAL_COMPLETE_LEVEL ) then
+	if ( GetTutorialsEnabled() and C_PlayerInfo.IsPlayerEligibleForNPE() ) then
 		UIParentLoadAddOn("Blizzard_Tutorial");
+	end
+end
+
+function NPE_CheckTutorials()
+	if C_PlayerInfo.IsPlayerNPERestricted() and UnitLevel("player") == 1 then
+		-- Hacky 9.0.1 fix for WOW9-58485...just force tutorials to on if they are entering Exile's Reach on a level 1 character
+		SetCVar("showTutorials", 1);
+	end
+
+	NPE_LoadUI();
+end
+
+function NPE_LoadUI()
+	if ( not GetTutorialsEnabled() or IsAddOnLoaded("Blizzard_NewPlayerExperience") ) then
+		return;
+	end
+	local isRestricted = C_PlayerInfo.IsPlayerNPERestricted();
+	if  isRestricted then
+		UIParentLoadAddOn("Blizzard_NewPlayerExperience");
 	end
 end
 
@@ -711,26 +781,42 @@ function AzeriteRespecFrame_LoadUI()
 	UIParentLoadAddOn("Blizzard_AzeriteRespecUI");
 end
 
+function ChromieTimeFrame_LoadUI()
+	UIParentLoadAddOn("Blizzard_ChromieTimeUI");
+end
+
+function CovenantPreviewFrame_LoadUI()
+	UIParentLoadAddOn("Blizzard_CovenantPreviewUI");
+end
+
+function AnimaDiversionFrame_LoadUI()
+	UIParentLoadAddOn("Blizzard_AnimaDiversionUI");
+end
+
+function RuneforgeFrame_LoadUI()
+	UIParentLoadAddOn("Blizzard_RuneforgeUI");
+end
+
+function SubscriptionInterstitial_LoadUI()
+	LoadAddOn("Blizzard_SubscriptionInterstitialUI");
+end
+
 local playerEnteredWorld = false;
 local varsLoaded = false;
 function NPETutorial_AttemptToBegin(event)
-	if ( NewPlayerExperience and not NewPlayerExperience.IsActive ) then
-		NewPlayerExperience:Begin();
-		return;
-	end
 	if( event == "PLAYER_ENTERING_WORLD" ) then
 		playerEnteredWorld = true;
 	elseif ( event == "VARIABLES_LOADED" ) then
 		varsLoaded = true;
 	end
 	if ( playerEnteredWorld and varsLoaded ) then
-		Tutorial_LoadUI();
+		NPE_CheckTutorials();
 	end
 end
 
 function OrderHall_CheckCommandBar()
 	if (not OrderHallCommandBar or not OrderHallCommandBar:IsShown()) then
-		if (C_Garrison.IsPlayerInGarrison(LE_GARRISON_TYPE_7_0)) then
+		if (C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_7_0)) then
 			OrderHall_LoadUI();
 			OrderHallCommandBar:Show();
 		end
@@ -745,7 +831,7 @@ function ShowMacroFrame()
 end
 
 function InspectAchievements (unit)
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -754,7 +840,7 @@ function InspectAchievements (unit)
 end
 
 function ToggleAchievementFrame(stats)
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -765,7 +851,7 @@ function ToggleAchievementFrame(stats)
 end
 
 function ToggleTalentFrame(suggestedTab)
-	if (UnitLevel("player") < SHOW_SPEC_LEVEL) then
+	if not C_SpecializationInfo.CanPlayerUseTalentSpecUI() then
 		return;
 	end
 
@@ -790,7 +876,7 @@ function ToggleTimeManager()
 end
 
 function ToggleCalendar()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -805,7 +891,7 @@ function IsCommunitiesUIDisabledByTrialAccount()
 end
 
 function ToggleGuildFrame()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -840,26 +926,26 @@ local function ToggleClubFinderBasedOnType(isGuildType)
 	ToggleCommunitiesFrame();
 	local communitiesFrame = CommunitiesFrame;
 
-	if( not communitiesFrame:IsShown()) then 
+	if( not communitiesFrame:IsShown()) then
 		return;
-	end 
+	end
 
-	if (isGuildType) then 
+	if (isGuildType) then
 		communitiesFrame:SetDisplayMode(COMMUNITIES_FRAME_DISPLAY_MODES.GUILD_FINDER);
-	else 
+	else
 		communitiesFrame:SetDisplayMode(COMMUNITIES_FRAME_DISPLAY_MODES.COMMUNITY_FINDER);
 	end
 
 	communitiesFrame.GuildFinderFrame.isGuildType = isGuildType;
 	communitiesFrame.GuildFinderFrame.selectedTab = 1;
-	communitiesFrame.GuildFinderFrame:UpdateType(); 
+	communitiesFrame.GuildFinderFrame:UpdateType();
 
 	communitiesFrame:SelectClub(nil);
 	communitiesFrame.Inset:Hide();
-end 
+end
 
 function ToggleGuildFinder()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -885,7 +971,7 @@ function ToggleCommunityFinder()
 end
 
 function ToggleLFDParentFrame()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -894,30 +980,26 @@ function ToggleLFDParentFrame()
 		return;
 	end
 
-	if ( UnitLevel("player") >= math.min(SHOW_LFD_LEVEL,SHOW_PVP_LEVEL) ) then
+	local canUse, failureReason = C_LFGInfo.CanPlayerUseGroupFinder();
+	if canUse then
 		PVEFrame_ToggleFrame("GroupFinderFrame", LFDParentFrame);
 	end
 end
 
 function ToggleHelpFrame()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
 	if ( HelpFrame:IsShown() ) then
 		HideUIPanel(HelpFrame);
 	else
-		StaticPopup_Hide("HELP_TICKET");
-		StaticPopup_Hide("HELP_TICKET_ABANDON_CONFIRM");
-		StaticPopup_Hide("GM_RESPONSE_NEED_MORE_HELP");
-		StaticPopup_Hide("GM_RESPONSE_RESOLVE_CONFIRM");
-		StaticPopup_Hide("GM_RESPONSE_MUST_RESOLVE_RESPONSE");
-		HelpFrame_ShowFrame();
+		HelpFrame:ShowFrame();
 	end
 end
 
 function ToggleRaidFrame()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -930,7 +1012,7 @@ function ToggleRaidFrame()
 end
 
 function ToggleRaidBrowser()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -955,6 +1037,10 @@ function CanShowEncounterJournal()
 end
 
 function ToggleEncounterJournal()
+	if ( Kiosk.IsEnabled() ) then
+		return false;
+	end
+
 	if ( not CanShowEncounterJournal() ) then
 		return false;
 	end
@@ -985,6 +1071,10 @@ COLLECTIONS_JOURNAL_TAB_INDEX_HEIRLOOMS = COLLECTIONS_JOURNAL_TAB_INDEX_TOYS + 1
 COLLECTIONS_JOURNAL_TAB_INDEX_APPEARANCES = COLLECTIONS_JOURNAL_TAB_INDEX_HEIRLOOMS + 1;
 
 function ToggleCollectionsJournal(tabIndex)
+	if Kiosk.IsEnabled() then
+		return;
+	end
+
 	if CollectionsJournal then
 		local tabMatches = not tabIndex or tabIndex == PanelTemplates_GetSelectedTab(CollectionsJournal);
 		local isShown = CollectionsJournal:IsShown() and tabMatches;
@@ -1017,17 +1107,18 @@ function ToggleToyCollection(autoPageToCollectedToyID)
 end
 
 function TogglePVPUI()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
-	if ( UnitLevel("player") >= math.min(SHOW_LFD_LEVEL,SHOW_PVP_LEVEL) ) then
+	local canUse, failureReason = C_LFGInfo.CanPlayerUseGroupFinder();
+	if canUse then
 		PVEFrame_ToggleFrame("PVPUIFrame", nil);
 	end
 end
 
 function ToggleStoreUI()
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -1042,7 +1133,7 @@ function ToggleStoreUI()
 end
 
 function SetStoreUIShown(shown)
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -1070,11 +1161,25 @@ function ToggleGarrisonMissionUI()
 	GarrisonMissionFrame_ToggleFrame();
 end
 
+function ToggleCovenantMissionUI()
+	if (not CovenantMissionFrame) then
+		Garrison_LoadUI();
+	end
+	ShowUIPanel(CovenantMissionFrame);
+end
+
 function ToggleOrderHallTalentUI()
 	if (not OrderHallTalentFrame) then
 		OrderHall_LoadUI();
 	end
 	OrderHallTalentFrame_ToggleFrame();
+end
+
+function ToggleCovenantRenown()
+	if (not CovenantRenownFrame) then
+		CovenantRenown_LoadUI();
+	end
+	ToggleFrame(CovenantRenownFrame);
 end
 
 function OpenDeathRecapUI(id)
@@ -1177,7 +1282,7 @@ function UIParent_OnEvent(self, event, ...)
 				local landingPageTabIndex;
 				local garrTypeID = GarrisonFollowerOptions[followerTypeID].garrisonType;
 				if (C_Garrison.HasGarrison(garrTypeID)) then
-					if (followerTypeID == LE_FOLLOWER_TYPE_SHIPYARD_6_2) then
+					if (followerTypeID == Enum.GarrisonFollowerType.FollowerType_6_2) then
 						landingPageTabIndex = 3;
 					else
 						landingPageTabIndex = 2;
@@ -1206,8 +1311,8 @@ function UIParent_OnEvent(self, event, ...)
 					GarrisonMissionListTab_SetTab(GarrisonMissionFrame.MissionTab.MissionList.Tab2);
 				end
 			else
-				if (C_Garrison.HasGarrison(LE_GARRISON_TYPE_6_0)) then
-					ShowGarrisonLandingPage(LE_GARRISON_TYPE_6_0);
+				if (C_Garrison.HasGarrison(Enum.GarrisonType.Type_6_0)) then
+					ShowGarrisonLandingPage(Enum.GarrisonType.Type_6_0);
 
 					-- switch to the mission tab
 					if ( PanelTemplates_GetSelectedTab(GarrisonLandingPage) ~= 1 ) then
@@ -1233,6 +1338,18 @@ function UIParent_OnEvent(self, event, ...)
 			end
 		end
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged);
+	elseif ( event == "CVAR_UPDATE" ) then
+		local cvarName = ...;
+		if cvarName and cvarName == "SHOW_TUTORIALS" then
+			local showTutorials = GetCVarBool("showTutorials");
+			if ( showTutorials ) then
+				if ( IsAddOnLoaded("Blizzard_NewPlayerExperience") ) then
+					NewPlayerExperience:Initialize();
+				else
+					NPE_LoadUI();
+				end
+			end
+		end
 	elseif ( event == "VARIABLES_LOADED" ) then
 		UIParent.variablesLoaded = true;
 
@@ -1326,6 +1443,8 @@ function UIParent_OnEvent(self, event, ...)
 		if ( dialog ) then
 			dialog.data = arg1;
 		end
+	elseif event == "LEAVING_TUTORIAL_AREA" then
+		StaticPopup_Show("LEAVING_TUTORIAL_AREA");
 	elseif ( event == "PARTY_INVITE_REQUEST" ) then
 		FlashClientIcon();
 
@@ -1376,13 +1495,22 @@ function UIParent_OnEvent(self, event, ...)
 			dialog.data = arg1;
 		end
 	elseif ( event == "EQUIP_BIND_CONFIRM" ) then
+		StaticPopup_Hide("EQUIP_BIND_REFUNDABLE");
 		StaticPopup_Hide("EQUIP_BIND_TRADEABLE");
 		local dialog = StaticPopup_Show("EQUIP_BIND");
 		if ( dialog ) then
 			dialog.data = arg1;
 		end
+	elseif ( event == "EQUIP_BIND_REFUNDABLE_CONFIRM" ) then
+		StaticPopup_Hide("EQUIP_BIND");
+		StaticPopup_Hide("EQUIP_BIND_TRADEABLE");
+		local dialog = StaticPopup_Show("EQUIP_BIND_REFUNDABLE");
+		if ( dialog ) then
+			dialog.data = arg1;
+		end
 	elseif ( event == "EQUIP_BIND_TRADEABLE_CONFIRM" ) then
 		StaticPopup_Hide("EQUIP_BIND");
+		StaticPopup_Hide("EQUIP_BIND_REFUNDABLE");
 		local dialog = StaticPopup_Show("EQUIP_BIND_TRADEABLE");
 		if ( dialog ) then
 			dialog.data = arg1;
@@ -1395,7 +1523,7 @@ function UIParent_OnEvent(self, event, ...)
 		StaticPopup_Show("CONFIM_BEFORE_USE");
 	elseif ( event == "DELETE_ITEM_CONFIRM" ) then
 		-- Check quality, ignore heirlooms
-		if ( arg2 >= LE_ITEM_QUALITY_RARE and arg2 ~= LE_ITEM_QUALITY_HEIRLOOM ) then
+		if ( arg2 >= Enum.ItemQuality.Rare and arg2 ~= Enum.ItemQuality.Heirloom ) then
 			if (arg4 == 1) then -- quest item?
 				StaticPopup_Show("DELETE_GOOD_QUEST_ITEM", arg1);
 			else
@@ -1409,7 +1537,7 @@ function UIParent_OnEvent(self, event, ...)
 			end
 		end
 	elseif ( event == "QUEST_ACCEPT_CONFIRM" ) then
-		local numEntries, numQuests = GetNumQuestLogEntries();
+		local numEntries, numQuests = C_QuestLog.GetNumQuestLogEntries();
 		if( numQuests >= MAX_QUESTS) then
 			StaticPopup_Show("QUEST_ACCEPT_LOG_FULL", arg1, arg2);
 		else
@@ -1418,7 +1546,7 @@ function UIParent_OnEvent(self, event, ...)
 	elseif ( event =="QUEST_LOG_UPDATE" or event == "UNIT_QUEST_LOG_CHANGED" ) then
 		local frameName = StaticPopup_Visible("QUEST_ACCEPT_LOG_FULL");
 		if( frameName ) then
-			local numEntries, numQuests = GetNumQuestLogEntries();
+			local numEntries, numQuests = C_QuestLog.GetNumQuestLogEntries();
 			local button = _G[frameName.."Button1"];
 			if( numQuests < MAX_QUESTS ) then
 				button:Enable();
@@ -1451,6 +1579,13 @@ function UIParent_OnEvent(self, event, ...)
 		end
 		if ( C_Commentator.IsSpectating() ) then
 			Commentator_LoadUI();
+		end
+
+		if(C_PlayerChoice.IsWaitingForPlayerChoiceResponse()) then
+			if(not PlayerChoiceFrame) then
+				PlayerChoice_LoadUI();
+			end
+			PlayerChoiceToggleButton:TryShow();
 		end
 
 		if ( UnitIsGhost("player") ) then
@@ -1513,6 +1648,14 @@ function UIParent_OnEvent(self, event, ...)
 		NPETutorial_AttemptToBegin(event);
 		ClassTrial_AttemptLoad();
 		BoostTutorial_AttemptLoad();
+
+		if Kiosk.IsEnabled() then
+			LoadAddOn("Blizzard_Kiosk");
+		end
+
+		if IsTrialAccount() or IsVeteranTrialAccount() then
+			SubscriptionInterstitial_LoadUI();
+		end
 	elseif ( event == "UPDATE_BATTLEFIELD_STATUS" or event == "PVP_BRAWL_INFO_UPDATED" ) then
 		PlayBattlefieldBanner(self);
 	elseif ( event == "GROUP_ROSTER_UPDATE" ) then
@@ -1547,23 +1690,13 @@ function UIParent_OnEvent(self, event, ...)
 		local resSicknessTime = GetResSicknessDuration();
 		if ( resSicknessTime ) then
 			local dialog = nil;
-			if (UnitLevel("player") <= 10) then
-				dialog = StaticPopup_Show("XP_LOSS_NO_DURABILITY", resSicknessTime);
+			if (UnitLevel("player") < Constants.LevelConstsExposed.MIN_RES_SICKNESS_LEVEL) then
+				dialog = StaticPopup_Show("XP_LOSS_NO_SICKNESS_NO_DURABILITY", resSicknessTime);
 			else
 				dialog = StaticPopup_Show("XP_LOSS", resSicknessTime);
 			end
 			if ( dialog ) then
 				dialog.data = resSicknessTime;
-			end
-		else
-			local dialog = nil;
-			if (UnitLevel("player") <= 10) then
-				dialog = StaticPopup_Show("XP_LOSS_NO_SICKNESS_NO_DURABILITY");
-			else
-				dialog = StaticPopup_Show("XP_LOSS_NO_SICKNESS");
-			end
-			if ( dialog ) then
-				dialog.data = 1;
 			end
 		end
 		HideUIPanel(GossipFrame);
@@ -1817,18 +1950,21 @@ function UIParent_OnEvent(self, event, ...)
 	elseif ( event == "ADVENTURE_MAP_OPEN" ) then
 		Garrison_LoadUI();
 		local followerTypeID = ...;
-		if ( followerTypeID == LE_FOLLOWER_TYPE_GARRISON_7_0 ) then
+		if ( followerTypeID == Enum.GarrisonFollowerType.FollowerType_7_0 ) then
 			ShowUIPanel(OrderHallMissionFrame);
-		else
+		elseif ( followerTypeID == Enum.GarrisonFollowerType.FollowerType_8_0 ) then
 			ShowUIPanel(BFAMissionFrame);
+		elseif ( followerTypeID == Enum.GarrisonFollowerType.FollowerType_9_0 ) then
+			ShowUIPanel(CovenantMissionFrame);
 		end
 
 	-- Event for BarberShop handling
 	elseif ( event == "BARBER_SHOP_OPEN" ) then
-		BarberShopFrame_LoadUI();
-		if ( BarberShopFrame ) then
-			ShowUIPanel(BarberShopFrame);
+		if not BarberShopFrame then
+			BarberShopFrame_LoadUI();
 		end
+
+		ShowUIPanel(BarberShopFrame);
 	elseif ( event == "BARBER_SHOP_CLOSE" ) then
 		if ( BarberShopFrame and BarberShopFrame:IsVisible() ) then
 			HideUIPanel(BarberShopFrame);
@@ -2028,15 +2164,10 @@ function UIParent_OnEvent(self, event, ...)
 
 	-- Quest Choice trigger event
 
-	elseif ( event == "QUEST_CHOICE_UPDATE" ) then
-		local choiceInfo = C_QuestChoice.GetQuestChoiceInfo();
-		if (choiceInfo.uiTextureKitID and choiceInfo.uiTextureKitID ~= 0) then
-			WarboardQuestChoice_LoadUI();
-			WarboardQuestChoiceFrame:TryShow();
-		else
-			QuestChoice_LoadUI();
-			QuestChoiceFrame:TryShow();
-		end
+	elseif ( event == "PLAYER_CHOICE_UPDATE" ) then
+		PlayerChoice_LoadUI();
+		PlayerChoiceFrame:TryShow();
+		PlayerChoiceToggleButton:TryShow();
 	elseif ( event == "LUA_WARNING" ) then
 		HandleLuaWarning(...);
 	elseif ( event == "GARRISON_ARCHITECT_OPENED") then
@@ -2050,7 +2181,7 @@ function UIParent_OnEvent(self, event, ...)
 		end
 	elseif ( event == "GARRISON_MISSION_NPC_OPENED") then
 		local followerType = ...;
-		if followerType ~= LE_FOLLOWER_TYPE_GARRISON_7_0 then
+		if followerType ~= Enum.GarrisonFollowerType.FollowerType_7_0 then
 			local frameName = GarrisonFollowerOptions[followerType].missionFrame;
 			if (not _G[frameName]) then
 				Garrison_LoadUI();
@@ -2065,6 +2196,10 @@ function UIParent_OnEvent(self, event, ...)
 		end
 		if ( BFAMissionFrame ) then
 			HideUIPanel(BFAMissionFrame);
+		end
+
+		if ( CovenantMissionFrame ) then
+			HideUIPanel(CovenantMissionFrame);
 		end
 	elseif ( event == "GARRISON_SHIPYARD_NPC_OPENED") then
 		if (not GarrisonShipyardFrame) then
@@ -2094,6 +2229,21 @@ function UIParent_OnEvent(self, event, ...)
 		OrderHall_LoadUI();
 		OrderHallTalentFrame:SetGarrisonType(...);
 		ToggleOrderHallTalentUI();
+	elseif ( event == "SOULBIND_FORGE_INTERACTION_STARTED") then
+		self:UnregisterEvent(event);
+		LoadAddOn("Blizzard_Soulbinds");
+		Soulbinds.OnAddonLoaded(event, ...);
+	elseif ( event == "COVENANT_SANCTUM_INTERACTION_STARTED" ) then
+		if not CovenantSanctumFrame then
+			CovenantSanctum_LoadUI();
+		end
+		CovenantSanctumFrame:OnEvent(event, ...);
+	elseif ( event == "COVENANT_RENOWN_INTERACTION_STARTED" ) then
+		self:UnregisterEvent(event);
+		if not CovenantRenownFrame then
+			CovenantRenown_LoadUI();
+		end
+		ShowUIPanel(CovenantRenownFrame);
 	elseif ( event == "PRODUCT_DISTRIBUTIONS_UPDATED" ) then
 		StoreFrame_CheckForFree(event);
 	elseif ( event == "LOADING_SCREEN_ENABLED" ) then
@@ -2183,6 +2333,22 @@ function UIParent_OnEvent(self, event, ...)
 	elseif (event == "ITEM_INTERACTION_OPEN") then
 		ItemInteraction_LoadUI();
 		ShowUIPanel(ItemInteractionFrame);
+	elseif (event =="COVENANT_PREVIEW_OPEN") then
+		CovenantPreviewFrame_LoadUI();
+		CovenantPreviewFrame:TryShow(...);
+	elseif (event =="CHROMIE_TIME_OPEN") then
+		ChromieTimeFrame_LoadUI();
+		ShowUIPanel(ChromieTimeFrame);
+	elseif (event == "ANIMA_DIVERSION_OPEN") then
+		AnimaDiversionFrame_LoadUI();
+		AnimaDiversionFrame:TryShow(...);
+	elseif (event == "RUNEFORGE_LEGENDARY_CRAFTING_OPENED") then
+		RuneforgeFrame_LoadUI();
+
+		local isUpgrade = ...;
+		RuneforgeFrame:SetRuneforgeState(isUpgrade and RuneforgeUtil.RuneforgeState.Upgrade or RuneforgeUtil.RuneforgeState.Craft);
+
+		ShowUIPanel(RuneforgeFrame);
 	-- Events for Reporting system
 	elseif (event == "REPORT_PLAYER_RESULT") then
 		local success = ...;
@@ -2193,6 +2359,11 @@ function UIParent_OnEvent(self, event, ...)
 			UIErrorsFrame:AddExternalErrorMessage(GERR_REPORT_SUBMISSION_FAILED);
 			DEFAULT_CHAT_FRAME:AddMessage(ERR_REPORT_SUBMISSION_FAILED);
 		end
+	elseif (event == "WEEKLY_REWARDS_SHOW") then
+		if not WeeklyRewardsFrame then
+			WeeklyRewards_LoadUI();
+		end
+		ShowUIPanel(WeeklyRewardsFrame);
 	elseif (event == "GLOBAL_MOUSE_DOWN" or event == "GLOBAL_MOUSE_UP") then
 		local buttonID = ...;
 
@@ -2204,7 +2375,7 @@ function UIParent_OnEvent(self, event, ...)
 
 		-- Clear keyboard focus.
 		local autoCompleteBoxList = { AutoCompleteBox }
-		if LFGListFrame and LFGListFrame.SearchPanel and LFGListFrame.SearchPanel.AutoCompleteFrame then 
+		if LFGListFrame and LFGListFrame.SearchPanel and LFGListFrame.SearchPanel.AutoCompleteFrame then
 			tinsert(autoCompleteBoxList, LFGListFrame.SearchPanel.AutoCompleteFrame);
 		end
 
@@ -2287,11 +2458,11 @@ function UIParent_UpdateTopFramePositions()
 		buffsAreaTopOffset = buffsAreaTopOffset + 13;
 	end
 
-	BuffFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -205, 0 - buffsAreaTopOffset);
+	BuffFrame:SetPoint("TOPRIGHT", MinimapCluster, "TOPLEFT", -10, 0 - buffsAreaTopOffset);
 end
 
 UIPARENT_ALTERNATE_FRAME_POSITIONS = {
-	["PlayerPowerBarAlt_Bottom"] = {baseY = true, yOffset = 20, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, reputation = 1, tutorialAlert = 1, extraActionBarFrame = 1, ZoneAbilityFrame = 1};
+	["PlayerPowerBarAlt_Bottom"] = {baseY = true, yOffset = 20, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, reputation = 1, tutorialAlert = 1, extraAbilityContainer = 1, };
 	["PlayerPowerBarAlt_Top"] = {baseY = -30, anchorTo = "UIParent", point = "TOP", rpoint = "TOP"};
 }
 
@@ -2302,21 +2473,20 @@ UIPARENT_MANAGED_FRAME_POSITIONS = {
 	["MultiBarBottomRight"] = {baseY = 2, watchBar = 1, maxLevel = 1, anchorTo = "ActionButton12", point = "TOPLEFT", rpoint = "TOPRIGHT", xOffset = 45};
 	["GroupLootContainer"] = {baseY = true, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1};
 	["TutorialFrameAlertButton"] = {baseY = true, yOffset = -10, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, watchBar = 1};
-	["FramerateLabel"] = {baseY = true, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraActionBarFrame = 1, anchorTo="WorldFrame" };
-	["ArcheologyDigsiteProgressBar"] = {baseY = true, yOffset = 40, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraActionBarFrame = 1, ZoneAbilityFrame = 1, castingBar = 1};
-	["CastingBarFrame"] = {baseY = true, yOffset = 40, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraActionBarFrame = 1, ZoneAbilityFrame = 1, talkingHeadFrame = 1, classResourceOverlayFrame = 1, classResourceOverlayOffset = 1};
-	["UIWidgetPowerBarContainerFrame"] = {baseY = true, yOffset = 20, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, extraActionBarFrame = 1, ZoneAbilityFrame = 1, talkingHeadFrame = 1, classResourceOverlayFrame = 1, classResourceOverlayOffset = 1};
-	["ClassResourceOverlayParentFrame"] = {baseY = true, yOffset = 0, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraActionBarFrame = 1, ZoneAbilityFrame = 1 };
+	["FramerateLabel"] = {baseY = true, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraAbilityContainer = 1, anchorTo="WorldFrame" };
+	["ArcheologyDigsiteProgressBar"] = {baseY = true, yOffset = 40, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraAbilityContainer = 1, castingBar = 1};
+	["CastingBarFrame"] = {baseY = true, yOffset = 40, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraAbilityContainer = 1, talkingHeadFrame = 1, classResourceOverlayFrame = 1, classResourceOverlayOffset = 1};
+	["UIWidgetPowerBarContainerFrame"] = {baseY = true, yOffset = 20, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, extraAbilityContainer = 1, talkingHeadFrame = 1, classResourceOverlayFrame = 1, classResourceOverlayOffset = 1};
+	["ClassResourceOverlayParentFrame"] = {baseY = true, yOffset = 0, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraAbilityContainer = 1, };
 	["PlayerPowerBarAlt"] = UIPARENT_ALTERNATE_FRAME_POSITIONS["PlayerPowerBarAlt_Bottom"];
-	["ExtraActionBarFrame"] = {baseY = true, yOffset = 0, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1};
-	["ZoneAbilityFrame"] = {baseY = true, yOffset = 0, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, extraActionBarFrame = 1};
+	["ExtraAbilityContainer"] = {baseY = true, yOffset = 0, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, powerBarWidgets = 1};
 	["ChatFrame1"] = {baseY = true, yOffset = 40, bottomLeft = actionBarOffset-8, justBottomRightAndStance = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, maxLevel = 1, point = "BOTTOMLEFT", rpoint = "BOTTOMLEFT", xOffset = 32};
 	["ChatFrame2"] = {baseY = true, yOffset = 40, bottomRight = actionBarOffset-8, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, rightLeft = -2*actionBarOffset, rightRight = -actionBarOffset, watchBar = 1, maxLevel = 1, point = "BOTTOMRIGHT", rpoint = "BOTTOMRIGHT", xOffset = -32};
 	["StanceBarFrame"] = {baseY = 0, bottomLeft = actionBarOffset, watchBar = 1, maxLevel = 1, anchorTo = "MainMenuBar", point = "BOTTOMLEFT", rpoint = "TOPLEFT", xOffset = 30};
 	["PossessBarFrame"] = {baseY = 0, bottomLeft = actionBarOffset, watchBar = 1, maxLevel = 1, anchorTo = "MainMenuBar", point = "BOTTOMLEFT", rpoint = "TOPLEFT", xOffset = 30};
 	["MultiCastActionBarFrame"] = {baseY = 8, bottomLeft = actionBarOffset, watchBar = 1, maxLevel = 1, anchorTo = "MainMenuBar", point = "BOTTOMLEFT", rpoint = "TOPLEFT", xOffset = 30};
 	["AuctionHouseMultisellProgressFrame"] = {baseY = true, yOffset = 18, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1};
-	["TalkingHeadFrame"] = {baseY = true, yOffset = 0, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraActionBarFrame = 1, ZoneAbilityFrame = 1, classResourceOverlayFrame = 1};
+	["TalkingHeadFrame"] = {baseY = true, yOffset = 0, bottomEither = actionBarOffset, overrideActionBar = overrideActionBarTop, petBattleFrame = petBattleTop, bonusActionBar = 1, pet = 1, watchBar = 1, tutorialAlert = 1, playerPowerBarAlt = 1, powerBarWidgets = 1, extraAbilityContainer = 1, classResourceOverlayFrame = 1};
 
 	-- Vars
 	-- These indexes require global variables of the same name to be declared. For example, if I have an index ["FOO"] then I need to make sure the global variable
@@ -2462,12 +2632,12 @@ local function FramePositionDelegate_OnAttributeChanged(self, attribute)
 		self:UIParentManageFramePositions();
 	elseif ( attribute == "panel-maximize" ) then
 		local frame = self:GetAttribute("panel-frame");
-		self:MoveUIPanel(GetUIPanelWindowInfo(frame, "area"), "fullscreen", UIPANEL_DO_SET_POINT, UIPANEL_VALIDATE_CURRENT_FRAME);
+		self:MoveUIPanel(GetUIPanelAttribute(frame, "area"), "fullscreen", UIPANEL_DO_SET_POINT, UIPANEL_VALIDATE_CURRENT_FRAME);
 		frame:ClearAllPoints();
-		frame:SetPoint(GetUIPanelWindowInfo(frame, "maximizePoint"));
+		frame:SetPoint(GetUIPanelAttribute(frame, "maximizePoint"));
 	elseif ( attribute == "panel-restore" ) then
 		local frame = self:GetAttribute("panel-frame");
-		self:MoveUIPanel("fullscreen", GetUIPanelWindowInfo(frame, "area"), UIPANEL_DO_SET_POINT, UIPANEL_VALIDATE_CURRENT_FRAME);
+		self:MoveUIPanel("fullscreen", GetUIPanelAttribute(frame, "area"), UIPANEL_DO_SET_POINT, UIPANEL_VALIDATE_CURRENT_FRAME);
 	end
 end
 
@@ -2476,14 +2646,14 @@ FramePositionDelegate:SetScript("OnAttributeChanged", FramePositionDelegate_OnAt
 
 function FramePositionDelegate:ShowUIPanel(frame, force)
 	local frameArea, framePushable;
-	frameArea = GetUIPanelWindowInfo(frame, "area");
+	frameArea = GetUIPanelAttribute(frame, "area");
 	if ( not CanOpenPanels() and frameArea ~= "center" and frameArea ~= "full" ) then
 		self:ShowUIPanelFailed(frame);
 		return;
 	end
-	framePushable = GetUIPanelWindowInfo(frame, "pushable") or 0;
+	framePushable = GetUIPanelAttribute(frame, "pushable") or 0;
 
-	if ( UnitIsDead("player") and not GetUIPanelWindowInfo(frame, "whileDead") ) then
+	if ( UnitIsDead("player") and not GetUIPanelAttribute(frame, "whileDead") ) then
 		self:ShowUIPanelFailed(frame);
 		NotWhileDeadError();
 		return;
@@ -2505,7 +2675,7 @@ function FramePositionDelegate:ShowUIPanel(frame, force)
 		end
 	end
 
-	if ( GetUIPanelWindowInfo(frame, "checkFit") == 1 ) then
+	if ( GetUIPanelAttribute(frame, "checkFit") == 1 ) then
 		self:UpdateScaleForFit(frame);
 	end
 
@@ -2513,11 +2683,11 @@ function FramePositionDelegate:ShowUIPanel(frame, force)
 	local centerFrame = self:GetUIPanel("center");
 	local centerArea, centerPushable;
 	if ( centerFrame ) then
-		if ( GetUIPanelWindowInfo(centerFrame, "allowOtherPanels") ) then
+		if ( GetUIPanelAttribute(centerFrame, "allowOtherPanels") ) then
 			HideUIPanel(centerFrame);
 			centerFrame = nil;
 		else
-			centerArea = GetUIPanelWindowInfo(centerFrame, "area");
+			centerArea = GetUIPanelAttribute(centerFrame, "area");
 			if ( centerArea and (centerArea == "center") and (frameArea ~= "center") and (frameArea ~= "full") ) then
 				if ( force ) then
 					self:SetUIPanel("center", nil, 1);
@@ -2526,7 +2696,7 @@ function FramePositionDelegate:ShowUIPanel(frame, force)
 					return;
 				end
 			end
-			centerPushable = GetUIPanelWindowInfo(centerFrame, "pushable") or 0;
+			centerPushable = GetUIPanelAttribute(centerFrame, "pushable") or 0;
 		end
 	end
 
@@ -2540,7 +2710,7 @@ function FramePositionDelegate:ShowUIPanel(frame, force)
 	-- Native "center" frames just replace each other, and they take priority over pushed frames
 	if ( frameArea == "center" ) then
 		securecall("CloseWindows");
-		if ( not GetUIPanelWindowInfo(frame, "allowOtherPanels") ) then
+		if ( not GetUIPanelAttribute(frame, "allowOtherPanels") ) then
 			securecall("CloseAllBags");
 		end
 		self:SetUIPanel("center", frame, 1);
@@ -2551,7 +2721,7 @@ function FramePositionDelegate:ShowUIPanel(frame, force)
 	if ( frameArea == "doublewide" ) then
 		local leftFrame = self:GetUIPanel("left");
 		if ( leftFrame ) then
-			local leftPushable = GetUIPanelWindowInfo(leftFrame, "pushable") or 0;
+			local leftPushable = GetUIPanelAttribute(leftFrame, "pushable") or 0;
 			if ( leftPushable > 0 and CanShowRightUIPanel(leftFrame) ) then
 				-- Push left to right
 				self:MoveUIPanel("left", "right", UIPANEL_SKIP_SET_POINT);
@@ -2585,7 +2755,7 @@ function FramePositionDelegate:ShowUIPanel(frame, force)
 		self:SetUIPanel("left", frame);
 		return;
 	end
-	local leftPushable = GetUIPanelWindowInfo(leftFrame, "pushable") or 0;
+	local leftPushable = GetUIPanelAttribute(leftFrame, "pushable") or 0;
 
 	-- Two open already
 	local rightFrame = self:GetUIPanel("right");
@@ -2653,7 +2823,7 @@ function FramePositionDelegate:ShowUIPanel(frame, force)
 	end
 
 	-- Three are shown
-	local rightPushable = GetUIPanelWindowInfo(rightFrame, "pushable") or 0;
+	local rightPushable = GetUIPanelAttribute(rightFrame, "pushable") or 0;
 	if ( framePushable > rightPushable ) then
 		-- This one is highest priority, slide the other two over
 		if ( CanShowUIPanels(centerFrame, rightFrame, frame) ) then
@@ -2674,7 +2844,7 @@ function FramePositionDelegate:ShowUIPanel(frame, force)
 end
 
 function FramePositionDelegate:ShowUIPanelFailed(frame)
-	if GetUIPanelWindowInfo(frame, "showFailedFunc") then
+	if GetUIPanelAttribute(frame, "showFailedFunc") then
 		frame:ExecuteAttribute("UIPanelLayout-showFailedFunc");
 	end
 end
@@ -2787,7 +2957,7 @@ function FramePositionDelegate:HideUIPanel(frame, skipSetPoint)
 	elseif ( frame == self:GetUIPanel("left") ) then
 		-- If we're hiding the left frame, move the other frames left, unless the center is a native center frame
 		if ( centerFrame ) then
-			local area = GetUIPanelWindowInfo(centerFrame, "area");
+			local area = GetUIPanelAttribute(centerFrame, "area");
 			if ( area ) then
 				if ( area == "center" ) then
 					-- Slide left, skip the center
@@ -2830,10 +3000,10 @@ function FramePositionDelegate:UpdateUIPanelPositions(currentFrame)
 	local info;
 	local frame = self:GetUIPanel("left");
 	if ( frame ) then
-		local xOff = GetUIPanelWindowInfo(frame,"xoffset") or 0;
-		local yOff = GetUIPanelWindowInfo(frame,"yoffset") or 0;
-		local bottomClampOverride = GetUIPanelWindowInfo(frame,"bottomClampOverride");
-		local minYOffset = GetUIPanelWindowInfo(frame,"minYOffset");
+		local xOff = GetUIPanelAttribute(frame,"xoffset") or 0;
+		local yOff = GetUIPanelAttribute(frame,"yoffset") or 0;
+		local bottomClampOverride = GetUIPanelAttribute(frame,"bottomClampOverride");
+		local minYOffset = GetUIPanelAttribute(frame,"minYOffset");
 		local yPos = ClampUIPanelY(frame, yOff + topOffset, minYOffset, bottomClampOverride);
 		frame:ClearAllPoints();
 		frame:SetPoint("TOPLEFT", "UIParent", "TOPLEFT", leftOffset + xOff, yPos);
@@ -2846,10 +3016,10 @@ function FramePositionDelegate:UpdateUIPanelPositions(currentFrame)
 
 		frame = self:GetUIPanel("doublewide");
 		if ( frame ) then
-			local xOff = GetUIPanelWindowInfo(frame,"xoffset") or 0;
-			local yOff = GetUIPanelWindowInfo(frame,"yoffset") or 0;
-			local bottomClampOverride = GetUIPanelWindowInfo(frame,"bottomClampOverride");
-			local minYOffset = GetUIPanelWindowInfo(frame,"minYOffset");
+			local xOff = GetUIPanelAttribute(frame,"xoffset") or 0;
+			local yOff = GetUIPanelAttribute(frame,"yoffset") or 0;
+			local bottomClampOverride = GetUIPanelAttribute(frame,"bottomClampOverride");
+			local minYOffset = GetUIPanelAttribute(frame,"minYOffset");
 			local yPos = ClampUIPanelY(frame, yOff + topOffset, minYOffset, bottomClampOverride);
 			frame:ClearAllPoints();
 			frame:SetPoint("TOPLEFT", "UIParent", "TOPLEFT", leftOffset + xOff, yPos);
@@ -2862,11 +3032,11 @@ function FramePositionDelegate:UpdateUIPanelPositions(currentFrame)
 	frame = self:GetUIPanel("center");
 	if ( frame ) then
 		if ( CanShowCenterUIPanel(frame) ) then
-			local area = GetUIPanelWindowInfo(frame, "area");
-			local xOff = GetUIPanelWindowInfo(frame,"xoffset") or 0;
-			local yOff = GetUIPanelWindowInfo(frame,"yoffset") or 0;
-			local bottomClampOverride = GetUIPanelWindowInfo(frame,"bottomClampOverride");
-			local minYOffset = GetUIPanelWindowInfo(frame,"minYOffset");
+			local area = GetUIPanelAttribute(frame, "area");
+			local xOff = GetUIPanelAttribute(frame,"xoffset") or 0;
+			local yOff = GetUIPanelAttribute(frame,"yoffset") or 0;
+			local bottomClampOverride = GetUIPanelAttribute(frame,"bottomClampOverride");
+			local minYOffset = GetUIPanelAttribute(frame,"minYOffset");
 			local yPos = ClampUIPanelY(frame, yOff + topOffset, minYOffset, bottomClampOverride);
 			if ( area ~= "center" ) then
 				frame:ClearAllPoints();
@@ -2900,10 +3070,10 @@ function FramePositionDelegate:UpdateUIPanelPositions(currentFrame)
 	frame = self:GetUIPanel("right");
 	if ( frame ) then
 		if ( CanShowRightUIPanel(frame) ) then
-			local xOff = GetUIPanelWindowInfo(frame,"xoffset") or 0;
-			local yOff = GetUIPanelWindowInfo(frame,"yoffset") or 0;
-			local bottomClampOverride = GetUIPanelWindowInfo(frame,"bottomClampOverride");
-			local minYOffset = GetUIPanelWindowInfo(frame,"minYOffset");
+			local xOff = GetUIPanelAttribute(frame,"xoffset") or 0;
+			local yOff = GetUIPanelAttribute(frame,"yoffset") or 0;
+			local bottomClampOverride = GetUIPanelAttribute(frame,"bottomClampOverride");
+			local minYOffset = GetUIPanelAttribute(frame,"minYOffset");
 			local yPos = ClampUIPanelY(frame, yOff + topOffset, minYOffset, bottomClampOverride);
 			xOff = xOff + xSpacing; -- add separating space
 			frame:ClearAllPoints();
@@ -2923,7 +3093,7 @@ function FramePositionDelegate:UpdateUIPanelPositions(currentFrame)
 		frame:Raise();
 	end
 
-	if ( currentFrame and GetUIPanelWindowInfo(currentFrame, "checkFit") == 1 ) then
+	if ( currentFrame and GetUIPanelAttribute(currentFrame, "checkFit") == 1 ) then
 		self:UpdateScaleForFit(currentFrame);
 	end
 
@@ -2931,13 +3101,7 @@ function FramePositionDelegate:UpdateUIPanelPositions(currentFrame)
 end
 
 function FramePositionDelegate:UpdateScaleForFit(frame)
-	local horizRatio = UIParent:GetWidth() / GetUIPanelWidth(frame);
-	local vertRatio = UIParent:GetHeight() / GetUIPanelHeight(frame);
-	if ( horizRatio < 1 or vertRatio < 1 ) then
-		frame:SetScale(min(horizRatio, vertRatio));
-	else
-		frame:SetScale(1);
-	end
+	UpdateScaleForFit(frame);
 end
 
 function FramePositionDelegate:UIParentManageFramePositions()
@@ -3010,11 +3174,8 @@ function FramePositionDelegate:UIParentManageFramePositions()
 		if UIWidgetPowerBarContainerFrame and UIWidgetPowerBarContainerFrame:GetNumWidgetsShowing() > 0 then
 			tinsert(yOffsetFrames, "powerBarWidgets");
 		end
-		if (ExtraActionBarFrame and ExtraActionBarFrame:IsShown() ) then
-			tinsert(yOffsetFrames, "extraActionBarFrame");
-		end
-		if (ZoneAbilityFrame and ZoneAbilityFrame:IsShown()) then
-			tinsert(yOffsetFrames, "ZoneAbilityFrame");
+		if ( ExtraAbilityContainer and ExtraAbilityContainer:IsShown() ) then
+			tinsert(yOffsetFrames, "extraAbilityContainer");
 		end
 		if ( TalkingHeadFrame and TalkingHeadFrame:IsShown() ) then
 			tinsert(yOffsetFrames, "talkingHeadFrame");
@@ -3042,13 +3203,9 @@ function FramePositionDelegate:UIParentManageFramePositions()
 		if ( value.powerBarWidgets and UIWidgetPowerBarContainerFrame ) then
 			value.powerBarWidgets = UIWidgetPowerBarContainerFrame:GetHeight() + 10;
 		end
-		if ( value.extraActionBarFrame and ExtraActionBarFrame ) then
-			value.extraActionBarFrame = ExtraActionBarFrame:GetHeight() + 10;
+		if ( value.extraAbilityContainer ) then
+			value.extraAbilityContainer = ExtraAbilityContainer:GetHeight() + 10;
 		end
-		if ( value.ZoneAbilityFrame and ZoneAbilityFrame ) then
-			value.ZoneAbilityFrame = ZoneAbilityFrame:GetHeight() + 10;
-		end
-
 		if ( value.bonusActionBar and BonusActionBarFrame ) then
 			value.bonusActionBar = BonusActionBarFrame:GetHeight() - MainMenuBar:GetHeight();
 		end
@@ -3288,6 +3445,10 @@ local function CheckProtectedFunctionsAllowed()
 end
 
 function ShowUIPanel(frame, force)
+	if ( CanAutoSetGamePadCursorControl(true) ) then
+		SetGamePadCursorControl(true);
+	end
+
 	if ( not frame or frame:IsShown() ) then
 		return;
 	end
@@ -3296,7 +3457,7 @@ function ShowUIPanel(frame, force)
 		return;
 	end
 
-	if ( not GetUIPanelWindowInfo(frame, "area") ) then
+	if ( not GetUIPanelAttribute(frame, "area") ) then
 		frame:Show();
 		return;
 	end
@@ -3316,7 +3477,7 @@ function HideUIPanel(frame, skipSetPoint)
 		return;
 	end
 
-	if ( not GetUIPanelWindowInfo(frame, "area") ) then
+	if ( not GetUIPanelAttribute(frame, "area") ) then
 		frame:Hide();
 		return;
 	end
@@ -3342,11 +3503,11 @@ function GetUIPanel(key)
 end
 
 function GetUIPanelWidth(frame)
-	return GetUIPanelWindowInfo(frame, "width") or frame:GetWidth() + (GetUIPanelWindowInfo(frame, "extraWidth") or 0);
+	return GetUIPanelAttribute(frame, "width") or frame:GetWidth() + (GetUIPanelAttribute(frame, "extraWidth") or 0);
 end
 
 function GetUIPanelHeight(frame)
-	return GetUIPanelWindowInfo(frame, "height") or frame:GetHeight() + (GetUIPanelWindowInfo(frame, "extraHeight") or 0);
+	return GetUIPanelAttribute(frame, "height") or frame:GetHeight() + (GetUIPanelAttribute(frame, "extraHeight") or 0);
 end
 
 --Allow a bit of overlap because there are built-in transparencies and buffers already
@@ -3395,9 +3556,9 @@ function CanShowUIPanels(leftFrame, centerFrame, rightFrame)
 	if ( leftFrame ) then
 		offset = offset + GetUIPanelWidth(leftFrame);
 		if ( centerFrame ) then
-			local area = GetUIPanelWindowInfo(centerFrame, "area");
+			local area = GetUIPanelAttribute(centerFrame, "area");
 			if ( area ~= "center" ) then
-				offset = offset + ( GetUIPanelWindowInfo(centerFrame, "width") or UIParent:GetAttribute("DEFAULT_FRAME_WIDTH") );
+				offset = offset + ( GetUIPanelAttribute(centerFrame, "width") or UIParent:GetAttribute("DEFAULT_FRAME_WIDTH") );
 			else
 				offset = offset + GetUIPanelWidth(centerFrame);
 			end
@@ -3431,8 +3592,8 @@ function CanOpenPanels()
 		return 1;
 	end
 
-	local area = GetUIPanelWindowInfo(centerFrame, "area");
-	local allowOtherPanels = GetUIPanelWindowInfo(centerFrame, "allowOtherPanels");
+	local area = GetUIPanelAttribute(centerFrame, "area");
+	local allowOtherPanels = GetUIPanelAttribute(centerFrame, "allowOtherPanels");
 	if ( area and (area == "center") and not allowOtherPanels ) then
 		return nil;
 	end
@@ -3484,7 +3645,7 @@ function CloseWindows(ignoreCenter, frameToIgnore)
 
 	if ( not frameToIgnore or frameToIgnore ~= centerFrame ) then
 		if ( centerFrame ) then
-			local area = GetUIPanelWindowInfo(centerFrame, "area");
+			local area = GetUIPanelAttribute(centerFrame, "area");
 			if ( area ~= "center" or not ignoreCenter ) then
 				HideUIPanel(centerFrame, UIPANEL_SKIP_SET_POINT);
 			end
@@ -3507,7 +3668,7 @@ end
 function CloseAllWindows_WithExceptions()
 	-- When the player loses control we close all UIs, unless they're handled below
 	local centerFrame = GetUIPanel("center");
-	local ignoreCenter = (centerFrame and GetUIPanelWindowInfo(centerFrame, "ignoreControlLost")) or IsOptionFrameOpen();
+	local ignoreCenter = (centerFrame and GetUIPanelAttribute(centerFrame, "ignoreControlLost")) or IsOptionFrameOpen();
 
 	CloseAllWindows(ignoreCenter);
 end
@@ -3523,7 +3684,11 @@ function CloseAllWindows(ignoreCenter)
 		end
 	end
 	windowsVisible = CloseWindows(ignoreCenter);
-	return (bagsVisible or windowsVisible);
+	local anyClosed = (bagsVisible or windowsVisible);
+	if (anyClosed and CanAutoSetGamePadCursorControl(false)) then
+		SetGamePadCursorControl(false);
+	end
+	return anyClosed;
 end
 
 -- this function handles possibly tainted values and so
@@ -4071,7 +4236,9 @@ function getglobal(varr)
 	return _G[varr];
 end
 
+local forceinsecure = forceinsecure;
 function setglobal(varr,value)
+	forceinsecure();
 	_G[varr] = value;
 end
 
@@ -4104,11 +4271,19 @@ end
 
 -- Function that handles the escape key functions
 function ToggleGameMenu()
-	if ( not UIParent:IsShown() ) then
+	if ( CanAutoSetGamePadCursorControl(true) and (not IsModifierKeyDown()) ) then
+		-- There are a few gameplay related cancel cases we want to handle before toggling cursor control on.
+		if ( SpellStopCasting() ) then
+		elseif ( SpellStopTargeting() ) then
+		elseif ( ClearTarget() and (not UnitIsCharmed("player")) ) then
+		else
+			SetGamePadCursorControl(true);
+		end
+	elseif ( not UIParent:IsShown() ) then
 		UIParent:Show();
 		SetUIVisibility(true);
 	elseif ( C_Commentator.IsSpectating() and IsFrameLockActive("COMMENTATOR_SPECTATING_MODE") ) then
-		PvPCommentator:SetFrameLock(false);
+		Commentator:SetFrameLock(false);
 	elseif ( ModelPreviewFrame:IsShown() ) then
 		ModelPreviewFrame:Hide();
 	elseif ( StoreFrame_EscapePressed and StoreFrame_EscapePressed() ) then
@@ -4150,7 +4325,10 @@ function ToggleGameMenu()
 	elseif ( securecall("BFAMissionFrame_EscapePressed") ) then
 	elseif ( SpellStopCasting() ) then
 	elseif ( SpellStopTargeting() ) then
+	elseif ( SoulbindViewer and SoulbindViewer:HandleEscape()) then
 	elseif ( securecall("CloseAllWindows") ) then
+	elseif ( CovenantPreviewFrame and CovenantPreviewFrame:IsShown()) then
+		CovenantPreviewFrame:HandleEscape();
 	elseif ( LootFrame:IsShown() ) then
 		-- if we're here, LootFrame was opened under the mouse (cvar "lootUnderMouse") so it didn't get closed by CloseAllWindows
 		LootFrame:Hide();
@@ -4158,9 +4336,11 @@ function ToggleGameMenu()
 	elseif ( OpacityFrame:IsShown() ) then
 		OpacityFrame:Hide();
 	elseif ( SplashFrame:IsShown() ) then
-		SplashFrame_Close();
+		SplashFrame:Close();
 	elseif ( ChallengesKeystoneFrame and ChallengesKeystoneFrame:IsShown() ) then
 		ChallengesKeystoneFrame:Hide();
+	elseif ( CanAutoSetGamePadCursorControl(false) and (not IsModifierKeyDown()) ) then
+		SetGamePadCursorControl(false);
 	else
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPEN);
 		ShowUIPanel(GameMenuFrame);
@@ -4234,7 +4414,7 @@ end
 function GetBindingFromClick(input)
 	local fullInput = "";
 
-	-- MUST BE IN THIS ORDER (ALT, CTRL, SHIFT)
+	-- MUST BE IN THIS ORDER (ALT, CTRL, SHIFT, META)
 	if ( IsAltKeyDown() ) then
 		fullInput = fullInput.."ALT-";
 	end
@@ -4246,6 +4426,10 @@ function GetBindingFromClick(input)
 	if ( IsShiftKeyDown() ) then
 		fullInput = fullInput.."SHIFT-"
 	end
+
+	 if ( IsMetaKeyDown() ) then
+		 fullInput = fullInput.."META-"
+	 end
 
 	if ( input == "LeftButton" ) then
 		fullInput = fullInput.."BUTTON1";
@@ -4654,6 +4838,29 @@ function RefreshDebuffs(frame, unit, numDebuffs, suffix, checkCVar)
 	end
 end
 
+-- New Color API
+-- This function is intended to be used with C++ wrapped functions that return the difficulty of content instead
+-- of hand calculating the difficulty in the UI like the below APIs do. You should get difficulty color
+-- like this:
+-- local difficulty = C_PlayerInfo.GetContentDifficultyCreatureForPlayer(self.unit)
+-- local color = GetDifficultyColor(difficulty);
+function GetDifficultyColor(difficulty)
+	if (difficulty == Enum.RelativeContentDifficulty.Trivial) then
+		return QuestDifficultyColors["trivial"], QuestDifficultyHighlightColors["trivial"]; -- Grey
+	elseif (difficulty == Enum.RelativeContentDifficulty.Easy) then
+		return QuestDifficultyColors["standard"], QuestDifficultyHighlightColors["standard"]; -- Green
+	elseif (difficulty == Enum.RelativeContentDifficulty.Fair) then
+		return QuestDifficultyColors["difficult"], QuestDifficultyHighlightColors["difficult"]; -- Yellow
+	elseif (difficulty == Enum.RelativeContentDifficulty.Difficult) then
+		return QuestDifficultyColors["verydifficult"], QuestDifficultyHighlightColors["verydifficult"]; -- Orange
+	elseif (difficulty == Enum.RelativeContentDifficulty.Impossible) then
+		return QuestDifficultyColors["impossible"], QuestDifficultyHighlightColors["impossible"]; -- Red
+	else
+		return QuestDifficultyColors["difficult"], QuestDifficultyHighlightColors["difficult"]; -- Yellow
+	end
+end
+
+-- Old Color API (See Comment Above: New Color API)
 function GetQuestDifficultyColor(level, isScaling, optQuestID)
 	if optQuestID and C_QuestLog.IsQuestDisabledForSession(optQuestID) then
 		return QuestDifficultyColors["disabled"], QuestDifficultyHighlightColors["disabled"];
@@ -4666,11 +4873,13 @@ function GetQuestDifficultyColor(level, isScaling, optQuestID)
 	return GetRelativeDifficultyColor(UnitEffectiveLevel("player"), level);
 end
 
+-- Old Color API (See Comment Above: New Color API)
 function GetCreatureDifficultyColor(level)
 	return GetRelativeDifficultyColor(UnitEffectiveLevel("player"), level);
 end
 
 --How difficult is this challenge for this unit?
+-- Old Color API (See Comment Above: New Color API)
 function GetRelativeDifficultyColor(unitLevel, challengeLevel)
 	local levelDiff = challengeLevel - unitLevel;
 	local color;
@@ -4680,13 +4889,14 @@ function GetRelativeDifficultyColor(unitLevel, challengeLevel)
 		return QuestDifficultyColors["verydifficult"], QuestDifficultyHighlightColors["verydifficult"];
 	elseif ( levelDiff >= -4 ) then
 		return QuestDifficultyColors["difficult"], QuestDifficultyHighlightColors["difficult"];
-	elseif ( -levelDiff <= GetQuestGreenRange() ) then
+	elseif ( -levelDiff <= UnitQuestTrivialLevelRange("player") ) then
 		return QuestDifficultyColors["standard"], QuestDifficultyHighlightColors["standard"];
 	else
 		return QuestDifficultyColors["trivial"], QuestDifficultyHighlightColors["trivial"];
 	end
 end
 
+-- Old Color API (See Comment Above: New Color API)
 function GetScalingQuestDifficultyColor(questLevel)
 	local playerLevel = UnitEffectiveLevel("player");
 	local levelDiff = questLevel - playerLevel;
@@ -4696,7 +4906,7 @@ function GetScalingQuestDifficultyColor(questLevel)
 		return QuestDifficultyColors["verydifficult"], QuestDifficultyHighlightColors["verydifficult"];
 	elseif ( levelDiff >= 0 ) then
 		return QuestDifficultyColors["difficult"], QuestDifficultyHighlightColors["difficult"];
-	elseif ( -levelDiff <= GetScalingQuestGreenRange() ) then
+	elseif ( -levelDiff <= UnitQuestTrivialLevelRangeScaling("player") ) then
 		return QuestDifficultyColors["standard"], QuestDifficultyHighlightColors["standard"];
 	else
 		return QuestDifficultyColors["trivial"], QuestDifficultyHighlightColors["trivial"];
@@ -5032,8 +5242,8 @@ end
 function SetGuildTabardTextures(emblemSize, columns, offset, unit, emblemTexture, backgroundTexture, borderTexture, tabardData)
 	local backgroundColor, borderColor, emblemColor, emblemFileID, emblemIndex;
 	tabardData = tabardData or C_GuildInfo.GetGuildTabardInfo(unit);
-	if(tabardData) then 
-		backgroundColor = tabardData.backgroundColor; 
+	if(tabardData) then
+		backgroundColor = tabardData.backgroundColor;
 		borderColor = tabardData.borderColor;
 		emblemColor = tabardData.emblemColor;
 		emblemFileID = tabardData.emblemFileID;
@@ -5083,7 +5293,7 @@ function SetGuildTabardTextures(emblemSize, columns, offset, unit, emblemTexture
 
 		return false;
 	end
-end 
+end
 
 function GetDisplayedAllyFrames()
 	local useCompact = GetCVarBool("useCompactPartyFrames")
@@ -5341,42 +5551,11 @@ end
 function nop()
 end
 
-function ShakeFrameRandom(frame, magnitude, duration, frequency)
-	if frequency <= 0 then
-		return;
-	end
-
-	local shake = {};
-	for i = 1, math.ceil(duration / frequency) do
-		local xVariation, yVariation = RandomFloatInRange(-magnitude, magnitude), RandomFloatInRange(-magnitude, magnitude);
-		shake[i] = { x = xVariation, y = yVariation };
-	end
-
-	ShakeFrame(frame, shake, duration, frequency);
-end
-
-function ShakeFrame(frame, shake, maximumDuration, frequency)
-	if ( frame.shakeTicker and not frame.shakeTicker:IsCancelled() )  then
-		return;
-	end
-	local point, relativeFrame, relativePoint, x, y = frame:GetPoint();
-	local shakeIndex = 1;
-	local endTime = GetTime() + maximumDuration;
-	frame.shakeTicker = C_Timer.NewTicker(frequency, function()
-		local xVariation, yVariation = shake[shakeIndex].x, shake[shakeIndex].y;
-		frame:SetPoint(point, relativeFrame, relativePoint, x + xVariation, y + yVariation);
-		shakeIndex = shakeIndex + 1;
-		if shakeIndex > #shake or GetTime() >= endTime then
-			frame:SetPoint(point, relativeFrame, relativePoint, x, y);
-			frame.shakeTicker:Cancel();
-		end
-	end);
-end
-
 -- Currency Overflow --
 function WillCurrencyRewardOverflow(currencyID, rewardQuantity)
-	local name, quantity, icon, earnedThisWeek, weeklyMax, maxQuantity, discovered, rarity = GetCurrencyInfo(currencyID);
-	return maxQuantity > 0 and rewardQuantity + quantity > maxQuantity;
+	local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(currencyID);
+	local quantity = currencyInfo.useTotalEarnedForMaxQty and currencyInfo.totalEarned or currencyInfo.quantity;
+	return currencyInfo.maxQuantity > 0 and rewardQuantity + quantity > currencyInfo.maxQuantity;
 end
 
 function GetColorForCurrencyReward(currencyID, rewardQuantity, defaultColor)
@@ -5428,14 +5607,8 @@ function ChatClassColorOverrideShown()
 	end
 end
 
- -- takes into account the current expansion
- -- NOTE: it's not safe to cache this value as it could change in the middle of the session
-function GetEffectivePlayerMaxLevel()
-	return MAX_PLAYER_LEVEL_TABLE[GetExpansionLevel()];
-end
-
 function IsLevelAtEffectiveMaxLevel(level)
-	return level >= GetEffectivePlayerMaxLevel();
+	return level >= GetMaxLevelForPlayerExpansion();
 end
 
 function IsPlayerAtEffectiveMaxLevel()

@@ -182,7 +182,7 @@ function FriendsFrame_ShowDropdown(name, connected, lineID, chatType, chatFrame,
 		end
 
 		FriendsDropDown.displayMode = "MENU";
-		FriendsDropDown.name = name;
+		FriendsDropDown.friendsDropDownName = name;
 		FriendsDropDown.friendsList = friendsList;
 		FriendsDropDown.lineID = lineID;
 		FriendsDropDown.communityClubID = communityClubID;
@@ -207,7 +207,7 @@ function FriendsFrame_ShowBNDropdown(name, connected, lineID, chatType, chatFram
 			FriendsDropDown.initialize = FriendsFrameBNOfflineDropDown_Initialize;
 		end
 		FriendsDropDown.displayMode = "MENU";
-		FriendsDropDown.name = name;
+		FriendsDropDown.friendsDropDownName = name;
 		FriendsDropDown.friendsList = friendsList;
 		FriendsDropDown.lineID = lineID;
 		FriendsDropDown.communityClubID = communityClubID;
@@ -224,19 +224,19 @@ function FriendsFrame_ShowBNDropdown(name, connected, lineID, chatType, chatFram
 end
 
 function FriendsFrameDropDown_Initialize()
-	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "FRIEND", nil, FriendsDropDown.name);
+	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "FRIEND", nil, FriendsDropDown.friendsDropDownName);
 end
 
 function FriendsFrameOfflineDropDown_Initialize()
-	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "FRIEND_OFFLINE", nil, FriendsDropDown.name);
+	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "FRIEND_OFFLINE", nil, FriendsDropDown.friendsDropDownName);
 end
 
 function FriendsFrameBNDropDown_Initialize()
-	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "BN_FRIEND", nil, FriendsDropDown.name);
+	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "BN_FRIEND", nil, FriendsDropDown.friendsDropDownName);
 end
 
 function FriendsFrameBNOfflineDropDown_Initialize()
-	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "BN_FRIEND_OFFLINE", nil, FriendsDropDown.name);
+	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "BN_FRIEND_OFFLINE", nil, FriendsDropDown.friendsDropDownName);
 end
 
 function FriendsFrame_OnLoad(self)
@@ -1077,7 +1077,7 @@ function FriendsFrame_GroupInvite()
 end
 
 function ToggleFriendsFrame(tab)
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -1106,18 +1106,24 @@ function FriendsFrame_CheckQuickJoinHelpTip()
 	local hasEnoughGroups = #C_SocialQueue.GetAllGroups(false) > 1;
 	local hasClosedTutorial = GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_FRIENDS_LIST_QUICK_JOIN);
 	if ( not hasClosedTutorial and hasEnoughGroups ) then
-		FriendsFrame.FriendsFrameQuickJoinHelpTip:Show();
-	else
-		FriendsFrame.FriendsFrameQuickJoinHelpTip:Hide();
+		local helpTipInfo = {
+			text = SOCIAL_QUICK_JOIN_TAB_HELP_TIP,
+			buttonStyle = HelpTip.ButtonStyle.Close,
+			cvarBitfield = "closedInfoFrames",
+			bitfieldFlag = LE_FRAME_TUTORIAL_FRIENDS_LIST_QUICK_JOIN,
+			targetPoint = HelpTip.Point.RightEdgeCenter,
+			offsetX = -13,
+		};
+		HelpTip:Show(FriendsFrame, helpTipInfo, FriendsFrameTab4);
 	end
 end
 
 function FriendsFrame_CloseQuickJoinHelpTip()
 	-- Don't mark it as closed until you've actually seen it.
-	if ( FriendsFrame.FriendsFrameQuickJoinHelpTip:IsShown() or #C_SocialQueue.GetAllGroups(false) > 1 ) then
+	if ( HelpTip:IsShowing(FriendsFrame, SOCIAL_QUICK_JOIN_TAB_HELP_TIP) or #C_SocialQueue.GetAllGroups(false) > 1 ) then
 		SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_FRIENDS_LIST_QUICK_JOIN, true);
 	end
-	FriendsFrame.FriendsFrameQuickJoinHelpTip:Hide();
+	HelpTip:Hide(FriendsFrame, SOCIAL_QUICK_JOIN_TAB_HELP_TIP);
 end
 
 function OpenFriendsFrame(tab)
@@ -1148,7 +1154,7 @@ function ShowWhoPanel()
 end
 
 function ToggleFriendsSubPanel(panelIndex)
-	if (IsKioskModeEnabled()) then
+	if (Kiosk.IsEnabled()) then
 		return;
 	end
 
@@ -1186,7 +1192,7 @@ function WhoFrame_GetDefaultWhoCommand()
 		minLevel = 1;
 	end
 	local maxLevel = min(level + 3, GetMaxPlayerLevel());
-	local command = WHO_TAG_ZONE.."\""..GetRealZoneText().."\" "..minLevel.."-"..maxLevel;
+	local command = WHO_TAG_ZONE.."\""..GetAreaText().."\" "..minLevel.."-"..maxLevel;
 	return command;
 end
 
@@ -1866,7 +1872,7 @@ end
 FriendsListButtonMixin = {};
 
 function FriendsListButtonMixin:OnLoad()
-	self.highlight:SetVertexColor(0.243, 0.570, 1);
+	self.highlight:SetVertexColor(HIGHLIGHT_LIGHT_BLUE:GetRGB());
 end
 
 function FriendsListButtonMixin:OnEnter()

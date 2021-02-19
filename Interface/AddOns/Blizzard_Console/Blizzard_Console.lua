@@ -1,3 +1,6 @@
+
+local forceinsecure = forceinsecure;
+
 local ADDON_NAME = ...;
 local DEFAULT_SAVED_VARS = { isShown = false, commandHistory = {}, messageHistory = {}, height = 300, fontHeight = 14 };
 local SAVED_VARS_VERSION = 3;
@@ -16,6 +19,7 @@ function DeveloperConsoleMixin:OnLoad()
 	self:RegisterEvent("CONSOLE_COLORS_CHANGED");
 	self:RegisterEvent("CONSOLE_FONT_SIZE_CHANGED");
 	self:RegisterEvent("DEBUG_MENU_TOGGLED");
+	self:RegisterEvent("SPELL_SCRIPT_ERROR");
 
 	self.MessageFrame:SetMaxLines(MAX_NUM_MESSAGE_HISTORY);
 
@@ -124,6 +128,9 @@ function DeveloperConsoleMixin:OnEvent(event, ...)
 		self:SetFontHeight(fontHeight);
 	elseif event == "DEBUG_MENU_TOGGLED" then
 		self:UpdateAnchors();
+	elseif event == "SPELL_SCRIPT_ERROR" then
+		local spellID, scriptID, lastEditUser, errorMessage, callStack = ...;
+		self:AddMessage(errorMessage, Enum.ConsoleColorType.ErrorColor);
 	end
 end
 
@@ -501,4 +508,18 @@ end
 
 function DeveloperConsoleMixin:HasSetCommandHistoryIndex()
 	return self.commandHistoryIndex ~= nil;
+end
+
+function BlizzardConsoleMessageFrame_OnHyperlinkClick(self, link, text, button)
+	local command = link:sub(2);
+	if IsShiftKeyDown() then
+		self:GetParent():InsertLinkedCommand(command);
+	else
+		forceinsecure();
+		ConsoleExec(command, true);
+		if button == "RightButton" then
+			self:GetParent():AddToCommandHistory(command);
+			self:GetParent():ResetCommandHistoryIndex();
+		end
+	end
 end

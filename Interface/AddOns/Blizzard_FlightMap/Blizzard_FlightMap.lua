@@ -3,12 +3,19 @@ UIPanelWindows["FlightMapFrame"] = { area = "center", pushable = 1, showFailedFu
 FlightMapMixin = {};
 
 function FlightMapMixin:SetupTitle()
-	self.BorderFrame.TitleText:SetText(FLIGHT_MAP);
 	self.BorderFrame.Bg:SetColorTexture(0, 0, 0, 1);
 	self.BorderFrame.Bg:SetParent(self);
 	self.BorderFrame.TopTileStreaks:Hide();
+	self:ResetTitleAndPortraitIcon();
+end
 
-	self.BorderFrame:SetPortraitToAsset([[Interface/Icons/icon_petfamily_flying]]);
+function FlightMapMixin:ResetTitleAndPortraitIcon()
+	self:UpdateTitleAndPortraitIcon(FLIGHT_MAP, [[Interface/Icons/icon_petfamily_flying]]);
+end
+
+function FlightMapMixin:UpdateTitleAndPortraitIcon(titleText, portraitIcon)
+	self.BorderFrame.TitleText:SetText(titleText);
+	self.BorderFrame:SetPortraitToAsset(portraitIcon);
 end
 
 function FlightMapMixin:OnLoad()
@@ -45,6 +52,7 @@ function FlightMapMixin:AddStandardDataProviders()
 	self:AddDataProvider(CreateFromMixins(ClickToZoomDataProviderMixin));	-- no pins
 	self:AddDataProvider(CreateFromMixins(ZoneLabelDataProviderMixin));	-- no pins
 	self:AddDataProvider(CreateFromMixins(FlightMap_AreaPOIProviderMixin));
+	self:AddDataProvider(CreateFromMixins(FlightMap_VignetteDataProviderMixin));
 	self:AddDataProvider(CreateFromMixins(QuestSessionDataProviderMixin));
 
 	local groupMembersDataProvider = CreateFromMixins(GroupMembersDataProviderMixin);
@@ -58,6 +66,7 @@ function FlightMapMixin:AddStandardDataProviders()
 	self:AddDataProvider(worldQuestDataProvider);
 
 	local pinFrameLevelsManager = self:GetPinFrameLevelsManager();
+	pinFrameLevelsManager:AddFrameLevel("PIN_FRAME_LEVEL_VIGNETTE", 200);
 	pinFrameLevelsManager:AddFrameLevel("PIN_FRAME_LEVEL_WORLD_QUEST", 500);
 	pinFrameLevelsManager:AddFrameLevel("PIN_FRAME_LEVEL_AREA_POI");
 	pinFrameLevelsManager:AddFrameLevel("PIN_FRAME_LEVEL_GROUP_MEMBER");
@@ -74,7 +83,15 @@ function FlightMapMixin:OnShow()
 
 	MapCanvasMixin.OnShow(self);
 
-	self:ResetZoom();
+	local playerPosition = C_Map.GetPlayerMapPosition(mapID, "player");
+	local subMapInfo = playerPosition and C_Map.GetMapInfoAtPosition(mapID, playerPosition:GetXY()) or nil;
+	if subMapInfo and (subMapInfo.mapID ~= mapID) and FlagsUtil.IsSet(subMapInfo.flags, Enum.UIMapFlag.FlightMapAutoZoom) then
+		local centerX, centerY = MapUtil.GetMapCenterOnMap(subMapInfo.mapID, mapID);
+		local ignoreScaleRatio = true;
+		self:InstantPanAndZoom(self:GetScaleForMaxZoom(), centerX, centerY, ignoreScaleRatio);
+	else
+		self:ResetZoom();
+	end
 
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN);
 end

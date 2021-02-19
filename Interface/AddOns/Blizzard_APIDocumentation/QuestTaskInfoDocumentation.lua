@@ -21,20 +21,6 @@ local QuestTaskInfo =
 			},
 		},
 		{
-			Name = "GetDistanceSqToQuest",
-			Type = "Function",
-
-			Arguments =
-			{
-				{ Name = "questID", Type = "number", Nilable = false },
-			},
-
-			Returns =
-			{
-				{ Name = "distanceSquared", Type = "number", Nilable = false },
-			},
-		},
-		{
 			Name = "GetQuestInfoByQuestID",
 			Type = "Function",
 
@@ -144,6 +130,20 @@ local QuestTaskInfo =
 			Returns =
 			{
 				{ Name = "quests", Type = "table", InnerType = "number", Nilable = false },
+			},
+		},
+		{
+			Name = "GetUIWidgetSetIDFromQuestID",
+			Type = "Function",
+
+			Arguments =
+			{
+				{ Name = "questID", Type = "number", Nilable = false },
+			},
+
+			Returns =
+			{
+				{ Name = "UiWidgetSetID", Type = "number", Nilable = false },
 			},
 		},
 		{

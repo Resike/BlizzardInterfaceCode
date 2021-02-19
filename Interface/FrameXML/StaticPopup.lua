@@ -226,16 +226,37 @@ StaticPopupDialogs["MAC_OPEN_UNIVERSAL_ACCESS"] = {
 		ShowUIPanel(MacOptionsFrame);
 	end,
 	OnShow = function(self)
-		if (MacOptions_HasNewStyleUniversalAccess() and MAC_OPEN_UNIVERSAL_ACCESS1090 ~= nil) then
-			self.text:SetFormattedText(MAC_OPEN_UNIVERSAL_ACCESS1090, MacOptions_GetGameBundleName());
+		self.text:SetFormattedText(MAC_OPEN_UNIVERSAL_ACCESS1090, MacOptions_GetGameBundleName());
+	end,
+	showAlert = 1,
+	timeout = 0,
+	exclusive = 0,
+	hideOnEscape = 0,
+	whileDead = 1,
+}
+
+StaticPopupDialogs["MAC_OPEN_INPUT_MONITORING"] = {
+	text = MAC_OPEN_UNIVERSAL_ACCESS,
+	button1 = YES,
+	button2 = NO,
+	OnAccept = function ()
+		MacOptions_OpenInputMonitoring();
+		ShowUIPanel(MacOptionsFrame);
+	end,
+	OnCancel = function()
+		ShowUIPanel(MacOptionsFrame);
+	end,
+	OnShow = function(self)
+		if (MacOptions_HasNewStyleInputMonitoring()) then
+			self.text:SetFormattedText(MAC_INPUT_MONITORING1015, MacOptions_GetGameBundleName());
 		else
-			self.text:SetText(MAC_OPEN_UNIVERSAL_ACCESS);
+			self.text:SetFormattedText(MAC_INPUT_MONITORING1014, MacOptions_GetGameBundleName());
 		end
 	end,
 	showAlert = 1,
 	timeout = 0,
-	exclusive = 1,
-	hideOnEscape = 1,
+	exclusive = 0,
+	hideOnEscape = 0,
 	whileDead = 1,
 }
 
@@ -558,23 +579,6 @@ StaticPopupDialogs["CONFIRM_ACCEPT_SOCKETS"] = {
 	end,
 	timeout = 0,
 	showAlert = 1,
-	hideOnEscape = 1,
-};
-
-StaticPopupDialogs["TAKE_GM_SURVEY"] = {
-	text = TAKE_GM_SURVEY,
-	button1 = YES,
-	button2 = NO,
-	OnAccept = function(self)
-		GMSurveyFrame_LoadUI();
-		ShowUIPanel(GMSurveyFrame);
-		TicketStatusFrame:Hide();
-	end,
-	OnCancel = function(self)
-		TicketStatusFrame.hasGMSurvey = false;
-		TicketStatusFrame:Hide();
-	end,
-	timeout = 0,
 	hideOnEscape = 1,
 };
 
@@ -1173,87 +1177,6 @@ StaticPopupDialogs["RESET_CHAT"] = {
 	hideOnEscape = 1,
 	exclusive = 1,
 };
-
-StaticPopupDialogs["HELP_TICKET_ABANDON_CONFIRM"] = {
-	text = HELP_TICKET_ABANDON_CONFIRM,
-	button1 = YES,
-	button2 = NO,
-	OnAccept = function(self, prevFrame)
-		DeleteGMTicket();
-	end,
-	OnCancel = function(self, prevFrame)
-	end,
-	OnShow = function(self)
-		HideUIPanel(HelpFrame);
-	end,
-	timeout = 0,
-	whileDead = 1,
-	hideOnEscape = 1,
-};
-StaticPopupDialogs["HELP_TICKET"] = {
-	text = HELP_TICKET_EDIT_ABANDON,
-	button1 = HELP_TICKET_EDIT,
-	button2 = HELP_TICKET_ABANDON,
-	OnAccept = function(self)
-		if ( HelpFrame_IsGMTicketQueueActive() ) then
-			HelpFrame_ShowFrame(HELPFRAME_SUBMIT_TICKET);
-		else
-			HideUIPanel(HelpFrame);
-			StaticPopup_Show("HELP_TICKET_QUEUE_DISABLED");
-		end
-	end,
-	OnCancel = function(self)
-		local currentFrame = self:GetParent();
-		local dialogFrame = StaticPopup_Show("HELP_TICKET_ABANDON_CONFIRM");
-		dialogFrame.data = currentFrame;
-	end,
-	timeout = 0,
-	whileDead = 1,
-	closeButton = 1,
-};
-StaticPopupDialogs["GM_RESPONSE_NEED_MORE_HELP"] = {
-	text = GM_RESPONSE_POPUP_NEED_MORE_HELP_WARNING,
-	button1 = YES,
-	button2 = NO,
-	OnAccept = function(self)
-		HelpFrame_GMResponse_Acknowledge();
-	end,
-	OnCancel = function(self)
-	end,
-	timeout = 0,
-	whileDead = 1,
-	hideOnEscape = 1,
-};
-StaticPopupDialogs["GM_RESPONSE_RESOLVE_CONFIRM"] = {
-	text = GM_RESPONSE_POPUP_RESOLVE_CONFIRM,
-	button1 = YES,
-	button2 = NO,
-	OnAccept = function(self)
-		HelpFrame_GMResponse_Acknowledge(true);
-	end,
-	OnCancel = function(self)
-	end,
-	timeout = 0,
-	whileDead = 1,
-	hideOnEscape = 1,
-};
-StaticPopupDialogs["GM_RESPONSE_MUST_RESOLVE_RESPONSE"] = {
-	text = GM_RESPONSE_POPUP_MUST_RESOLVE_RESPONSE,
-	button1 = GM_RESPONSE_POPUP_VIEW_RESPONSE,
-	button2 = CANCEL,
-	OnAccept = function(self)
-		HelpFrame_ShowFrame(HELPFRAME_GM_RESPONSE);
-	end,
-	OnCancel = function(self)
-	end,
-	OnShow = function(self)
-		HideUIPanel(HelpFrame);
-	end,
-	timeout = 0,
-	whileDead = 1,
-	hideOnEscape = 1,
-	showAlert = 1,
-};
 StaticPopupDialogs["PETRENAMECONFIRM"] = {
 	text = PET_RENAME_CONFIRMATION,
 	button1 = YES,
@@ -1275,6 +1198,7 @@ StaticPopupDialogs["DEATH"] = {
 	button2 = USE_SOULSTONE,	-- rez option 1
 	button3 = USE_SOULSTONE,	-- rez option 2
 	button4 = DEATH_RECAP,
+	selectCallbackByIndex = true,
 	OnShow = function(self)
 		self.timeleft = GetReleaseTimeRemaining();
 
@@ -1822,6 +1746,24 @@ StaticPopupDialogs["EQUIP_BIND"] = {
 	whileDead = 1,
 	hideOnEscape = 1
 };
+StaticPopupDialogs["EQUIP_BIND_REFUNDABLE"] = {
+	text = END_REFUND,
+	button1 = OKAY,
+	button2 = CANCEL,
+	OnAccept = function(self, slot)
+		EquipPendingItem(slot);
+	end,
+	OnCancel = function(self, slot)
+		CancelPendingEquip(slot);
+	end,
+	OnHide = function(self, slot)
+		CancelPendingEquip(slot);
+	end,
+	timeout = 0,
+	exclusive = 1,
+	whileDead = 1,
+	hideOnEscape = 1
+};
 StaticPopupDialogs["EQUIP_BIND_TRADEABLE"] = {
 	text = END_BOUND_TRADEABLE,
 	button1 = OKAY,
@@ -2048,6 +1990,9 @@ StaticPopupDialogs["DELETE_GOOD_ITEM"] = {
 		ChatEdit_FocusActiveWindow();
 		self.editBox:SetText("");
 		MerchantFrame_ResetRefundItem();
+		if GameTooltip:GetOwner() == self then
+			GameTooltip:Hide();
+		end
 	end,
 	OnHyperlinkEnter = function(self, link, text, region, boundsLeft, boundsBottom, boundsWidth, boundsHeight)
 		GameTooltip:SetOwner(self, "ANCHOR_PRESERVE");
@@ -2177,7 +2122,7 @@ StaticPopupDialogs["ABANDON_QUEST"] = {
 	button1 = YES,
 	button2 = NO,
 	OnAccept = function(self)
-		AbandonQuest();
+		C_QuestLog.AbandonQuest();
 		if ( QuestLogPopupDetailFrame:IsShown() ) then
 			HideUIPanel(QuestLogPopupDetailFrame);
 		end
@@ -2193,7 +2138,7 @@ StaticPopupDialogs["ABANDON_QUEST_WITH_ITEMS"] = {
 	button1 = YES,
 	button2 = NO,
 	OnAccept = function(self)
-		AbandonQuest();
+		C_QuestLog.AbandonQuest();
 		if ( QuestLogPopupDetailFrame:IsShown() ) then
 			HideUIPanel(QuestLogPopupDetailFrame);
 		end
@@ -2514,13 +2459,13 @@ StaticPopupDialogs["ADD_IGNORE"] = {
 	hideOnEscape = 1
 };
 
-local function ClubInviteDisabledOnEnter(self) 
-	if(not self:IsEnabled()) then 
+local function ClubInviteDisabledOnEnter(self)
+	if(not self:IsEnabled()) then
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT");
 		GameTooltip_AddColoredLine(GameTooltip, CLUB_FINDER_MAX_MEMBER_COUNT_HIT, RED_FONT_COLOR, true);
 		GameTooltip:Show();
 	end
-end 
+end
 
 StaticPopupDialogs["ADD_GUILDMEMBER"] = {
 	text = ADD_GUILDMEMBER_LABEL,
@@ -2541,7 +2486,7 @@ StaticPopupDialogs["ADD_GUILDMEMBER"] = {
 			ClubInviteDisabledOnEnter(self);
 		end );
 		self.button1:SetScript("OnLeave", GameTooltip_Hide);
-		if (self.extraButton) then 
+		if (self.extraButton) then
 			self.extraButton:SetMotionScriptsWhileDisabled(true);
 			self.extraButton:SetScript("OnEnter", function(self)
 				ClubInviteDisabledOnEnter(self);
@@ -2551,12 +2496,12 @@ StaticPopupDialogs["ADD_GUILDMEMBER"] = {
 		local clubInfo = C_Club.GetClubInfo(data.clubId);
 		if(clubInfo and clubInfo.memberCount and clubInfo.memberCount >= C_Club.GetClubCapacity()) then
 			self.button1:Disable();
-			if (self.extraButton) then 
+			if (self.extraButton) then
 				self.extraButton:Disable();
 			end
-		else 
-			self.button1:Enable(); 
-			if (self.extraButton) then 
+		else
+			self.button1:Enable();
+			if (self.extraButton) then
 				self.extraButton:Enable();
 			end
 		end
@@ -2566,7 +2511,7 @@ StaticPopupDialogs["ADD_GUILDMEMBER"] = {
 		self.editBox:SetText("");
 		self.button1:SetScript("OnEnter", nil );
 		self.button1:SetScript("OnLeave", nil);
-		if (self.extraButton) then 
+		if (self.extraButton) then
 			self.extraButton:SetScript("OnEnter", nil );
 			self.extraButton:SetScript("OnLeave", nil);
 		end
@@ -2594,11 +2539,11 @@ StaticPopupDialogs["ADD_GUILDMEMBER_WITH_FINDER_LINK"] = Mixin({
 	extraButton = CLUB_FINDER_LINK_POST_IN_CHAT,
 	OnExtraButton = function(self, data)
 		local clubInfo = ClubFinderGetCurrentClubListingInfo(data.clubId);
-		if (clubInfo) then 
+		if (clubInfo) then
 			local link = GetClubFinderLink(clubInfo.clubFinderGUID, clubInfo.name);
 			if not ChatEdit_InsertLink(link) then
 				ChatFrame_OpenChat(link);
-			end 
+			end
 		end
 	end,
 }, StaticPopupDialogs["ADD_GUILDMEMBER"]);
@@ -2870,11 +2815,11 @@ StaticPopupDialogs["XP_LOSS"] = {
 	OnUpdate = function(self, elapsed)
 		if ( not CheckSpiritHealerDist() ) then
 			self:Hide();
-			CloseGossip();
+			C_GossipInfo.CloseGossip();
 		end
 	end,
 	OnCancel = function(self)
-		CloseGossip();
+		C_GossipInfo.CloseGossip();
 	end,
 	timeout = 0,
 	exclusive = 1,
@@ -2882,62 +2827,7 @@ StaticPopupDialogs["XP_LOSS"] = {
 	showAlert = 1,
 	hideOnEscape = 1
 };
-StaticPopupDialogs["XP_LOSS_NO_DURABILITY"] = {
-	text = CONFIRM_XP_LOSS_NO_DURABILITY,
-	button1 = ACCEPT,
-	button2 = CANCEL,
-	OnAccept = function(self, data)
-		if ( data ) then
-			self.text:SetFormattedText(CONFIRM_XP_LOSS_AGAIN_NO_DURABILITY, data);
-			self.data = nil;
-			return 1;
-		else
-			AcceptXPLoss();
-		end
-	end,
-	OnUpdate = function(self, elapsed)
-		if ( not CheckSpiritHealerDist() ) then
-			self:Hide();
-			CloseGossip();
-		end
-	end,
-	OnCancel = function(self)
-		CloseGossip();
-	end,
-	timeout = 0,
-	exclusive = 1,
-	whileDead = 1,
-	showAlert = 1,
-	hideOnEscape = 1
-};
-StaticPopupDialogs["XP_LOSS_NO_SICKNESS"] = {
-	text = CONFIRM_XP_LOSS_NO_SICKNESS,
-	button1 = ACCEPT,
-	button2 = CANCEL,
-	OnAccept = function(self, data)
-		if ( data ) then
-			self.text:SetText(CONFIRM_XP_LOSS_AGAIN_NO_SICKNESS);
-			self.data = nil;
-			return 1;
-		else
-			AcceptXPLoss();
-		end
-	end,
-	OnUpdate = function(self, dialog)
-		if ( not CheckSpiritHealerDist() ) then
-			self:Hide();
-			CloseGossip();
-		end
-	end,
-	OnCancel = function(self)
-		CloseGossip();
-	end,
-	timeout = 0,
-	exclusive = 1,
-	whileDead = 1,
-	showAlert = 1,
-	hideOnEscape = 1
-};
+
 StaticPopupDialogs["XP_LOSS_NO_SICKNESS_NO_DURABILITY"] = {
 	text = CONFIRM_XP_LOSS_NO_SICKNESS_NO_DURABILITY,
 	button1 = ACCEPT,
@@ -2948,11 +2838,11 @@ StaticPopupDialogs["XP_LOSS_NO_SICKNESS_NO_DURABILITY"] = {
 	OnUpdate = function(self, dialog)
 		if ( not CheckSpiritHealerDist() ) then
 			self:Hide();
-			CloseGossip();
+			C_GossipInfo.CloseGossip();
 		end
 	end,
 	OnCancel = function(self)
-		CloseGossip();
+		C_GossipInfo.CloseGossip();
 	end,
 	timeout = 0,
 	exclusive = 1,
@@ -3022,6 +2912,18 @@ StaticPopupDialogs["BIND_ENCHANT"] = {
 };
 StaticPopupDialogs["BIND_SOCKET"] = {
 	text = ACTION_WILL_BIND_ITEM,
+	button1 = OKAY,
+	button2 = CANCEL,
+	OnAccept = function(self)
+		C_ItemSocketInfo.CompleteSocketing();
+	end,
+	timeout = 0,
+	exclusive = 1,
+	showAlert = 1,
+	hideOnEscape = 1
+};
+StaticPopupDialogs["REFUNDABLE_SOCKET"] = {
+	text = END_REFUND,
 	button1 = OKAY,
 	button2 = CANCEL,
 	OnAccept = function(self)
@@ -3391,7 +3293,7 @@ StaticPopupDialogs["GOSSIP_CONFIRM"] = {
 	button1 = ACCEPT,
 	button2 = CANCEL,
 	OnAccept = function(self, data)
-		SelectGossipOption(data, "", true);
+		C_GossipInfo.SelectOption(data, "", true);
 	end,
 	hasMoneyFrame = 1,
 	timeout = 0,
@@ -3404,7 +3306,7 @@ StaticPopupDialogs["GOSSIP_ENTER_CODE"] = {
 	button2 = CANCEL,
 	hasEditBox = 1,
 	OnAccept = function(self, data)
-		SelectGossipOption(data, self.editBox:GetText(), true);
+		C_GossipInfo.SelectOption(data, self.editBox:GetText(), true);
 	end,
 	OnShow = function(self)
 		self.editBox:SetFocus();
@@ -3415,7 +3317,7 @@ StaticPopupDialogs["GOSSIP_ENTER_CODE"] = {
 	end,
 	EditBoxOnEnterPressed = function(self, data)
 		local parent = self:GetParent();
-		SelectGossipOption(data, parent.editBox:GetText());
+		C_GossipInfo.SelectOption(data, parent.editBox:GetText());
 		parent:Hide();
 	end,
 	EditBoxOnEscapePressed = function(self)
@@ -4147,9 +4049,6 @@ StaticPopupDialogs["BACKPACK_INCREASE_SIZE"] = {
 	OnAccept = function(self)
 		LoadURLIndex(41);
 	end,
-	OnHide = function(self)
-		ContainerFrame_SetBackpackForceExtended(false);
-	end,
 	wide = true,
 	timeout = 0,
 	whileDead = 0,
@@ -4172,6 +4071,28 @@ StaticPopupDialogs["AUCTION_HOUSE_DEPRECATED"] = {
 	whileDead = 1,
 	showAlert = 1,
 }
+
+StaticPopupDialogs["LEAVING_TUTORIAL_AREA"] = {
+	text = "",
+	button1 = "",
+	button2 = NPE_ABANDON_LEAVE_TUTORIAL,
+	OnButton1 = function(self)
+		C_Tutorial.ReturnToTutorialArea();
+	end,
+	OnButton2 = function(self)
+		C_Tutorial.AbandonTutorialArea();
+	end,
+	OnShow = function(self)
+		if UnitFactionGroup("player") == "Horde" then
+			self.button1:SetText(NPE_ABANDON_H_RETURN);
+			self.text:SetText(NPE_ABANDON_H_WARNING);
+		else
+			self.button1:SetText(NPE_ABANDON_A_RETURN);
+			self.text:SetText(NPE_ABANDON_A_WARNING);
+		end
+	end,
+	selectCallbackByIndex = true,
+};
 
 local function InviteToClub(clubId, text)
 	local clubInfo = C_Club.GetClubInfo(clubId);
@@ -4235,7 +4156,7 @@ StaticPopupDialogs["INVITE_COMMUNITY_MEMBER"] = {
 			ClubInviteDisabledOnEnter(self);
 		end );
 		self.button1:SetScript("OnLeave", GameTooltip_Hide);
-		if (self.extraButton) then 
+		if (self.extraButton) then
 			self.extraButton:SetMotionScriptsWhileDisabled(true);
 			self.extraButton:SetScript("OnEnter", function(self)
 				ClubInviteDisabledOnEnter(self);
@@ -4245,12 +4166,12 @@ StaticPopupDialogs["INVITE_COMMUNITY_MEMBER"] = {
 
 		if(clubInfo and clubInfo.memberCount and clubInfo.memberCount >= C_Club.GetClubCapacity()) then
 			self.button1:Disable();
-			if (self.extraButton) then 
+			if (self.extraButton) then
 				self.extraButton:Disable();
 			end
-		else 
-			self.button1:Enable(); 
-			if (self.extraButton) then 
+		else
+			self.button1:Enable();
+			if (self.extraButton) then
 				self.extraButton:Enable();
 			end
 		end
@@ -4260,7 +4181,7 @@ StaticPopupDialogs["INVITE_COMMUNITY_MEMBER"] = {
 		self.editBox:SetText("");
 		self.button1:SetScript("OnEnter", nil );
 		self.button1:SetScript("OnLeave", nil);
-		if (self.extraButton) then 
+		if (self.extraButton) then
 			self.extraButton:SetScript("OnEnter", nil );
 			self.extraButton:SetScript("OnLeave", nil);
 		end
@@ -4374,8 +4295,6 @@ function StaticPopup_Resize(dialog, which)
 			width = 420;
 		elseif ( info.editBoxWidth and info.editBoxWidth > 260 ) then
 			width = width + (info.editBoxWidth - 260);
-		elseif ( which == "HELP_TICKET" ) then
-			width = 350;
 		elseif ( which == "GUILD_IMPEACH" ) then
 			width = 375;
 		end
@@ -4561,7 +4480,9 @@ function StaticPopup_Show(which, text_arg1, text_arg2, data, insertedFrame)
 		 (which == "BFMGR_INVITED_TO_ENTER") or
 		 (which == "AREA_SPIRIT_HEAL") or
 		 (which == "CONFIRM_REMOVE_COMMUNITY_MEMBER") or
-		 (which == "CONFIRM_DESTROY_COMMUNITY_STREAM")) then 
+		 (which == "CONFIRM_DESTROY_COMMUNITY_STREAM") or
+		 (which == "CONFIRM_RUNEFORGE_LEGENDARY_CRAFT") or
+		 (which == "ANIMA_DIVERSION_CONFIRM_CHANNEL")) then 
 		text:SetText(" ");	-- The text will be filled in later.
 		text.text_arg1 = text_arg1;
 		text.text_arg2 = text_arg2;
@@ -4659,10 +4580,19 @@ function StaticPopup_Show(which, text_arg1, text_arg2, data, insertedFrame)
 	if ( info.hasItemFrame ) then
 		dialog.ItemFrame:Show();
 		if ( data and type(data) == "table" ) then
-			if ( data.useLinkForItemInfo ) then
-				StaticPopupItemFrame_RetrieveInfo(dialog.ItemFrame, data);
+			dialog.ItemFrame:SetCustomOnEnter(data.itemFrameOnEnter);
+
+			local itemFrameCallback = data.itemFrameCallback;
+			if ( itemFrameCallback ) then
+				itemFrameCallback(dialog.ItemFrame);
+			else
+				if ( data.useLinkForItemInfo ) then
+					dialog.ItemFrame:RetrieveInfo(data);
+				end
+				dialog.ItemFrame:DisplayInfo(data.link, data.name, data.color, data.texture, data.count);
 			end
-			StaticPopupItemFrame_DisplayInfo(dialog.ItemFrame, data.link, data.name, data.color, data.texture, data.count);
+
+			dialog.ItemFrame:SetPoint("BOTTOM", -60, bottomSpace + 29);
 		end
 	else
 		dialog.ItemFrame:Hide();
@@ -4891,7 +4821,8 @@ function StaticPopup_OnUpdate(dialog, elapsed)
 			 (which == "BFMGR_INVITED_TO_ENTER") or
 			 (which == "AREA_SPIRIT_HEAL") or
 			 (which == "SPELL_CONFIRMATION_PROMPT") or 
-			 (which == "PREMADE_GROUP_LEADER_CHANGE_DELIST_WARNING")) then
+			 (which == "PREMADE_GROUP_LEADER_CHANGE_DELIST_WARNING") or
+			 (which == "ANIMA_DIVERSION_CONFIRM_CHANNEL")) then
 			local text = _G[dialog:GetName().."Text"];
 			timeleft = ceil(timeleft);
 			if ( (which == "INSTANCE_BOOT") or (which == "GARRISON_BOOT") ) then
@@ -4917,6 +4848,10 @@ function StaticPopup_OnUpdate(dialog, elapsed)
 				text:SetText(StaticPopupDialogs[which].text .. " " ..TIME_REMAINING .. " " .. time);
 			elseif (which == "PREMADE_GROUP_LEADER_CHANGE_DELIST_WARNING") then 
 				dialog.SubText:SetText(StaticPopupDialogs[which].subText:format(SecondsToTime(timeleft)));
+			elseif (which == "ANIMA_DIVERSION_CONFIRM_CHANNEL") then
+				local formatterOutput = WorldQuestsSecondsFormatter:Format(timeleft);
+				local formattedTime = BONUS_OBJECTIVE_TIME_LEFT:format(formatterOutput);
+				text:SetFormattedText(StaticPopupDialogs[which].text, text.text_arg1, formattedTime);
 			else
 				if ( timeleft < 60 ) then
 					text:SetFormattedText(StaticPopupDialogs[which].text, timeleft, SECONDS);
@@ -5089,7 +5024,7 @@ function StaticPopup_OnClick(dialog, index)
 		return nil;
 	end
 
-	if ( which == "DEATH" or which == "CLASS_TRIAL_CHOOSE_BOOST_TYPE" ) then
+	if info.selectCallbackByIndex then
 		local func;
 		if ( index == 1 ) then
 			func = info.OnAccept or info.OnButton1;
@@ -5296,18 +5231,43 @@ function StaticPopup_HideExclusive()
 	end
 end
 
-function StaticPopupItemFrame_OnEvent(self, event, ...)
+
+StaticPopupItemFrameMixin = {};
+
+function StaticPopupItemFrameMixin:OnLoad()
+	self:GetParent().itemFrame = self;
+	self:RegisterEvent("GET_ITEM_INFO_RECEIVED");
+end
+
+function StaticPopupItemFrameMixin:OnEvent(event, ...)
 	if ( event == "GET_ITEM_INFO_RECEIVED" ) then
 		local itemID = ...;
 		if ( itemID == self.itemID ) then
 			local data = self:GetParent().data;
-			StaticPopupItemFrame_RetrieveInfo(self, data);
-			StaticPopupItemFrame_DisplayInfo(self, data.link, data.name, data.color, data.texture, data.count);
+			self:RetrieveInfo(data);
+			self:DisplayInfo(data.link, data.name, data.color, data.texture, data.count);
 		end
 	end
 end
 
-function StaticPopupItemFrame_RetrieveInfo(self, data)
+function StaticPopupItemFrameMixin:OnEnter()
+	if ( self.customOnEnter ) then
+		self.customOnEnter(self);
+	elseif ( self.link ) then
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		GameTooltip:SetHyperlink(self.link);
+	end
+end
+
+function StaticPopupItemFrameMixin:OnLeave()
+	GameTooltip:Hide();
+end
+
+function StaticPopupItemFrameMixin:SetCustomOnEnter(customOnEnter)
+	self.customOnEnter = customOnEnter;
+end
+
+function StaticPopupItemFrameMixin:RetrieveInfo(data)
 	local itemName, _, itemQuality, _, _, _, _, _, _, texture = GetItemInfo(data.link);
 	if ( itemName ) then
 		data.name = itemName;
@@ -5324,7 +5284,7 @@ function StaticPopupItemFrame_RetrieveInfo(self, data)
 	end
 end
 
-function StaticPopupItemFrame_DisplayInfo(self, link, name, color, texture, count)
+function StaticPopupItemFrameMixin:DisplayInfo(link, name, color, texture, count)
 	self.link = link;
 	_G[self:GetName().."IconTexture"]:SetTexture(texture);
 	local nameText = _G[self:GetName().."Text"];

@@ -4,6 +4,8 @@
 		<!--Change this on inheriting frames to adjust where the tooltip anchors to-->
 		<KeyValues>
 			<KeyValue key="tooltipAnchor" value="ANCHOR_BOTTOMLEFT" type="string"/>
+			<KeyValue key="tooltipXOffset" value="0" type="number"/>
+			<KeyValue key="tooltipYOffset" value="0" type="number"/>
 		</KeyValues>
 		<Scripts>
 			<OnLoad method="OnLoad"/>
@@ -86,15 +88,19 @@
 						<Anchor point="TOPLEFT"/>
 					</Anchors>
 				</Texture>
-				<FontString parentKey="StackCount" inherits="NumberFontNormal">
-					<Anchors>
-						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Icon" x="-2" y="2"/>
-					</Anchors>
-				</FontString>
 				<MaskTexture parentKey="IconMask" atlas="UI-Frame-IconMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeKey="$parent.Icon" />
 						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Icon" />
+					</Anchors>
+					<MaskedTextures>
+						<MaskedTexture childKey="Icon"/>
+					</MaskedTextures>
+				</MaskTexture>
+				<MaskTexture parentKey="CircleMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hidden="true" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Icon" x="2" y="-2" />
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Icon" x="-2" y="2" />
 					</Anchors>
 					<MaskedTextures>
 						<MaskedTexture childKey="Icon"/>
@@ -121,6 +127,16 @@
 					<Color r="0.8" g="0" b="0"/>
 					<TexCoords left="0.296875" right="0.5703125" top="0" bottom="0.515625"/>
 				</Texture>
+				<Texture parentKey="AmountBorder">
+					<Anchors>
+						<Anchor point="BOTTOM" relativeKey="$parent.Icon" />
+					</Anchors>
+				</Texture>
+				<FontString parentKey="StackCount" inherits="NumberFontNormal">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Icon" x="-2" y="2"/>
+					</Anchors>
+				</FontString>
 			</Layer>
 		</Layers>
 	</Frame>
@@ -249,5 +265,45 @@
 				<Alpha childKey="CapturedGlowStar" fromAlpha="1" toAlpha="0" order="1" duration=".4"/>
 			</AnimationGroup>
 		</Animations>
+	</Frame>
+
+	<Frame name="UIWidgetBaseScenarioHeaderTemplate" inherits="UIWidgetBaseTemplate" virtual="true" mixin="UIWidgetBaseScenarioHeaderTemplateMixin">
+		<Layers>
+			<Layer level="BORDER">
+				<Texture parentKey="Frame" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString parentKey="HeaderText" inherits="QuestTitleFont" wordwrap="true" justifyH="LEFT" justifyV="MIDDLE" mixin="ShrinkUntilTruncateFontStringMixin">
+					<Size x="172" y="36"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="15" y="-8"/>
+					</Anchors>
+					<Color color="SCENARIO_STAGE_COLOR" />
+					<Shadow>
+						<Offset x="1" y="-1"/>
+						<Color r="0" g="0" b="0"/>
+					</Shadow>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Frame name="UIWidgetBaseCircularStatusBarTemplate" inherits="UIWidgetTemplateTooltipFrame" mixin="UIWidgetBaseCircularStatusBarTemplateMixin" virtual="true">
+		<Size x="128" y="128" />
+		<Frames>
+			<Cooldown parentKey="Progress" hideCountdownNumbers="true" useCircularEdge="true">
+				<Size x="128" y="128" />
+				<Anchors>
+					<Anchor point="CENTER" />
+				</Anchors>
+				<SwipeTexture>
+					<Color r="1" g="1" b="1" a="1"/>
+				</SwipeTexture>
+			</Cooldown>
+		</Frames>
 	</Frame>
 </Ui>

@@ -49,6 +49,11 @@ local function take(name)
 	_G[name] = nil;
 end
 
+--Removes something from the global environment entirely (note: make sure that any saved references are local and will not be returned or otherwise exposed under any circumstances)
+local function remove(name)
+	_G[name] = nil;
+end
+
 -- We create the "Enum" table directly in contents because we dont want the reference from _G in the secure environment
 local function retainenum(name)
 	if (not contents["Enum"]) then
@@ -125,6 +130,8 @@ retain("PercentageBetween");
 retain("Saturate");
 retain("GetCursorDelta");
 retain("GetScaledCursorDelta");
+retain("CalculateDistanceSq");
+retain("GetTickTime");
 retain("Vector3D_Add");
 retain("Vector3D_Normalize");
 retain("Vector3D_ScaleBy");
@@ -136,7 +143,6 @@ retain("GetScreenWidth");
 retain("GetScreenHeight");
 retain("GetPhysicalScreenSize");
 retain("GetScreenDPIScale");
-retain("ConvertPixelsToUI");
 retain("IsTrialAccount");
 retain("IsVeteranTrialAccount");
 retain("C_StorePublic");
@@ -148,6 +154,8 @@ retain("UnitRace");
 retain("UnitSex");
 retain("GetURLIndexAndLoadURL");
 retain("GetUnscaledFrameRect");
+retain("BLIZZARD_STORE_EXTERNAL_LINK_BUTTON_TEXT");
+retain("GetCurrentRegionName");
 
 --For auth challenge
 take("C_AuthChallenge");
@@ -543,7 +551,6 @@ takeenum("PurchaseEligibility");
 takeenum("BattlepayProductDecorator");
 takeenum("VasServiceType");
 takeenum("VasPurchaseState");
-takeenum("BattlepaySpecialProducts");
 takeenum("BattlepayProductGroupFlag");
 takeenum("BattlepayGroupDisplayType");
 takeenum("BattlepayCardType");
@@ -592,3 +599,6 @@ retain("C_RecruitAFriend");
 -- retain shared constants
 retain("WOW_GAMES_CATEGORY_ID");
 retain("WOW_GAME_TIME_CATEGORY_ID");
+retain("WOW_SUBSCRIPTION_CATEGORY_ID");
+
+remove("loadstring_untainted");

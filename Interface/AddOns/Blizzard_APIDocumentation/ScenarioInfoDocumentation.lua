@@ -6,10 +6,34 @@ local ScenarioInfo =
 
 	Functions =
 	{
+		{
+			Name = "GetJailersTowerTypeString",
+			Type = "Function",
+
+			Arguments =
+			{
+				{ Name = "runType", Type = "JailersTowerType", Nilable = false },
+			},
+
+			Returns =
+			{
+				{ Name = "typeString", Type = "string", Nilable = true },
+			},
+		},
 	},
 
 	Events =
 	{
+		{
+			Name = "JailersTowerLevelUpdate",
+			Type = "Event",
+			LiteralName = "JAILERS_TOWER_LEVEL_UPDATE",
+			Payload =
+			{
+				{ Name = "level", Type = "number", Nilable = false },
+				{ Name = "type", Type = "JailersTowerType", Nilable = false },
+			},
+		},
 		{
 			Name = "ScenarioBonusObjectiveComplete",
 			Type = "Event",
@@ -76,6 +100,28 @@ local ScenarioInfo =
 
 	Tables =
 	{
+		{
+			Name = "JailersTowerType",
+			Type = "Enumeration",
+			NumValues = 12,
+			MinValue = 0,
+			MaxValue = 11,
+			Fields =
+			{
+				{ Name = "TwistingCorridors", Type = "JailersTowerType", EnumValue = 0 },
+				{ Name = "SkoldusHalls", Type = "JailersTowerType", EnumValue = 1 },
+				{ Name = "FractureChambers", Type = "JailersTowerType", EnumValue = 2 },
+				{ Name = "Soulforges", Type = "JailersTowerType", EnumValue = 3 },
+				{ Name = "Coldheart", Type = "JailersTowerType", EnumValue = 4 },
+				{ Name = "Mortregar", Type = "JailersTowerType", EnumValue = 5 },
+				{ Name = "UpperReaches", Type = "JailersTowerType", EnumValue = 6 },
+				{ Name = "ArkobanHall", Type = "JailersTowerType", EnumValue = 7 },
+				{ Name = "TormentChamberJaina", Type = "JailersTowerType", EnumValue = 8 },
+				{ Name = "TormentChamberThrall", Type = "JailersTowerType", EnumValue = 9 },
+				{ Name = "TormentChamberAnduin", Type = "JailersTowerType", EnumValue = 10 },
+				{ Name = "AdamantVaults", Type = "JailersTowerType", EnumValue = 11 },
+			},
+		},
 	},
 };
 

@@ -1,13 +1,3 @@
---Extra lines added because looking upward was too much work.
-
-
-
-
-
-
-
-LFR_MAX_SHOWN_LEVEL_DIFF = 15;
-
 NUM_LFR_CHOICE_BUTTONS = 16;
 
 NUM_LFR_LIST_BUTTONS = 21;
@@ -189,7 +179,7 @@ function LFRQueueFrameSpecificListButton_SetDungeon(button, dungeonID, mode, sub
 		button.isCollapsed = false;
 	end
 
-	if ( not LFGLockList[dungeonID] or LFR_CanQueueForLockedInstances() or (LFR_CanQueueForRaidLockedInstances() and LFGLockList[dungeonID] == LFG_INSTANCE_INVALID_RAID_LOCKED) ) then
+	if ( not LFGLockList[dungeonID] or LFR_CanQueueForLockedInstances() or (LFR_CanQueueForRaidLockedInstances() and LFGLockList[dungeonID].reason == LFG_INSTANCE_INVALID_RAID_LOCKED) ) then
 		if ( LFR_CanQueueForMultiple() ) then
 			button.enableButton:Show();
 			LFGSpecificChoiceEnableButton_SetIsRadio(button.enableButton, false);
@@ -265,7 +255,7 @@ end
 
 function LFRQueueFrame_QueueForInstanceIfEnabled(queueID)
 	if ( not LFGIsIDHeader(queueID) and LFGEnabledList[queueID] and
-		(not LFGLockList[queueID] or LFR_CanQueueForLockedInstances() or (LFR_CanQueueForRaidLockedInstances() and LFGLockList[queueID] == LFG_INSTANCE_INVALID_RAID_LOCKED)) ) then
+		(not LFGLockList[queueID] or LFR_CanQueueForLockedInstances() or (LFR_CanQueueForRaidLockedInstances() and LFGLockList[queueID].reason == LFG_INSTANCE_INVALID_RAID_LOCKED)) ) then
 		SetLFGDungeon(LE_LFG_CATEGORY_LFR, queueID);
 		return true;
 	end
@@ -297,6 +287,19 @@ function LFRQueueFrame_Join()
 end
 
 LFRHiddenByCollapseList = {};
+
+local function UpdateLFRRaidList()
+	LFRRaidList = {};
+
+	-- Get the list of raids, then pull out raids that are hidden (due to current Timewalking Campaign, etc) and add the rest to LFRRaidList
+	local raidList = GetLFRChoiceOrder();
+	for _, raidID in ipairs(raidList) do
+		if not LFGLockList[raidID] or not LFGLockList[raidID].hideEntry then
+			table.insert(LFRRaidList, raidID);
+		end
+	end
+end
+
 function LFRQueueFrame_Update()
 	local mode, submode = GetLFGMode(LE_LFG_CATEGORY_LFR);
 
@@ -307,9 +310,9 @@ function LFRQueueFrame_Update()
 		checkedList = LFGQueuedForList[LE_LFG_CATEGORY_LFR];
 	end
 
-	LFRRaidList = GetLFRChoiceOrder(LFRRaidList);
+	UpdateLFRRaidList();
 
-	LFGQueueFrame_UpdateLFGDungeonList(LFRRaidList, LFRHiddenByCollapseList, checkedList, LFR_CURRENT_FILTER, LFR_MAX_SHOWN_LEVEL_DIFF);
+	LFGQueueFrame_UpdateLFGDungeonList(LFRRaidList, LFRHiddenByCollapseList, checkedList, LFR_CURRENT_FILTER);
 
 	LFRQueueFrameSpecificList_Update();
 end

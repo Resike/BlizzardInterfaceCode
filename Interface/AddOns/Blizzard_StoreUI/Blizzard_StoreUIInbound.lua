@@ -44,6 +44,10 @@ function StoreFrame_SelectBoost(boostType, reason, guid)
 	StoreFrame:SetAttribute("selectboost", data);
 end
 
+function StoreFrame_SelectSubscriptionProduct()
+	StoreFrame:SetAttribute("selectsubscription", true);
+end
+
 function StoreFrame_SelectGameTimeProduct()
 	StoreFrame:SetAttribute("selectgametime", true);
 end
