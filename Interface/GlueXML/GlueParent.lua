@@ -21,6 +21,7 @@ ACCOUNT_SUSPENDED_ERROR_CODE = 53;
 -- Mirror of the same variables in Blizzard_StoreUISecure.lua and UIParent.lua
 local WOW_GAMES_CATEGORY_ID = 33; 
 WOW_GAME_TIME_CATEGORY_ID = 37;
+WOW_CLASSIC_CHARACTER_CLONE_CATEGORY_ID = 159;
 
 local function OnDisplaySizeChanged(self)
 	local width = GetScreenWidth();
@@ -685,7 +686,7 @@ end
 function GetDisplayedExpansionLogo(expansionLevel)
 	local isTrial = expansionLevel == nil;
 	if isTrial then
-		return "Interface\\Glues\\Common\\Glues-WoW-StarterLogo";
+		return [[Interface\Glues\Common\Glues-WoW-FreeTrial]];
 	elseif expansionLevel <= GetMinimumExpansionLevel() then
 		local expansionInfo = GetExpansionDisplayInfo(LE_EXPANSION_CLASSIC);
 		if expansionInfo then

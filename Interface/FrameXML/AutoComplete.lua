@@ -25,9 +25,9 @@ AUTOCOMPLETE_LIST_TEMPLATES = {
 		include = AUTOCOMPLETE_FLAG_ALL,
 		exclude = bit.bor(AUTO_COMPLETE_ACCOUNT_CHARACTER,AUTOCOMPLETE_FLAG_BNET),
 	},
-	ALL_CHARS_LOCAL_REALM = {
+	ALL_CHARS = {
 		include = AUTOCOMPLETE_FLAG_ALL,
-		exclude = bit.bor(AUTOCOMPLETE_FLAG_BNET, AUTO_COMPLETE_NON_LOCAL_REALM),
+		exclude = AUTOCOMPLETE_FLAG_BNET,
 	},
 	FRIENDLY_CHARS = {
 		include = bit.bor(AUTOCOMPLETE_FLAG_IN_GUILD,AUTOCOMPLETE_FLAG_FRIEND,AUTO_COMPLETE_ACCOUNT_CHARACTER),
@@ -108,7 +108,7 @@ local AUTOCOMPLETE_LIST = AUTOCOMPLETE_LIST;
 	AUTOCOMPLETE_LIST.FRIENDS			= AUTOCOMPLETE_LIST_TEMPLATES.NOT_FRIEND;
 	AUTOCOMPLETE_LIST.REMOVEFRIEND		= AUTOCOMPLETE_LIST_TEMPLATES.FRIEND;
 	AUTOCOMPLETE_LIST.CHANINVITE		= AUTOCOMPLETE_LIST_TEMPLATES.ONLINE_NOT_BNET;
-	AUTOCOMPLETE_LIST.MAIL				= AUTOCOMPLETE_LIST_TEMPLATES.ALL_CHARS_LOCAL_REALM;
+	AUTOCOMPLETE_LIST.MAIL				= AUTOCOMPLETE_LIST_TEMPLATES.ALL_CHARS;
 	AUTOCOMPLETE_LIST.CALENDARGUILDEVENT= AUTOCOMPLETE_LIST_TEMPLATES.KNOWN_NOT_GUILD;
 	AUTOCOMPLETE_LIST.CALENDAREVENT		= AUTOCOMPLETE_LIST_TEMPLATES.KNOWN;
 	AUTOCOMPLETE_LIST.IGNORE			= AUTOCOMPLETE_LIST_TEMPLATES.NOT_FRIEND;
@@ -357,11 +357,27 @@ end
 
 function AutoCompleteEditBox_OnTextChanged(self, userInput)
     if ( userInput ) then
-        AutoComplete_Update(self, self:GetText(), self:GetUTF8CursorPosition());
+		if self.disallowAutoComplete then
+			AutoComplete_HideIfAttachedTo(self);
+		else
+			AutoComplete_Update(self, self:GetText(), self:GetUTF8CursorPosition());
+		end
     end
     if(self:GetText() == "") then
         AutoComplete_HideIfAttachedTo(self);
     end
+end
+
+function AutoCompleteEditBox_OnKeyDown(self, key)
+	if ( key == "BACKSPACE" or key == "DELETE" ) then
+		self.disallowAutoComplete = true;
+	end
+end
+
+function AutoCompleteEditBox_OnKeyUp(self, key)
+	if ( key == "BACKSPACE" or key == "DELETE" ) then
+		self.disallowAutoComplete = false;
+	end
 end
 
 function AutoCompleteEditBox_AddHighlightedText(editBox, text)
@@ -415,10 +431,7 @@ function AutoCompleteButton_OnClick(self)
 	if (editBox.command) then
 		newText = editBox.command.." "..name;
 	else
-		newText = string.gsub(editBoxText, AUTOCOMPLETE_SIMPLE_REGEX,
-			string.format(AUTOCOMPLETE_SIMPLE_FORMAT_REGEX, name,
-				string.match(editBoxText, AUTOCOMPLETE_SIMPLE_REGEX)),
-				1);
+		newText = name;
 	end
 	
 	if ( editBox.addSpaceToAutoComplete ) then

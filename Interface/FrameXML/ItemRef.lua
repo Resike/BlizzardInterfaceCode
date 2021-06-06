@@ -20,9 +20,6 @@ function SetItemRef(link, text, button, chatFrame)
 		end
 		if ( name and (strlen(name) > 0) ) then
 			if ( IsModifiedClick("CHATLINK") ) then
-				-- Remove unnecessary server suffixes.
-				name = Ambiguate(name, "none");
-
 				local staticPopup;
 				staticPopup = StaticPopup_Visible("ADD_IGNORE");
 				if ( staticPopup ) then
@@ -318,6 +315,8 @@ function SetItemRef(link, text, button, chatFrame)
 		elseif category == "services" then
 			StoreFrame_SetServicesCategory();
 			ToggleStoreUI();
+		elseif category == "gametime" then
+			StoreFrame_OpenGameTimeCategory();
 		end
 	elseif ( strsub(link, 1, 4) == "item" ) then
 		if ( IsModifiedClick("CHATLINK") and button == "LeftButton" ) then
