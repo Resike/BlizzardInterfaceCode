@@ -268,7 +268,7 @@ end
 AuctionHouseSellFrameMixin = CreateFromMixins(AuctionHouseSortOrderSystemMixin);
 
 local AUCTION_HOUSE_SELL_FRAME_EVENTS = {
-	"CURSOR_UPDATE",
+	"CURSOR_CHANGED",
 	"AUCTION_HOUSE_THROTTLED_SYSTEM_READY",
 	"AUCTION_HOUSE_THROTTLED_MESSAGE_SENT",
 }
@@ -318,18 +318,14 @@ function AuctionHouseSellFrameMixin:OnShow()
 	self.fixedWidth = self:GetWidth();
 	self.fixedHeight = self:GetHeight();
 	self:Layout();
-
-	OpenAllBags(self:GetAuctionHouseFrame());
 end
 
 function AuctionHouseSellFrameMixin:OnHide()
 	FrameUtil.UnregisterFrameForEvents(self, AUCTION_HOUSE_SELL_FRAME_EVENTS);
-
-	CloseAllBags(self:GetAuctionHouseFrame());
 end
 
 function AuctionHouseSellFrameMixin:OnEvent(event, ...)
-	if event == "CURSOR_UPDATE" then
+	if event == "CURSOR_CHANGED" then
 		if self.Overlay:IsMouseOver() then
 			self:OnOverlayEnter();
 		end
@@ -434,7 +430,7 @@ function AuctionHouseSellFrameMixin:GetDefaultPrice()
 		local defaultPrice = COPPER_PER_SILVER;
 		if LinkUtil.IsLinkType(itemLink, "item") then
 			local vendorPrice = select(11, GetItemInfo(itemLink));
-			defaultPrice = vendorPrice ~= nil and (vendorPrice * 1.5) or COPPER_PER_SILVER;
+			defaultPrice = vendorPrice ~= nil and (vendorPrice * Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER) or COPPER_PER_SILVER;
 			defaultPrice = defaultPrice + (COPPER_PER_SILVER - (defaultPrice % COPPER_PER_SILVER)); -- AH prices must be in silver increments.
 		end
 		return math.max(defaultPrice, COPPER_PER_SILVER);

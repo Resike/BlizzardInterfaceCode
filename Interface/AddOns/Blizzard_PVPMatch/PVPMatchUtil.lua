@@ -16,6 +16,11 @@ PVPMatchUtil = {
 PVPMatchUtil.MatchTimeFormatter = CreateFromMixins(SecondsFormatterMixin);
 PVPMatchUtil.MatchTimeFormatter:Init(0, SecondsFormatter.Abbreviation.Truncate, true);
 
+function PVPMatchUtil.InSoloShuffleBrawl()
+	local brawlInfo = C_PvP.GetActiveBrawlInfo();
+	return brawlInfo and brawlInfo.brawlID == 130;
+end
+
 function PVPMatchUtil.IsActiveMatchComplete()
 	return C_PvP.GetActiveMatchState() == Enum.PvPMatchState.Complete;
 end
@@ -34,61 +39,51 @@ function PVPMatchUtil.GetCellColor(factionIndex, useAlternateColor)
 	return PVPMatchUtil.CellColors[index];
 end
 
-function PVPMatchUtil.GetOptionalCategories()
-	local categories = {};
-	categories.honorableKills = C_PvP.CanDisplayHonorableKills();
-	categories.deaths = C_PvP.CanDisplayDeaths();
-	
-	if C_PvP.DoesMatchOutcomeAffectRating() then
-		if PVPMatchUtil.IsActiveMatchComplete() then
-			-- Skirmish is considered rated for matchmaking reasons.
-			categories.ratingChange = not IsArenaSkirmish();
-			categories.ratingPost = true;
-		else
-			categories.ratingPre = true;
-		end
-	end
-	
-	return categories;
-end
+PVPMatchStyle = {};
+PVPMatchStyle.PurpleColor = CreateColor(0.557, 0.0, 1.0);
 
-PVPMatchStyle = {
-	PanelColors = {
-			CreateColor(1.0, 0.0, 0.0),		-- Horde
-			CreateColor(0.557, 0.0, 1.0),	-- Horde Alternate
-			CreateColor(0.0, .376, 1.0),	-- Alliance
-			CreateColor(1.0, 0.824, 0.0),	-- Alliance Alternate
+PVPMatchStyle.PanelColors = {
+	CreateColor(1.0, 0.0, 0.0),		-- Horde
+	PVPMatchStyle.PurpleColor,					-- Horde Alternate
+	CreateColor(0.0, .376, 1.0),	-- Alliance
+	CreateColor(1.0, 0.824, 0.0),	-- Alliance Alternate
+};
+
+PVPMatchStyle.Theme = {
+	Horde = {
+		decoratorOffsetY = -37,
+		decoratorTexture = "scoreboard-horde-header",
+		nineSliceLayout = "BFAMissionHorde",
 	},
-	Theme = {
-		Horde = {
-			decoratorOffsetY = -37,
-			decoratorTexture = "scoreboard-horde-header",
-			nineSliceLayout = "BFAMissionHorde",
-		},
-		Alliance = {
-			decoratorOffsetY = -28,
-			decoratorTexture = "scoreboard-alliance-header",
-			nineSliceLayout = "BFAMissionAlliance",
-		},
-		Neutral = {
-			nineSliceLayout = "GenericMetal",
-		},
+	Alliance = {
+		decoratorOffsetY = -28,
+		decoratorTexture = "scoreboard-alliance-header",
+		nineSliceLayout = "BFAMissionAlliance",
 	},
-}
+	Neutral = {
+		nineSliceLayout = "GenericMetal",
+	},
+};
 
 function PVPMatchUtil.UpdateMatchmakingText(fontString)
-	if C_PvP.IsRatedBattleground() or C_PvP.IsRatedArena() and not IsArenaSkirmish() then
+	if (C_PvP.IsRatedSoloShuffle() or C_PvP.GetCustomVictoryStatID() == 0 and (C_PvP.IsRatedBattleground() or C_PvP.IsRatedArena() and (not IsArenaSkirmish()))) then
 		local teamInfos = { 
 			C_PvP.GetTeamInfo(0),
 			C_PvP.GetTeamInfo(1), 
 		};
 
-		local factionIndex = GetBattlefieldArenaFaction();
-		local enemyFactionIndex = (factionIndex+1) % 2;
-		local yourMMR = BreakUpLargeNumbers(teamInfos[factionIndex+1].ratingMMR);
-		local enemyMMR = BreakUpLargeNumbers(teamInfos[enemyFactionIndex+1].ratingMMR);
-		local yourTeamString = MATCHMAKING_YOUR_AVG_RATING:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(yourMMR));
-		local enemyTeamString = MATCHMAKING_ENEMY_AVG_RATING:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(enemyMMR));
+		local yourTeamString, enemyTeamString;
+		if C_PvP.IsRatedSoloShuffle() then
+			-- For Rated Solo Shuffle your MMR is always first, followed by the match average
+			yourTeamString = BATTLEGROUND_YOUR_PERSONAL_RATING:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(BreakUpLargeNumbers(teamInfos[1].ratingMMR)));
+			enemyTeamString = BATTLEGROUND_MATCH_AVERAGE_RATING:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(BreakUpLargeNumbers(teamInfos[2].ratingMMR)));
+		else
+			local factionIndex = GetBattlefieldArenaFaction();
+			local enemyFactionIndex = (factionIndex+1) % 2;
+			yourTeamString = MATCHMAKING_YOUR_AVG_RATING:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(BreakUpLargeNumbers(teamInfos[factionIndex+1].ratingMMR)));
+			enemyTeamString = MATCHMAKING_ENEMY_AVG_RATING:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(BreakUpLargeNumbers(teamInfos[enemyFactionIndex+1].ratingMMR)));
+		end
+
 		fontString:SetText(format("%s\n%s", yourTeamString, enemyTeamString));
 		fontString:Show();
 	else
@@ -96,23 +91,43 @@ function PVPMatchUtil.UpdateMatchmakingText(fontString)
 	end
 end
 
-function PVPMatchUtil.UpdateTable(tableBuilder, scrollFrame)
-	local buttons = HybridScrollFrame_GetButtons(scrollFrame);
-	local buttonCount = #buttons;
-	local displayCount = GetNumBattlefieldScores();
-	local offset = HybridScrollFrame_GetOffset(scrollFrame);
-	local populateCount = math.min(buttonCount, displayCount);
-	tableBuilder:Populate(offset, populateCount);
-	
-	for i = 1, buttonCount do
-		local visible = i <= displayCount;
-		buttons[i]:SetShown(visible);
-	end
+function PVPMatchUtil.UpdateDataProvider(scrollBox, forceNewDataProvider)
+	local scores = GetNumBattlefieldScores();
+	if not scrollBox:GetDataProviderSize() ~= scores or forceNewDataProvider then
+		local useAlternateColor = not C_PvP.IsMatchFactional();
+		local dataProvider = CreateDataProvider();
 
-	local buttonHeight = buttons[1]:GetHeight();
-	local visibleElementHeight = displayCount * buttonHeight;
-	local regionHeight = scrollFrame:GetHeight();
-	HybridScrollFrame_Update(scrollFrame, visibleElementHeight, regionHeight);
+		if C_PvP.GetCustomVictoryStatID() == 0 then
+			local useAlternateColor = not C_PvP.IsMatchFactional();
+			for index = 1, scores do 
+				dataProvider:Insert({index=index, useAlternateColor=useAlternateColor});
+			end
+		else
+			for index = 1, scores do 
+				dataProvider:Insert({index=index, backgroundColor=PVPMatchStyle.PurpleColor});
+			end
+		end
+
+		local retainScrollPosition = not forceNewDataProvider;
+		scrollBox:SetDataProvider(dataProvider, retainScrollPosition);
+	end
+end
+
+function PVPMatchUtil.InitScrollBox(scrollBox, scrollBar, tableBuilder)
+	local view = CreateScrollBoxListLinearView();
+	view:SetElementInitializer("PVPTableRowTemplate", function(button, elementData)
+		if elementData.backgroundColor then
+			button:SetBackgroundColor(elementData.backgroundColor);
+		else
+			button:SetUseAlternateColor(elementData.useAlternateColor);
+		end
+	end);
+	ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view);
+
+	local function ElementDataTranslator(elementData)
+		return elementData.index;
+	end
+	ScrollUtil.RegisterTableBuilder(scrollBox, tableBuilder, ElementDataTranslator);
 end
 
 function PVPMatchStyle.GetTeamColor(factionIndex, useAlternateColor)

@@ -342,7 +342,9 @@ function CovenantSanctumUpgradesTabMixin:SetUpCurrencies()
 
 	local stride = #currencies;
 	local paddingX = 7;
-	local layout = AnchorUtil.CreateGridLayout(GridLayoutMixin.Direction.TopRightToBottomLeft, stride, paddingX);
+	local paddingY = nil;
+	local fixedWidth = 62;
+	local layout = AnchorUtil.CreateGridLayout(GridLayoutMixin.Direction.TopRightToBottomLeft, stride, paddingX, paddingY, fixedWidth);
 	local initAnchor = nil;
 	local abbreviateCost = false;
 	local reverseOrder = true;
@@ -564,10 +566,6 @@ end
 
 --=============================================================================================
 CovenantSanctumUpgradeTalentMixin = { };
-
-function CovenantSanctumUpgradeTalentMixin:OnLoad()
-	self.Name:SetFontObjectsToTry("SystemFont_Shadow_Med2", "GameFontHighlight");
-end
 
 function CovenantSanctumUpgradeTalentMixin:Set(talentInfo, inIntroMode)
 	self.Name:SetText(talentInfo.name);

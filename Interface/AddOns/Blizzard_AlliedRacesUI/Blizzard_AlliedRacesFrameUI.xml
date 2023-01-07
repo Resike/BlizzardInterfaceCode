@@ -1,5 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
-..\FrameXML\UI.xsd">
+..\..\FrameXML\UI.xsd">
 	<Script file="Blizzard_AlliedRacesFrameUI.lua"/>
 	<Script file="AlliedRacesModelControlButtonMixin.lua"/>
 
@@ -238,7 +238,10 @@
 				</Frames>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString parentKey="AlliedRacesRaceName" inherits="Fancy48Font" justifyH="CENTER" mixin="ShrinkUntilTruncateFontStringMixin">
+						<FontString parentKey="AlliedRacesRaceName" inherits="Fancy32Font" justifyH="CENTER" mixin="AutoScalingFontStringMixin">
+							<KeyValues>
+								<KeyValue key="minLineHeight" value="16" type="number"/>
+							</KeyValues>
 							<Size x="270" y="40"/>
 							<Anchors>
 								<Anchor point="TOPRIGHT" relativeTo="AlliedRacesFrame" x="-52" y="-38"/>
@@ -267,7 +270,6 @@
 		</Layers>
 		<Scripts>
 			<OnLoad  method="OnLoad"/>
-			<OnEvent method="OnEvent"/>
 			<OnHide  method="OnHide"/>
 			<OnShow  method="OnShow"/>
 		</Scripts>

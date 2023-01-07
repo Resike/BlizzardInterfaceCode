@@ -284,12 +284,12 @@ function LevelUpDisplay_OnEvent(self, event, ...)
 		end
 	elseif ( event == "PET_BATTLE_LEVEL_CHANGED" ) then
 		local activePlayer, activePetSlot, newLevel = ...;
-		if (activePlayer == LE_BATTLE_PET_ALLY) then
+		if (activePlayer == Enum.BattlePetOwner.Ally) then
 			LevelUpDisplay_AddBattlePetLevelUpEvent(self, activePlayer, activePetSlot, newLevel);
 		end
 	elseif ( event == "PET_BATTLE_CAPTURED" ) then
 		local fromPlayer, activePetSlot = ...;
-		if (fromPlayer == LE_BATTLE_PET_ENEMY) then
+		if (fromPlayer == Enum.BattlePetOwner.Enemy) then
 			LevelUpDisplay_AddBattlePetCaptureEvent(self, fromPlayer, activePetSlot);
 		end
 	elseif ( event == "PET_BATTLE_LOOT_RECEIVED" ) then
@@ -367,7 +367,8 @@ function LevelUpDisplay_InitPlayerStates(self)
 end
 
 function LevelUpDisplay_BuildCharacterList(self)
-	local name, icon, spellLink = "",nil,nil;
+	local name = "";
+	local icon, spellLink, link;
 	self.unlockList = {};
 
 	for func, stateInfo in pairs(LEVEL_UP_PLAYER_STATE_CHECKS) do
@@ -494,17 +495,17 @@ function LevelUpDisplay_BuildPetBattleWinnerList(self)
 	self.winnerString = PET_BATTLE_RESULT_LOSE;
 	if(C_PetBattles.IsWildBattle()) then
 		self.winnerSoundKitID = 34090; --UI_PetBattle_PVE_Defeat
-	elseif(C_PetBattles.IsPlayerNPC(LE_BATTLE_PET_ENEMY)) then
+	elseif(C_PetBattles.IsPlayerNPC(Enum.BattlePetOwner.Enemy)) then
 		self.winnerSoundKitID = 34094; --UI_PetBattle_Special_Defeat
 	else
 		self.winnerSoundKitID = 34092; --UI_PetBattle_PVP_Defeat
 	end
 
-	if ( self.winner == LE_BATTLE_PET_ALLY ) then
+	if ( self.winner == Enum.BattlePetOwner.Ally ) then
 		self.winnerString = PET_BATTLE_RESULT_WIN;
 		if(C_PetBattles.IsWildBattle()) then
 			self.winnerSoundKitID = 34089; --UI_PetBattle_PVE_Victory
-		elseif(C_PetBattles.IsPlayerNPC(LE_BATTLE_PET_ENEMY)) then
+		elseif(C_PetBattles.IsPlayerNPC(Enum.BattlePetOwner.Enemy)) then
 			self.winnerSoundKitID = 34093; --UI_PetBattle_Special_Victory
 		else
 			self.winnerSoundKitID = 34091; --UI_PetBattle_PVP_Victory
@@ -549,7 +550,7 @@ function LevelUpDisplay_AddBattlePetTrapUpgradeEvent(self, trapLevel)
 end
 
 function LevelUpDisplay_AddBattlePetLevelUpEvent(self, activePlayer, activePetSlot, newLevel)
-	if (activePlayer ~= LE_BATTLE_PET_ALLY) then
+	if (activePlayer ~= Enum.BattlePetOwner.Ally) then
 		return;
 	end
 
@@ -558,7 +559,7 @@ function LevelUpDisplay_AddBattlePetLevelUpEvent(self, activePlayer, activePetSl
 		LevelUpDisplay_Show(self);
 	end
 
-	local petID = C_PetJournal.GetPetLoadOutInfo(activePetSlot);
+	local petID = C_PetJournal.GetPetLoadOutInfo(activePetSlot - 1);
 	if (petID == nil) then
 		return;
 	end
@@ -630,7 +631,7 @@ function LevelUpDisplay_CreateOrAppendItem(self, createType, info)
 end
 
 function LevelUpDisplay_AddBattlePetCaptureEvent(self, fromPlayer, activePetSlot)
-	if (fromPlayer ~= LE_BATTLE_PET_ENEMY) then
+	if (fromPlayer ~= Enum.BattlePetOwner.Enemy) then
 		return;
 	end
 

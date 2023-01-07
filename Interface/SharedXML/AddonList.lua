@@ -190,7 +190,7 @@ function AddonList_Hide(save)
 end
 
 function AddonList_OnLoad(self)
-	self.TitleText:SetText(ADDON_LIST)
+	self:SetTitle(ADDON_LIST);
 	ButtonFrameTemplate_HidePortrait(self)
 
 	self.offset = 0;
@@ -201,16 +201,6 @@ function AddonList_OnLoad(self)
 		AddonDialog:SetFrameStrata("DIALOG")
 		AddonDialogButton1:SetScript("OnClick", AddonDialog_OnClick);
 		AddonDialogButton2:SetScript("OnClick", AddonDialog_OnClick);
-		local bg = CreateFrame("Frame", "AddonListBackground", GlueParent)
-		bg:SetFrameStrata("HIGH")
-		bg:EnableMouse(true)
-		bg:SetAllPoints()
-		bg:Hide()
-		local tex = bg:CreateTexture()
-		tex:SetColorTexture(0, 0, 0, 0.6)
-		tex:SetDrawLayer("BACKGROUND")
-		tex:SetPoint("TOPLEFT")
-		tex:SetPoint("BOTTOMRIGHT")
 		self:EnableKeyboard(true)
 		self:SetScript("OnKeyDown", AddonList_OnKeyDown)
 		self:SetFrameStrata("DIALOG")
@@ -233,7 +223,15 @@ function AddonList_OnLoad(self)
 	drop:SetPoint("TOPLEFT", 0, -30)
 	UIDropDownMenu_Initialize(drop, AddonListCharacterDropDown_Initialize);
 	UIDropDownMenu_SetSelectedValue(drop, true);
-	AddonListScrollFrameScrollChildFrame:SetParent(AddonListScrollFrame);
+
+	local view = CreateScrollBoxListLinearView();
+	view:SetElementInitializer("AddonListEntryTemplate", function(button, elementData)
+		AddonList_InitButton(button, elementData);
+	end);
+
+	view:SetPadding(2,2,2,2,5);
+
+	ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view);
 end
 
 function AddonList_SetStatus(self,lod,status,reload)
@@ -283,98 +281,86 @@ local function TriStateCheckbox_SetState(checked, checkButton)
 	end
 end
 
-function AddonList_Update()
-	local numEntrys = GetNumAddOns();
-	local name, title, notes, enabled, loadable, reason, security;
-	local addonIndex;
-	local entry, checkbox, string, status, urlButton, securityIcon, versionButton;
+function AddonList_InitButton(entry, addonIndex)
+	local name, title, notes, loadable, reason, security = GetAddOnInfo(addonIndex);
 
-	for i=1, MAX_ADDONS_DISPLAYED do
-		addonIndex = AddonList.offset + i;
-		entry = _G["AddonListEntry"..i];
-		if ( addonIndex > numEntrys ) then
-			entry:Hide();
-		else
-			name, title, notes, loadable, reason, security = GetAddOnInfo(addonIndex);
-
-			-- Get the character from the current list (nil is all characters)
-			local character = UIDropDownMenu_GetSelectedValue(AddonCharacterDropDown);
-			if ( character == true ) then
-				character = nil;
-			end
-
-			checkbox = _G["AddonListEntry"..i.."Enabled"];
-			local checkboxState = GetAddOnEnableState(character, addonIndex);
-			if ( not InGlue() ) then
-				enabled = (GetAddOnEnableState(UnitName("player"), addonIndex) > 0);
-			else
-				enabled = (checkboxState > 0);
-			end
-
-			TriStateCheckbox_SetState(checkboxState, checkbox);
-			if (checkboxState == 1 ) then
-				checkbox.AddonTooltip = ENABLED_FOR_SOME;
-			else
-				checkbox.AddonTooltip = nil;
-			end
-
-			string = _G["AddonListEntry"..i.."Title"];
-			if ( loadable or ( enabled and (reason == "DEP_DEMAND_LOADED" or reason == "DEMAND_LOADED") ) ) then
-				string:SetTextColor(1.0, 0.78, 0.0);
-			elseif ( enabled and reason ~= "DEP_DISABLED" ) then
-				string:SetTextColor(1.0, 0.1, 0.1);
-			else
-				string:SetTextColor(0.5, 0.5, 0.5);
-			end
-			if ( title ) then
-				string:SetText(title);
-			else
-				string:SetText(name);
-			end
-			securityIcon = _G["AddonListEntry"..i.."SecurityIcon"];
-			if ( security == "SECURE" ) then
-				AddonList_SetSecurityIcon(securityIcon, 1);
-			elseif ( security == "INSECURE" ) then
-				AddonList_SetSecurityIcon(securityIcon, 2);
-			elseif ( security == "BANNED" ) then
-				AddonList_SetSecurityIcon(securityIcon, 3);
-			end
-			_G["AddonListEntry"..i.."Security"].tooltip = _G["ADDON_"..security];
-			string = _G["AddonListEntry"..i.."Status"];
-			if ( not loadable and reason ) then
-				string:SetText(_G["ADDON_"..reason]);
-			else
-				string:SetText("");
-			end
-
-			if ( not InGlue() ) then
-				if ( enabled ~= AddonList.startStatus[addonIndex] and reason ~= "DEP_DISABLED" or
-					(reason ~= "INTERFACE_VERSION" and tContains(AddonList.outOfDateIndexes, addonIndex)) or
-					(reason == "INTERFACE_VERSION" and not tContains(AddonList.outOfDateIndexes, addonIndex))) then
-					if ( enabled ) then
-						-- special case for loadable on demand addons
-						if ( AddonList_IsAddOnLoadOnDemand(addonIndex) ) then
-							AddonList_SetStatus(entry, true, false, false)
-						else
-							AddonList_SetStatus(entry, false, false, true)
-						end
-					else
-						AddonList_SetStatus(entry, false, false, true)
-					end
-				else
-					AddonList_SetStatus(entry, false, true, false)
-				end
-			else
-				AddonList_SetStatus(entry, false, true, false)
-			end
-
-			entry:SetID(addonIndex);
-			entry:Show();
-		end
+	-- Get the character from the current list (nil is all characters)
+	local character = UIDropDownMenu_GetSelectedValue(AddonCharacterDropDown);
+	if ( character == true ) then
+		character = nil;
 	end
 
-	-- ScrollFrame stuff
-	FauxScrollFrame_Update(AddonListScrollFrame, numEntrys, MAX_ADDONS_DISPLAYED, ADDON_BUTTON_HEIGHT);
+	local checkboxState = GetAddOnEnableState(character, addonIndex);
+	if ( not InGlue() ) then
+		enabled = (GetAddOnEnableState(UnitName("player"), addonIndex) > 0);
+	else
+		enabled = (checkboxState > 0);
+	end
+
+	TriStateCheckbox_SetState(checkboxState, entry.Enabled);
+	if (checkboxState == 1 ) then
+		entry.Enabled.AddonTooltip = ENABLED_FOR_SOME;
+	else
+		entry.Enabled.AddonTooltip = nil;
+	end
+
+	if ( loadable or ( enabled and (reason == "DEP_DEMAND_LOADED" or reason == "DEMAND_LOADED") ) ) then
+		entry.Title:SetTextColor(1.0, 0.78, 0.0);
+	elseif ( enabled and reason ~= "DEP_DISABLED" ) then
+		entry.Title:SetTextColor(1.0, 0.1, 0.1);
+	else
+		entry.Title:SetTextColor(0.5, 0.5, 0.5);
+	end
+
+	if ( title ) then
+		entry.Title:SetText(title);
+	else
+		entry.Title:SetText(name);
+	end
+
+	if ( security == "SECURE" ) then
+		AddonList_SetSecurityIcon(entry.Security.Icon, 1);
+	elseif ( security == "INSECURE" ) then
+		AddonList_SetSecurityIcon(entry.Security.Icon, 2);
+	elseif ( security == "BANNED" ) then
+		AddonList_SetSecurityIcon(entry.Security.Icon, 3);
+	end
+
+	entry.Security.tooltip = _G["ADDON_"..security];
+
+	if ( not loadable and reason ) then
+		entry.Status:SetText(_G["ADDON_"..reason]);
+	else
+		entry.Status:SetText("");
+	end
+
+	if ( not InGlue() ) then
+		if ( enabled ~= AddonList.startStatus[addonIndex] and reason ~= "DEP_DISABLED" or
+			(reason ~= "INTERFACE_VERSION" and tContains(AddonList.outOfDateIndexes, addonIndex)) or
+			(reason == "INTERFACE_VERSION" and not tContains(AddonList.outOfDateIndexes, addonIndex))) then
+			if ( enabled ) then
+				-- special case for loadable on demand addons
+				if ( AddonList_IsAddOnLoadOnDemand(addonIndex) ) then
+					AddonList_SetStatus(entry, true, false, false)
+				else
+					AddonList_SetStatus(entry, false, false, true)
+				end
+			else
+				AddonList_SetStatus(entry, false, false, true)
+			end
+		else
+			AddonList_SetStatus(entry, false, true, false)
+		end
+	else
+		AddonList_SetStatus(entry, false, true, false)
+	end
+
+	entry:SetID(addonIndex);
+end
+
+function AddonList_Update()
+	local dataProvider = CreateIndexRangeDataProvider(GetNumAddOns());
+	AddonList.ScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition);
 
 	if ( not InGlue() ) then
 		if ( AddonList_HasAnyChanged() ) then
@@ -387,7 +373,7 @@ function AddonList_Update()
 	end
 end
 
-function AddonList_OnKeyDown(key)
+function AddonList_OnKeyDown(self, key)
 	if ( key == "ESCAPE" ) then
 		AddonList_OnCancel();
 	elseif ( key == "ENTER" ) then
@@ -461,20 +447,9 @@ function AddonList_OnCancel()
 	AddonList_Hide(false);
 end
 
-function AddonListScrollFrame_OnVerticalScroll(self, offset)
-	local scrollbar = _G[self:GetName().."ScrollBar"];
-	scrollbar:SetValue(offset);
-	AddonList.offset = floor((offset / ADDON_BUTTON_HEIGHT) + 0.5);
-	AddonList_Update();
-	if ( AddonTooltip:IsShown() ) then
-		AddonTooltip_Update(AddonTooltip:GetOwner());
-		AddonTooltip:Show()
-	end
-end
-
-function AddonList_OnShow()
+function AddonList_OnShow(self)
 	if ( InGlue() ) then
-		AddonListBackground:Show()
+		GlueParent_AddModalFrame(self);
 	end
 	UIDropDownMenu_Initialize(AddonCharacterDropDown, AddonListCharacterDropDown_Initialize);
 	UIDropDownMenu_SetSelectedValue( AddonCharacterDropDown, UIDropDownMenu_GetSelectedValue(AddonCharacterDropDown) );
@@ -483,7 +458,7 @@ end
 
 function AddonList_OnHide(self)
 	if ( InGlue() ) then
-		AddonListBackground:Hide()
+		GlueParent_RemoveModalFrame(self);
 	end
 	if ( self.save ) then
 		SaveAddOns();

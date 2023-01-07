@@ -19,7 +19,7 @@ abilityInfo should be defined with the following functions:
 	:GetState(stateID, target) - returns the value of a state associated with a unit. If not associated with a battle, return 0.
 	:GetWeatherState(stateID) - returns the value of the state associated with the weather. If not associated with a battle, return 0.
 	:GetPadState(stateID, target) - returns the value of the state associated with the pad on target's side. If not associated with a battle, return 0.
-	:GetPetOwner(target)	- returns either LE_BATTLE_PET_ALLY, LE_BATTLE_PET_ENEMY, or LE_BATTLE_PET_WEATHER while in combat.
+	:GetPetOwner(target)	- returns either Enum.BattlePetOwner.Ally, Enum.BattlePetOwner.Enemy, or Enum.BattlePetOwner.Weather while in combat.
 	:HasAura(auraID, target) - returns true if the unit has the aura active, false if they don't or we aren't in combat.
 	:GetPetType(target) - returns the pet type ID of the target. May return nil if the target doesn't exist (e.g. when clicking on the link in chat.)
 
@@ -40,7 +40,7 @@ function DEFAULT_PET_BATTLE_ABILITY_INFO:GetSpeedStat(target) return 0 end
 function DEFAULT_PET_BATTLE_ABILITY_INFO:GetState(stateID, target) return 0 end
 function DEFAULT_PET_BATTLE_ABILITY_INFO:GetWeatherState(stateID) return 0 end
 function DEFAULT_PET_BATTLE_ABILITY_INFO:GetPadState(stateID) return 0 end
-function DEFAULT_PET_BATTLE_ABILITY_INFO:GetPetOwner(taget) return LE_BATTLE_PET_ALLY end
+function DEFAULT_PET_BATTLE_ABILITY_INFO:GetPetOwner(taget) return Enum.BattlePetOwner.Ally end
 function DEFAULT_PET_BATTLE_ABILITY_INFO:HasAura(auraID, target) return false end
 function DEFAULT_PET_BATTLE_ABILITY_INFO:GetPetType(target) if ( self:IsInBattle() ) then error("UI: Unimplemented Function"); else return nil end end
 
@@ -289,7 +289,7 @@ do
 					if ( not target ) then
 						target = "default";
 					end
-					return parsedAbilityInfo:GetPetOwner(target) == LE_BATTLE_PET_ALLY;
+					return parsedAbilityInfo:GetPetOwner(target) == Enum.BattlePetOwner.Ally;
 				end,
 		unitHasAura = function(auraID, target)
 					if ( not target ) then
@@ -411,13 +411,13 @@ do
 
 		if ( multi > 1 ) then 
 			output = GREEN_FONT_COLOR_CODE..math.floor(baseDamage * multi)..FONT_COLOR_CODE_CLOSE;
-			if ( ENABLE_COLORBLIND_MODE == "1" ) then
+			if ( CVarCallbackRegistry:GetCVarValueBool("colorblindMode") ) then
 				output = output.."|Tinterface\\petbattles\\battlebar-abilitybadge-strong-small:0|t";
 			end
 			return output;
 		elseif ( multi < 1 ) then 
 			output = RED_FONT_COLOR_CODE..math.floor(baseDamage * multi)..FONT_COLOR_CODE_CLOSE;
-			if ( ENABLE_COLORBLIND_MODE == "1" ) then
+			if ( CVarCallbackRegistry:GetCVarValueBool("colorblindMode") ) then
 				output = output.."|Tinterface\\petbattles\\battlebar-abilitybadge-weak-small:0|t";
 			end
 			return output;
@@ -439,13 +439,13 @@ do
 
 		if ( finalMulti > 1 ) then 
 			output = GREEN_FONT_COLOR_CODE..math.floor(baseHeal * finalMulti)..FONT_COLOR_CODE_CLOSE;
-			if (ENABLE_COLORBLIND_MODE == "1") then
+			if (CVarCallbackRegistry:GetCVarValueBool("colorblindMode")) then
 				output = output.."|Tinterface\\petbattles\\battlebar-abilitybadge-strong-small:0|t";
 			end
 			return output;
 		elseif( finalMulti < 1 ) then 
 			output = RED_FONT_COLOR_CODE..math.floor(baseHeal * finalMulti)..FONT_COLOR_CODE_CLOSE;
-			if (ENABLE_COLORBLIND_MODE == "1") then
+			if (CVarCallbackRegistry:GetCVarValueBool("colorblindMode")) then
 				output = output.."|Tinterface\\petbattles\\battlebar-abilitybadge-weak-small:0|t";
 			end
 			return output;
@@ -470,12 +470,12 @@ do
 		local accuracyBonus = parserEnv.AccuracyBonus(...);
 		local output = string.format("%d%%", math.floor(parserEnv.SimpleAccuracy(...)));
 		if ( accuracyBonus > 0 ) then
-			if ( ENABLE_COLORBLIND_MODE == "1" ) then
+			if ( CVarCallbackRegistry:GetCVarValueBool("colorblindMode") ) then
 				output = output.."(+)";
 			end
 			output = GREEN_FONT_COLOR_CODE..output..FONT_COLOR_CODE_CLOSE;
 		elseif ( accuracyBonus < 0 ) then
-			if ( ENABLE_COLORBLIND_MODE == "1" ) then
+			if ( CVarCallbackRegistry:GetCVarValueBool("colorblindMode") ) then
 				output = output.."(-)";
 			end
 			output = RED_FONT_COLOR_CODE..output..FONT_COLOR_CODE_CLOSE;

@@ -1,6 +1,8 @@
 local REWARDS_SECTION_OFFSET = 5;		-- vertical distance between sections
 local REWARDS_ROW_OFFSET = 2;			-- vertical distance between rows within a section
 
+local MAJOR_FACTION_REPUTATION_REWARD_ICON_FORMAT = [[Interface\Icons\UI_MajorFaction_%s]];
+
 function QuestInfoTimerFrame_OnUpdate(self, elapsed)
 	if ( self.timeLeft ) then
 		self.timeLeft = max(self.timeLeft - elapsed, 0);
@@ -23,20 +25,24 @@ function QuestInfo_Display(template, parentFrame, acceptButton, material, mapVie
 
 	if ( template.canHaveSealMaterial ) then
 		local questFrame = parentFrame:GetParent():GetParent();
-		local questID;
-		if ( template.questLog ) then
-			questID = questFrame.questID;
+		if QuestUtil.QuestTextContrastEnabled() then
+			questFrame.SealMaterialBG:Hide();
 		else
-			questID = GetQuestID();
-		end
+			local questID;
+			if ( template.questLog ) then
+				questID = questFrame.questID;
+			else
+				questID = GetQuestID();
+			end
 
-		local theme = C_QuestLog.GetQuestDetailsTheme(questID);
-		QuestInfoSealFrame.theme = theme;
+			local theme = C_QuestLog.GetQuestDetailsTheme(questID);
+			QuestInfoSealFrame.theme = theme;
 
-		local hasValidBackground = theme and theme.background;
-		questFrame.SealMaterialBG:SetShown(hasValidBackground);
-		if hasValidBackground then
-			questFrame.SealMaterialBG:SetAtlas(theme.background);
+			local hasValidBackground = theme and theme.background;
+			questFrame.SealMaterialBG:SetShown(hasValidBackground);
+			if hasValidBackground then
+				questFrame.SealMaterialBG:SetAtlas(theme.background);
+			end
 		end
 	end
 
@@ -454,6 +460,10 @@ local function QuestInfo_ShowRewardAsItemCommon(questItem, index, questLogQueryF
 	questItem:SetID(index);
 	questItem:Show();
 
+	if not itemID then
+		return;
+	end
+
 	local item = Item:CreateFromItemID(itemID);
 	item:ContinueOnItemLoad(function()
 		if ( QuestInfoFrame.questLog ) then
@@ -527,6 +537,7 @@ function QuestInfo_ShowRewards()
 	local numSpellRewards = 0;
 	local rewardsFrame = QuestInfoFrame.rewardsFrame;
 	local hasWarModeBonus = false;
+	local majorFactionRepRewards;
 
 	local spellGetter;
 	local questID;
@@ -546,6 +557,7 @@ function QuestInfo_ShowRewards()
 			numSpellRewards = GetNumQuestLogRewardSpells();
 			spellGetter = GetQuestLogRewardSpell;
 			hasWarModeBonus = C_QuestLog.QuestHasWarModeBonus(questID)
+			majorFactionRepRewards = C_QuestLog.GetQuestLogMajorFactionReputationRewards(questID);
 		end
 	else
 		questID = GetQuestID();
@@ -562,6 +574,7 @@ function QuestInfo_ShowRewards()
 			numSpellRewards = GetNumRewardSpells();
 			spellGetter = GetRewardSpell;
 			hasWarModeBonus = C_QuestLog.QuestCanHaveWarModeBonus(questID);
+			majorFactionRepRewards = C_QuestOffer.GetQuestOfferMajorFactionReputationRewards();
 		end
 	end
 
@@ -576,7 +589,7 @@ function QuestInfo_ShowRewards()
 	end
 
 	local totalRewards = numQuestRewards + numQuestChoices + numQuestCurrencies;
-	if ( totalRewards == 0 and money == 0 and xp == 0 and not playerTitle and numQuestSpellRewards == 0 and artifactXP == 0 and honor == 0 ) then
+	if ( totalRewards == 0 and money == 0 and xp == 0 and not playerTitle and numQuestSpellRewards == 0 and artifactXP == 0 and honor == 0 and not majorFactionRepRewards ) then
 		rewardsFrame:Hide();
 		return nil;
 	end
@@ -690,6 +703,7 @@ function QuestInfo_ShowRewards()
 	rewardsFrame.spellRewardPool:ReleaseAll();
 	rewardsFrame.followerRewardPool:ReleaseAll();
 	rewardsFrame.spellHeaderPool:ReleaseAll();
+	rewardsFrame.reputationRewardPool:ReleaseAll();
 	rewardsFrame.WarModeBonusFrame:Hide();
 
 	-- Setup spell rewards
@@ -791,7 +805,7 @@ function QuestInfo_ShowRewards()
 
 	-- Setup mandatory rewards
 	local hasChanceForQuestSessionBonusReward = C_QuestLog.QuestHasQuestSessionBonus(questID);
-	if ( numQuestRewards > 0 or numQuestCurrencies > 0 or money > 0 or xp > 0 or honor > 0 or hasChanceForQuestSessionBonusReward ) then
+	if ( numQuestRewards > 0 or numQuestCurrencies > 0 or money > 0 or xp > 0 or honor > 0 or majorFactionRepRewards or hasChanceForQuestSessionBonusReward ) then
 		-- receive text, will either say "You will receive" or "You will also receive"
 		local questItemReceiveText = rewardsFrame.ItemReceiveText;
 		if ( numQuestChoices > 0 or numQuestSpellRewards > 0 or playerTitle ) then
@@ -889,6 +903,15 @@ function QuestInfo_ShowRewards()
 			end
 		end
 
+		-- Major Faction Reputation Rewards
+		if majorFactionRepRewards then
+			for i, rewardInfo in ipairs(majorFactionRepRewards) do
+				local reputationReward = rewardsFrame.reputationRewardPool:Acquire();
+				reputationReward:SetUpMajorFactionReputationReward(rewardInfo);
+				AddRewardElement(reputationReward);
+			end
+		end
+
 		-- warmode bonus
 		if hasWarModeBonus and C_PvP.IsWarModeDesired() then
 			rewardsFrame.WarModeBonusFrame.Count:SetFormattedText(PLUS_PERCENT_FORMAT, C_PvP.GetWarModeRewardBonus());
@@ -962,7 +985,7 @@ function QuestInfo_ShowRewards()
 end
 
 function QuestInfo_OnHyperlinkEnter(self, link, text, region, left, bottom, width, height)
-	local linkType, linkData = ExtractLinkData(link);
+	local linkType, linkData = LinkUtil.SplitLinkData(link);
 	local title, body;
 	if linkType == "questReplay" then
 		title = QUEST_SESSION_REPLAY_TOOLTIP_TITLE_ENABLED;
@@ -1055,19 +1078,22 @@ QUEST_TEMPLATE_MAP_REWARDS = { questLog = true, chooseItems = nil, contentWidth 
 function QuestInfoRewardItemCodeTemplate_OnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 
+	local showCollectionText = false;
+
 	if (self.objectType == "questSessionBonusReward") then
 		GameTooltip:SetItemByID(self:GetID());
 		GameTooltip_ShowCompareItem(GameTooltip);
 	elseif ( QuestInfoFrame.questLog ) then
 		if (self.objectType == "item") then
-			GameTooltip:SetQuestLogItem(self.type, self:GetID());
+			local questID = nil;
+			GameTooltip:SetQuestLogItem(self.type, self:GetID(), questID, showCollectionText);
 			GameTooltip_ShowCompareItem(GameTooltip);
 		elseif (self.objectType == "currency") then
 			GameTooltip:SetQuestLogCurrency(self.type, self:GetID());
 		end
 	else
 		if (self.objectType == "item") then
-			GameTooltip:SetQuestItem(self.type, self:GetID());
+			GameTooltip:SetQuestItem(self.type, self:GetID(), showCollectionText);
 			GameTooltip_ShowCompareItem(GameTooltip);
 		elseif (self.objectType == "currency") then
 			GameTooltip:SetQuestCurrency(self.type, self:GetID());
@@ -1080,14 +1106,42 @@ end
 
 function QuestInfoRewardItemCodeTemplate_OnClick(self, button)
 	if ( IsModifiedClick() and self.objectType == "item") then
+		local link;
 		if ( QuestInfoFrame.questLog ) then
-			HandleModifiedItemClick(GetQuestLogItemLink(self.type, self:GetID()));
+			link = GetQuestLogItemLink(self.type, self:GetID());
 		else
-			HandleModifiedItemClick(GetQuestItemLink(self.type, self:GetID()));
+			link = GetQuestItemLink(self.type, self:GetID());
 		end
+		HandleModifiedItemClick(link);
 	else
 		if ( QuestInfoFrame.chooseItems ) then
 			QuestInfoItem_OnClick(self);
 		end
 	end
+end
+
+QuestInfoReputationRewardButtonMixin = { };
+
+function QuestInfoReputationRewardButtonMixin:SetUpMajorFactionReputationReward(reputationRewardInfo)
+	local majorFactionData = C_MajorFactions.GetMajorFactionData(reputationRewardInfo.factionID);
+	self.factionName = majorFactionData.name;
+	self.rewardAmount = reputationRewardInfo.rewardAmount;
+
+	self.Name:SetText(QUEST_REPUTATION_REWARD_TITLE:format(self.factionName));
+	self.RewardAmount:SetText(AbbreviateNumbers(self.rewardAmount));
+
+	local majorFactionIcon = MAJOR_FACTION_REPUTATION_REWARD_ICON_FORMAT:format(majorFactionData.textureKit);
+	self.Icon:SetTexture(majorFactionIcon);
+end
+
+function QuestInfoReputationRewardButtonMixin:OnEnter()
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	local wrapText = false;
+	GameTooltip_SetTitle(GameTooltip, QUEST_REPUTATION_REWARD_TITLE:format(self.factionName), HIGHLIGHT_FONT_COLOR, wrapText);
+	GameTooltip_AddNormalLine(GameTooltip, QUEST_REPUTATION_REWARD_TOOLTIP:format(self.rewardAmount, self.factionName));
+	GameTooltip:Show();
+end
+
+function QuestInfoReputationRewardButtonMixin:OnLeave()
+	GameTooltip_Hide();
 end

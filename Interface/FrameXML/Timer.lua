@@ -22,6 +22,7 @@ TIMER_NUMBERS_SETS["BigGold"]  = {	texture = "Interface\\Timer\\BigTimerNumbers"
 function TimerTracker_OnLoad(self)
 	self.timerList = {};
 	self:RegisterEvent("START_TIMER");
+	self:RegisterEvent("STOP_TIMER_OF_TYPE");
 	self:RegisterEvent("PLAYER_ENTERING_WORLD");
 end
 
@@ -98,6 +99,10 @@ function TimerTracker_OnEvent(self, event, ...)
 				end
 			end
 			
+			if(timer and timer.type == TIMER_TYPE_PLAYER_COUNTDOWN) then 
+				FreeTimerTrackerTimer(timer);
+			end 
+
 			if not timer then
 				timer = CreateFrame("FRAME", self:GetName().."Timer"..(#self.timerList+1), self, "StartTimerBar");
 				self.timerList[#self.timerList+1] = timer;
@@ -130,9 +135,17 @@ function TimerTracker_OnEvent(self, event, ...)
 			timer:Show();
 		end
 		StartTimer_SetGoTexture(timer);
+	elseif event == "STOP_TIMER_OF_TYPE" then
+		local timerType = ...;
+		for a,timer in pairs(self.timerList) do
+			if(timer.type == timerType) then 
+				FreeTimerTrackerTimer(timer);
+				timer:Hide();
+			end
+		end
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		for a,timer in pairs(self.timerList) do
-			if(timer.type == "TIMER_TYPE_PVP") then 
+			if(timer.type == TIMER_TYPE_PVP) then 
 				FreeTimerTrackerTimer(timer);
 			end
 		end

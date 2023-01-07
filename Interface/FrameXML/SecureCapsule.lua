@@ -103,7 +103,7 @@ retain("error");
 retain("assert");
 retain("strtrim");
 retain("LoadURLIndex");
-retain("GetContainerNumFreeSlots");
+retain("C_Container");
 retain("GetCursorPosition");
 retain("GetRealmName");
 retain("PlaySound");
@@ -112,10 +112,12 @@ retain("SetPortraitTexture");
 retain("getmetatable");
 retain("BACKPACK_CONTAINER");
 retain("NUM_BAG_SLOTS");
+retain("NUM_TOTAL_EQUIPPED_BAG_SLOTS");
 retain("RAID_CLASS_COLORS");
 retain("CLASS_ICON_TCOORDS");
 retain("C_Timer");
 retain("C_ModelInfo");
+retain("C_PlayerInfo");
 retain("IsModifiedClick");
 retain("GetTime");
 retain("UnitAffectingCombat");
@@ -155,6 +157,8 @@ retain("UnitSex");
 retain("GetURLIndexAndLoadURL");
 retain("GetUnscaledFrameRect");
 retain("BLIZZARD_STORE_EXTERNAL_LINK_BUTTON_TEXT");
+retain("Round");
+retain("IsCharacterNPERestricted");
 
 --For auth challenge
 take("C_AuthChallenge");
@@ -230,6 +234,10 @@ take("BLIZZARD_STORE_CURRENCY_FORMAT_AUD");
 take("BLIZZARD_STORE_CURRENCY_FORMAT_JPY");
 take("BLIZZARD_STORE_CURRENCY_FORMAT_CAD");
 take("BLIZZARD_STORE_CURRENCY_FORMAT_NZD");
+take("BLIZZARD_STORE_CURRENCY_FORMAT_GEL");
+take("BLIZZARD_STORE_CURRENCY_FORMAT_TRY");
+take("BLIZZARD_STORE_CURRENCY_FORMAT_KZT");
+take("BLIZZARD_STORE_CURRENCY_FORMAT_UAH");
 take("BLIZZARD_STORE_CURRENCY_RAW_ASTERISK");
 take("BLIZZARD_STORE_CURRENCY_BETA");
 take("BLIZZARD_STORE_BROWSE_BATTLE_COINS_KR");
@@ -262,6 +270,10 @@ take("BLIZZARD_STORE_LICENSE_ACK_TEXT_AUD");
 take("BLIZZARD_STORE_LICENSE_ACK_TEXT_JPY");
 take("BLIZZARD_STORE_LICENSE_ACK_TEXT_CAD");
 take("BLIZZARD_STORE_LICENSE_ACK_TEXT_NZD");
+take("BLIZZARD_STORE_LICENSE_ACK_TEXT_GEL");
+take("BLIZZARD_STORE_LICENSE_ACK_TEXT_TRY");
+take("BLIZZARD_STORE_LICENSE_ACK_TEXT_KZT");
+take("BLIZZARD_STORE_LICENSE_ACK_TEXT_UAH");
 take("BLIZZARD_STORE_REGION_LOCKED");
 take("BLIZZARD_STORE_REGION_LOCKED_SUBTEXT");
 take("BLIZZARD_STORE_ERROR_TITLE_INSUFFICIENT_BALANCE");
@@ -375,6 +387,7 @@ take("BLIZZARD_STORE_VAS_ERROR_GM_SENORITY_INSUFFICIENT");
 take("BLIZZARD_STORE_VAS_ERROR_OPERATION_ALREADY_IN_PROGRESS");
 take("BLIZZARD_STORE_VAS_ERROR_LOCKED_FOR_VAS");
 take("BLIZZARD_STORE_VAS_ERROR_MOVE_IN_PROGRESS");
+take("BLIZZARD_STORE_VAS_ERROR_HAS_CRAFTING_ORDERS");
 take("BLIZZARD_STORE_VAS_ERROR_OTHER");
 take("BLIZZARD_STORE_VAS_ERROR_LABEL");
 take("BLIZZARD_STORE_DISCLAIMER_FACTION_CHANGE");
@@ -590,6 +603,7 @@ end
 
 take("SecureMixin");
 take("CreateFromSecureMixins");
+take("CreateSecureMixinCopy");
 
 retain("GetFinalNameFromTextureKit")
 retain("C_Texture");

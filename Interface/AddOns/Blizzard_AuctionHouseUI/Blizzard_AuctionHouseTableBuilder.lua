@@ -48,7 +48,7 @@ end
 
 function AuctionHouseTableCellItemKeyMixin:TryUpdateDisplay()
 	local itemKey = self.rowData.itemKey;
-	local itemKeyInfo = C_AuctionHouse.GetItemKeyInfo(itemKey, self.restrictQualityToFilter);
+	local itemKeyInfo = itemKey and C_AuctionHouse.GetItemKeyInfo(itemKey, self.restrictQualityToFilter) or nil;
 	if not itemKeyInfo then
 		self.pendingItemID = itemKey.itemID;
 		self:RegisterEvent("ITEM_KEY_ITEM_INFO_RECEIVED");
@@ -183,7 +183,8 @@ function AuctionHouseTableCellCommoditiesQuantityMixin:Init(...)
 end
 
 function AuctionHouseTableCellCommoditiesQuantityMixin:Populate(rowData, dataIndex)
-	self.Text:SetText(BreakUpLargeNumbers(rowData.quantity));
+	local rowQuantity = rowData.quantity or 0;
+	self.Text:SetText(BreakUpLargeNumbers(rowQuantity));
 end
 
 
@@ -214,29 +215,12 @@ function AuctionHouseTableCellFavoriteMixin:OnLineLeave()
 end
 
 
-AuctionHouseTableCellFavoriteButtonMixin = CreateFromMixins(AuctionHouseTableCellMixin);
-
-function AuctionHouseTableCellFavoriteButtonMixin:OnClick()
-	if not self:IsInteractionAvailable() then
-		return;
-	end
-	
-	local setToFavorite = not self:IsFavorite();
-	C_AuctionHouse.SetFavoriteItem(self.itemKey, setToFavorite);
-	self:UpdateFavoriteState();
-end
-
-function AuctionHouseTableCellFavoriteButtonMixin:IsInteractionAvailable()
-	return C_AuctionHouse.FavoritesAreAvailable() and (self:IsFavorite() or not C_AuctionHouse.HasMaxFavorites());
-end
+AuctionHouseTableCellFavoriteButtonMixin = CreateFromMixins(AuctionHouseTableCellMixin, AuctionHouseFavoriteButtonBaseMixin);
 
 function AuctionHouseTableCellFavoriteButtonMixin:OnEnter()
 	if not self:IsInteractionAvailable() then
+		self:ShowMaxedFavoritesTooltip();
 		self:LockTexture();
-
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-		GameTooltip_AddErrorLine(GameTooltip, AUCTION_HOUSE_FAVORITES_MAXED_TOOLTIP);
-		GameTooltip:Show();
 	else
 		local row = self:GetParent():GetParent();
 		ExecuteFrameScript(row, "OnEnter");
@@ -251,17 +235,16 @@ function AuctionHouseTableCellFavoriteButtonMixin:OnLeave()
 	ExecuteFrameScript(row, "OnLeave");
 end
 
-function AuctionHouseTableCellFavoriteButtonMixin:SetItemKey(itemKey)
-	self.itemKey = itemKey;
-	self:UpdateFavoriteState();
-end
-
 function AuctionHouseTableCellFavoriteButtonMixin:UpdateFavoriteState()
 	local isFavorite = self:IsFavorite();
 	local defaultTexture = self.textureLocked and "auctionhouse-icon-favorite-off" or nil;
 	self.NormalTexture:SetAtlas(isFavorite and "auctionhouse-icon-favorite" or defaultTexture);
 	self.HighlightTexture:SetAtlas(isFavorite and "auctionhouse-icon-favorite" or "auctionhouse-icon-favorite-off");
 	self.HighlightTexture:SetAlpha(isFavorite and 0.2 or 0.4);
+end
+
+function AuctionHouseTableCellFavoriteButtonMixin:UpdateState()
+	self:UpdateFavoriteState();
 end
 
 function AuctionHouseTableCellFavoriteButtonMixin:LockTexture()
@@ -279,15 +262,6 @@ function AuctionHouseTableCellFavoriteButtonMixin:UnlockTexture()
 		self.NormalTexture:SetAtlas(nil);
 	end
 end
-
-function AuctionHouseTableCellFavoriteButtonMixin:IsFavorite()
-	return self.itemKey and C_AuctionHouse.IsFavoriteItem(self.itemKey);
-end
-
-function AuctionHouseTableCellFavoriteButtonMixin:UpdateState()
-	self:UpdateFavoriteState();
-end
-
 
 AuctionHouseTableCellBidMixin = CreateFromMixins(AuctionHouseTablePriceDisplayMixin);
 
@@ -507,6 +481,7 @@ function AuctionHouseTableCellAuctionsBidMixin:Populate(rowData, dataIndex)
 		self.MoneyDisplay:SetShown(not sold);
 		if sold then
 			self.Text:SetText(AUCTION_HOUSE_INCOMING_AMOUNT);
+			self.Checkmark:Hide();
 		else
 			AuctionHouseTableCellBidMixin.Populate(self, rowData, dataIndex);
 		end
@@ -713,12 +688,13 @@ function AuctionHouseTableCellItemDisplayMixin:ClearDisplay()
 end
 
 function AuctionHouseTableCellItemDisplayMixin:UpdateDisplay(itemKey, itemKeyInfo)
-	self.Text:SetText(AuctionHouseUtil.GetItemDisplayTextFromItemKey(itemKey, itemKeyInfo, self.hideItemLevel));
-	
+	local rowData = self.rowData;
+	self.Text:SetText(AuctionHouseUtil.GetItemDisplayTextFromItemKey(itemKey, itemKeyInfo, self.hideItemLevel, rowData));
+
 	self.Icon:SetTexture(itemKeyInfo.iconFileID);
 	self.Icon:Show();
 
-	local noneAvailable = self.rowData.totalQuantity == 0;
+	local noneAvailable = rowData.totalQuantity == 0;
 	self.Icon:SetAlpha(noneAvailable and 0.5 or 1.0);
 end
 
@@ -840,13 +816,15 @@ function AuctionHouseTableCellItemQuantityMixin:Populate(rowData, dataIndex)
 	local bidStatus = self:GetAuctionHouseFrame():GetBidStatus(rowData);
 	local hasPlayerBid = bidStatus == AuctionHouseBidStatus.PlayerBid or bidStatus == AuctionHouseBidStatus.PlayerOutbid;
 	local showPlayerBid = hasPlayerBid and not self.hideBidStatus;
-	self.Text:SetShown(showPlayerBid or (rowData.quantity > 1));
+
+	local rowQuantity = rowData.quantity or 0;
+	self.Text:SetShown(showPlayerBid or (rowQuantity > 1));
 
 	if showPlayerBid then
 		self.Text:SetText(AuctionHouseUtil.GetBidTextFromStatus(bidStatus));
 		self.Text:SetFontObject(Number13FontGray);
 	else
-		self.Text:SetText(BreakUpLargeNumbers(rowData.quantity));
+		self.Text:SetText(BreakUpLargeNumbers(rowQuantity));
 		self.Text:SetFontObject(PriceFontWhite);
 	end
 end

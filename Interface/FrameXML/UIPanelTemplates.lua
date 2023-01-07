@@ -29,7 +29,7 @@ function BagSearch_OnTextChanged(self, userChanged)
 			bar:SetText(self:GetText());
 		end
 	end
-	SetItemSearch(self:GetText());
+	C_Container.SetItemSearch(self:GetText());
 end
 
 function BagSearch_OnChar(self, text)
@@ -76,62 +76,6 @@ function RoleCountMixin:Refresh()
 	self.DamagerCount:SetText(counts.DAMAGER);
 	self.HealerCount:SetText(counts.HEALER);
 	self.TankCount:SetText(counts.TANK);
-end
-
-UIFrameCache = CreateFrame("FRAME");
-local caches = {};
-function UIFrameCache:New (frameType, baseName, parent, template)
-	if ( self ~= UIFrameCache ) then
-		error("Attempt to run factory method on class member");
-	end
-
-	local frameCache = {};
-
-	setmetatable(frameCache, self);
-	self.__index = self;
-
-	frameCache.frameType = frameType;
-	frameCache.baseName = baseName;
-	frameCache.parent = parent;
-	frameCache.template = template;
-	frameCache.frames = {};
-	frameCache.usedFrames = {};
-	frameCache.numFrames = 0;
-
-	tinsert(caches, frameCache);
-
-	return frameCache;
-end
-
-function UIFrameCache:GetFrame ()
-	local frame = self.frames[1];
-	if ( frame ) then
-		tremove(self.frames, 1);
-		tinsert(self.usedFrames, frame);
-		return frame;
-	end
-
-	frame = CreateFrame(self.frameType, self.baseName .. self.numFrames + 1, self.parent, self.template);
-	frame.frameCache = self;
-	self.numFrames = self.numFrames + 1;
-	tinsert(self.usedFrames, frame);
-	return frame;
-end
-
-function UIFrameCache:ReleaseFrame (frame)
-	for k, v in next, self.frames do
-		if ( v == frame ) then
-			return;
-		end
-	end
-
-	for k, v in next, self.usedFrames do
-		if ( v == frame ) then
-			tinsert(self.frames, frame);
-			tremove(self.usedFrames, k);
-			break;
-		end
-	end
 end
 
 -- SquareButton template code
@@ -305,7 +249,7 @@ function CurrencyTemplateMixin:SetCurrencyFromID(currencyID, amount, formatStrin
 	else
 		self:SetText(currencyString);
 	end
-	
+
 	self.currencyID = currencyID;
 	self.amount = amount;
 	self.formatString = formatString;
@@ -452,13 +396,13 @@ end
 CurrencyDisplayMixin = CreateFromMixins(CurrencyTemplateMixin);
 
 -- currencies: An array of currencyInfo
--- currencyInfo: either a currencyID, or an array with { currencyID, overrideAmount, colorCode }, or a table with { currencyID = 123, amount = 45 }
+-- currencyInfo: either a currencyID, or an array with { currencyID, overrideAmount, colorCode }, or a table with { currencyID = 123, amount = 45, colorCode = RED_FONT_COLOR_CODE [, formatString = "5 / %s"] }
 function CurrencyDisplayMixin:SetCurrencies(currencies, formatString)
 	if #currencies == 1 then
 		local currency = currencies[1];
 		if type(currency) == "table" then
 			if currency.currencyID and currency.amount then
-				self:SetCurrencyFromID(currency.currencyID, currency.amount, formatString);
+				self:SetCurrencyFromID(currency.currencyID, currency.amount, currency.formatString or formatString, currency.colorCode);
 			else
 				local currencyID, overrideAmount, colorCode = unpack(currency);
 				self:SetCurrencyFromID(currencyID, overrideAmount, formatString, colorCode);
@@ -480,11 +424,17 @@ end
 
 function CurrencyDisplayMixin:SetText(text)
 	self.Text:SetText(text);
+	self:MarkDirty();
 end
 
 function CurrencyDisplayMixin:SetTextAnchorPoint(anchorPoint)
 	self.Text:ClearAllPoints();
 	self.Text:SetPoint(anchorPoint);
+	self:MarkDirty();
+end
+
+function CurrencyDisplayMixin:SetCurrencyFont(fontObject)
+	self.Text:SetFontObject(fontObject);
 end
 
 CurrencyDisplayGroupMixin = {};
@@ -494,22 +444,40 @@ function CurrencyDisplayGroupMixin:OnLoad()
 end
 
 -- Defaults to a TOPRIGHT configuration.
-function CurrencyDisplayGroupMixin:SetCurrencies(currencies, initFunction, initialAnchor, gridLayout, tooltipAnchor, abbreviate, reverseOrder)
+function CurrencyDisplayGroupMixin:SetCurrencies(currencies, initFunction, initialAnchor, layout, tooltipAnchor, abbreviate, reverseOrder)
+	initialAnchor = initialAnchor or AnchorUtil.CreateAnchor("TOPRIGHT", self, "TOPRIGHT");
+
+	local stride = nil;
+	local paddingX = 10;
+	local paddingY = nil;
+	local fixedWidth = 62;
+	layout = layout or AnchorUtil.CreateGridLayout(GridLayoutMixin.Direction.TopRightToBottomLeft, stride, paddingX, paddingY, fixedWidth);
+
 	self.currencyFramePool:ReleaseAll();
 
 	local function FactoryFunction(index)
 		local currencyFrame = self.currencyFramePool:Acquire();
+
+		local customFontObject = self.customFontObject;
+		if customFontObject ~= nil then
+			currencyFrame:SetCurrencyFont(customFontObject);
+		end
+
 		local tIndex = index;
 		if reverseOrder then
 			tIndex = #currencies + 1 - index;
 		end
 		local currencyInfo = currencies[tIndex];
 
-		currencyFrame:SetTooltipAnchor(tooltipAnchor);
+		currencyFrame:SetTooltipAnchor(tooltipAnchor or "ANCHOR_RIGHT");
 		currencyFrame:SetAbbreviate(abbreviate);
 
-		if type(currency) == "table" then
-			currencyFrame:SetCurrencyFromID(unpack(currencyInfo));
+		if type(currencyInfo) == "table" then
+			if currencyInfo.currencyID and currencyInfo.amount then
+				currencyFrame:SetCurrencyFromID(currencyInfo.currencyID, currencyInfo.amount, currencyInfo.formatString, currencyInfo.colorCode);
+			else
+				currencyFrame:SetCurrencyFromID(unpack(currencyInfo));
+			end
 		else
 			currencyFrame:SetCurrencyFromID(currencyInfo);
 		end
@@ -518,13 +486,15 @@ function CurrencyDisplayGroupMixin:SetCurrencies(currencies, initFunction, initi
 			initFunction(currencyFrame);
 		end
 
+		-- Force the frame to resize. This anchor will be replaced by the grid layout function.
+		currencyFrame:SetPoint("CENTER");
+		currencyFrame:Layout();
+
 		currencyFrame:Show();
 
 		return currencyFrame;
 	end
 
-	local initialAnchor = initialAnchor or AnchorUtil.CreateAnchor("TOPRIGHT", self, "TOPRIGHT");
-	local layout = gridLayout or AnchorUtil.CreateGridLayout(GridLayoutMixin.Direction.TopRightToBottomLeft);
 	AnchorUtil.GridLayoutFactoryByCount(FactoryFunction, #currencies, initialAnchor, layout);
 
 	self:MarkDirty();
@@ -534,6 +504,14 @@ function CurrencyDisplayGroupMixin:Refresh()
 	for currencyFrame in self.currencyFramePool:EnumerateActive() do
 		currencyFrame:Refresh();
 	end
+end
+
+function CurrencyDisplayGroupMixin:SetCurrencyFont(fontObject)
+	for currencyFrame in self.currencyFramePool:EnumerateActive() do
+		currencyFrame:SetCurrencyFont(fontObject);
+	end
+
+	self.customFontObject = fontObject;
 end
 
 CurrencyHorizontalLayoutFrameMixin = { };
@@ -555,6 +533,7 @@ function CurrencyHorizontalLayoutFrameMixin:AddToLayout(region)
 	region.layoutIndex = self.nextLayoutIndex;
 	self.nextLayoutIndex = self.nextLayoutIndex + 1;
 	region:Show();
+	self:MarkDirty();
 end
 
 function CurrencyHorizontalLayoutFrameMixin:GetQuantityFontString()
@@ -588,6 +567,7 @@ function CurrencyHorizontalLayoutFrameMixin:CreateLabel(text, color, fontObject,
 	label:SetText(text);
 	color = color or HIGHLIGHT_FONT_COLOR;
 	label:SetTextColor(color:GetRGB());
+	self:MarkDirty();
 end
 
 function CurrencyHorizontalLayoutFrameMixin:AddCurrency(currencyID, overrideAmount, color)

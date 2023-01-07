@@ -11,7 +11,7 @@ end
 function UIErrorsMixin:OnEvent(event, ...)
 	if event == "SYSMSG" then
 		local message, r, g, b = ...;
-		self:AddMessage(message, r, g, b, 1.0);
+		self:CheckAddMessage(message, r, g, b, 1.0);
 	elseif event == "UI_INFO_MESSAGE" then
 		local messageType, message = ...;
 		self:TryDisplayMessage(messageType, message, YELLOW_FONT_COLOR:GetRGB());
@@ -64,6 +64,7 @@ local THROTTLED_MESSAGE_TYPES = {
 	[LE_GAME_ERR_SPELL_FAILED_ALREADY_AT_FULL_POWER_S] = true,
 	[LE_GAME_ERR_SPELL_FAILED_EQUIPPED_ITEM_CLASS_S] = true,
 	[LE_GAME_ERR_SPELL_FAILED_ALREADY_AT_FULL_HEALTH] = true,
+	[LE_GAME_ERR_SPELL_FAILED_CANT_FLY_HERE] = true,
 	[LE_GAME_ERR_GENERIC_NO_VALID_TARGETS] = true,
 
 	[LE_GAME_ERR_ITEM_COOLDOWN] = true,
@@ -94,6 +95,7 @@ local BLACK_LISTED_MESSAGE_TYPES = {
 	[LE_GAME_ERR_OUT_OF_RUNES] = true,
 	[LE_GAME_ERR_OUT_OF_FURY] = true,
 	[LE_GAME_ERR_OUT_OF_MAELSTROM] = true,
+	[LE_GAME_ERR_OUT_OF_ESSENCE] = true,
 };
 
 function UIErrorsMixin:FlashFontString(fontString)
@@ -129,12 +131,12 @@ function UIErrorsMixin:ShouldDisplayMessageType(messageType, message)
 			return false;
 		end
 	end
-
+	
 	return true;
 end
 
 function UIErrorsMixin:TryDisplayMessage(messageType, message, r, g, b)
-	if self:ShouldDisplayMessageType(messageType, message) then
+	if not self:GetMessagesSuppressed() and self:ShouldDisplayMessageType(messageType, message) then
 		self:AddMessage(message, r, g, b, 1.0, messageType);
 
 		local errorStringId, soundKitID, voiceID = GetGameMessageInfo(messageType);
@@ -149,7 +151,7 @@ end
 local function AddExternalMessage(self, message, color)
 	if not self:TryFlashingExistingMessage(LE_GAME_ERR_SYSTEM, message) then
 		local r, g, b = color:GetRGB();
-		self:AddMessage(message, r, g, b, 1.0, LE_GAME_ERR_SYSTEM);
+		self:CheckAddMessage(message, r, g, b, 1.0, LE_GAME_ERR_SYSTEM);
 	end
 end
 
@@ -159,4 +161,27 @@ end
 
 function UIErrorsMixin:AddExternalWarningMessage(message)
 	AddExternalMessage(self, message, YELLOW_FONT_COLOR);
+end
+
+function UIErrorsMixin:SetMessagesSuppressed(messagesSuppressed)
+	self.messagesSuppressed = messagesSuppressed;
+end
+
+function UIErrorsMixin:GetMessagesSuppressed()
+	return self.messagesSuppressed;
+end
+
+function UIErrorsMixin:SuppressMessagesThisFrame()
+	if self:GetMessagesSuppressed() then
+		return;
+	end
+	
+	self:SetMessagesSuppressed(true);
+	C_Timer.After(0, GenerateClosure(self.SetMessagesSuppressed, self, false));
+end
+
+function UIErrorsMixin:CheckAddMessage(...)
+	if not self:GetMessagesSuppressed() then
+		self:AddMessage(...);
+	end
 end

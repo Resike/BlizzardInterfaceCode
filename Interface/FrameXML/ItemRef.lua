@@ -1,17 +1,13 @@
-local function FormatLink(linkType, linkDisplayText, ...)
-	local linkFormatTable = { ("|H%s"):format(linkType), ... };
-	local returnLink = table.concat(linkFormatTable, ":");
-	if linkDisplayText then
-		return returnLink .. ("|h%s|h"):format(linkDisplayText);
-	else
-		return returnLink .. "|h";
-	end
-end
+local DUNGEON_SCORE_LINK_INDEX_START = 11; 
+local DUNGEON_SCORE_LINK_ITERATE = 3; 
+local PVP_LINK_ITERATE = 3; 
+local PVP_LINK_ITERATE_BRACKET = 4; 
+local PVP_LINK_INDEX_START = 7;
 
 function SetItemRef(link, text, button, chatFrame)
 
 	-- Going forward, use linkType and linkData instead of strsub and strsplit everywhere
-	local linkType, linkData = ExtractLinkData(link);
+	local linkType, linkData = LinkUtil.SplitLinkData(link);
 
 	if ( strsub(link, 1, 6) == "player" ) then
 		local namelink, isGMLink, isCommunityLink;
@@ -134,7 +130,7 @@ function SetItemRef(link, text, button, chatFrame)
 		return;
 	elseif ( strsub(link, 1, 7) == "levelup" ) then
 		local _, level, levelUpType, arg1 = strsplit(":", link);
-		LevelUpDisplay_ShowSideDisplay(tonumber(level), _G[levelUpType], arg1);
+		EventToastManagerSideDisplay:DisplayToastsByLevel(level);
 		return;
 	elseif ( strsub(link, 1, 6) == "pvpbgs" ) then
 		TogglePVPUI();
@@ -155,7 +151,7 @@ function SetItemRef(link, text, button, chatFrame)
 		ToggleTalentFrame(TALENTS_TAB);
 		return;
 	elseif ( strsub(link, 1, 14) == "mountequipment" ) then
-		ToggleCollectionsJournal(1);
+		ToggleCollectionsJournal(COLLECTIONS_JOURNAL_TAB_INDEX_MOUNTS);
 		return;
 	elseif ( strsub(link, 1, 11) == "honortalent" ) then
 		ToggleTalentFrame(PVP_TALENTS_TAB);
@@ -243,7 +239,7 @@ function SetItemRef(link, text, button, chatFrame)
 		return;
 	elseif ( strsub(link, 1, 9) == "shareitem" ) then
 		local strippedItemLink, earned = link:match("^shareitem:(.-):(%d+)$");
-		local itemLink = FormatLink("item", nil, strippedItemLink);
+		local itemLink = LinkUtil.FormatLink("item", nil, strippedItemLink);
 		SocialFrame_LoadUI();
 		Social_ShowItem(itemLink, earned);
 		return;
@@ -254,25 +250,26 @@ function SetItemRef(link, text, button, chatFrame)
 		end
 		return;
 	elseif ( strsub(link, 1, 18) == "transmogappearance" ) then
+		local _, sourceID = strsplit(":", link);
 		if ( IsModifiedClick("CHATLINK") ) then
-			local _, sourceID = strsplit(":", link);
 			local itemLink = select(6, C_TransmogCollection.GetAppearanceSourceInfo(sourceID));
 			HandleModifiedItemClick(itemLink);
 		else
-			if ( not CollectionsJournal ) then
-				CollectionsJournal_LoadUI();
-			end
-			if ( CollectionsJournal ) then
-				WardrobeCollectionFrame_OpenTransmogLink(link);
-			end
+			TransmogUtil.OpenCollectionToItem(sourceID);
 		end
 		return;
 	elseif ( strsub(link, 1, 11) == "transmogset" ) then
-		if ( not CollectionsJournal ) then
-			CollectionsJournal_LoadUI();
-		end
-		if ( CollectionsJournal ) then
-			WardrobeCollectionFrame_OpenTransmogLink(link);
+		local _, setID = strsplit(":", link);
+		TransmogUtil.OpenCollectionToSet(setID);
+		return;
+	elseif ( strsub(link, 1, 6) == "outfit" ) then
+		local fixedLink = GetFixedLink(text);
+		if not HandleModifiedItemClick(fixedLink) then
+			local itemTransmogInfoList = C_TransmogCollection.GetItemTransmogInfoListFromOutfitHyperlink(text);
+			if itemTransmogInfoList then
+				local showOutfitDetails = true;
+				DressUpItemTransmogInfoList(itemTransmogInfoList, showOutfitDetails);
+			end
 		end
 		return;
 	elseif ( strsub(link, 1, 3) == "api" ) then
@@ -361,22 +358,31 @@ function SetItemRef(link, text, button, chatFrame)
 			OpenWorldMap(waypoint.uiMapID);
 		end
 		return;
+	elseif ( strsub(link, 1, 12) ==  "dungeonScore" ) then 
+		DisplayDungeonScoreLink(link);
+		return; 
+	elseif ( strsub(link, 1, 9) == "pvpRating" ) then
+		DisplayPvpRatingLink(link);
+		return;
+	elseif ( strsub(link, 1, 14) == "aadcopenconfig" ) then
+		ShowUIPanel(ChatConfigFrame);
+		return;
+	elseif ( strsub(link, 1, 6) == "layout" ) then
+		local fixedLink = GetFixedLink(text);
+		if not HandleModifiedItemClick(fixedLink) then
+			EditModeManagerFrame:OpenAndShowImportLayoutLinkDialog(fixedLink);
+		end
+		return;
 	end
-
 	if ( IsModifiedClick() ) then
 		local fixedLink = GetFixedLink(text);
 		HandleModifiedItemClick(fixedLink);
 	else
-		local itemName, itemLink = ItemRefTooltip:GetItem();
-		if itemLink == GetFixedLink(text) then
-			HideUIPanel(ItemRefTooltip);
-		else
-			ShowUIPanel(ItemRefTooltip);
-			if ( not ItemRefTooltip:IsShown() ) then
-				ItemRefTooltip:SetOwner(UIParent, "ANCHOR_PRESERVE");
-			end
-			ItemRefTooltip:ItemRefSetHyperlink(link);
+		ShowUIPanel(ItemRefTooltip);
+		if ( not ItemRefTooltip:IsShown() ) then
+			ItemRefTooltip:SetOwner(UIParent, "ANCHOR_PRESERVE");
 		end
+		ItemRefTooltip:ItemRefSetHyperlink(link);
 	end
 end
 
@@ -403,7 +409,7 @@ function GetFixedLink(text, quality)
 		elseif ( strsub(text, startLink + 2, startLink + 14) == "battlePetAbil" ) then
 			return (gsub(text, "(|H.+|h.+|h)", "|cff4e96f7%1|r", 1));
 		elseif ( strsub(text, startLink + 2, startLink + 10) == "battlepet" ) then
-			return (gsub(text, "(|H.+|h.+|h)", "|cffffd200%1|r", 1)); -- s_defaultColorString (yellow)
+			return (gsub(text, "(|H.+|h.+|h)", "|cffffd200%1|r", 1)); -- UIColor::GetColorString("NORMAL_FONT_COLOR") (yellow)
 		elseif ( strsub(text, startLink + 2, startLink + 12) == "garrmission" ) then
 			return (gsub(text, "(|H.+|h.+|h)", "|cffffff00%1|r", 1));
 		elseif ( strsub(text, startLink + 2, startLink + 17) == "transmogillusion" ) then
@@ -412,8 +418,12 @@ function GetFixedLink(text, quality)
 			return (gsub(text, "(|H.+|h.+|h)", "|cffff80ff%1|r", 1));
 		elseif ( strsub(text, startLink + 2, startLink + 12) == "transmogset" ) then
 			return (gsub(text, "(|H.+|h.+|h)", "|cffff80ff%1|r", 1));
+		elseif ( strsub(text, startLink + 2, startLink + 7) == "outfit" ) then
+			return (gsub(text, "(|H.+|h.+|h)", "|cffff80ff%1|r", 1));
 		elseif ( strsub(text, startLink + 2, startLink + 9) == "worldmap" ) then
 			return (gsub(text, "(|H.+|h.+|h)", "|cffffff00%1|r", 1));
+		elseif ( strsub(text, startLink + 2, startLink + 7) == "layout" ) then
+			return (gsub(text, "(|H.+|h.+|h)", "|cffff80ff%1|r", 1));
 		end
 	end
 	--Nothing to change.
@@ -427,27 +437,28 @@ function GetBattlePetAbilityHyperlink(abilityID, maxHealth, power, speed)
 		return "";
 	end
 
-	return ("|cff4e96f7%s|r"):format(FormatLink("battlePetAbil", name, abilityID, maxHealth or 100, power or 0, speed or 0));
+	local linkDisplayText = ("[%s]"):format(name);
+	return ("|cff4e96f7%s|r"):format(LinkUtil.FormatLink("battlePetAbil", linkDisplayText, abilityID, maxHealth or 100, power or 0, speed or 0));
 end
 
 function GetPlayerLink(characterName, linkDisplayText, lineID, chatType, chatTarget)
 	-- Use simplified link if possible
 	if lineID or chatType or chatTarget then
-		return FormatLink("player", linkDisplayText, characterName, lineID or 0, chatType or 0, chatTarget or "");
+		return LinkUtil.FormatLink("player", linkDisplayText, characterName, lineID or 0, chatType or 0, chatTarget or "");
 	else
-		return FormatLink("player", linkDisplayText, characterName);
+		return LinkUtil.FormatLink("player", linkDisplayText, characterName);
 	end
 end
 
 function GetBNPlayerLink(name, linkDisplayText, bnetIDAccount, lineID, chatType, chatTarget)
-	return FormatLink("BNplayer", linkDisplayText, name, bnetIDAccount, lineID or 0, chatType, chatTarget);
+	return LinkUtil.FormatLink("BNplayer", linkDisplayText, name, bnetIDAccount, lineID or 0, chatType, chatTarget);
 end
 
 function GetGMLink(gmName, linkDisplayText, lineID)
 	if lineID then
-		return FormatLink("playerGM", linkDisplayText, gmName, lineID or 0);
+		return LinkUtil.FormatLink("playerGM", linkDisplayText, gmName, lineID or 0);
 	else
-		return FormatLink("playerGM", linkDisplayText, gmName);
+		return LinkUtil.FormatLink("playerGM", linkDisplayText, gmName);
 	end
 end
 
@@ -466,16 +477,16 @@ end
 
 function GetBNPlayerCommunityLink(playerName, linkDisplayText, bnetIDAccount, clubId, streamId, epoch, position)
 	clubId, streamId, epoch, position = SanitizeCommunityData(clubId, streamId, epoch, position);
-	return FormatLink("BNplayerCommunity", linkDisplayText, playerName, bnetIDAccount, clubId, streamId, epoch, position);
+	return LinkUtil.FormatLink("BNplayerCommunity", linkDisplayText, playerName, bnetIDAccount, clubId, streamId, epoch, position);
 end
 
 function GetPlayerCommunityLink(playerName, linkDisplayText, clubId, streamId, epoch, position)
 	clubId, streamId, epoch, position = SanitizeCommunityData(clubId, streamId, epoch, position);
-	return FormatLink("playerCommunity", linkDisplayText, playerName, clubId, streamId, epoch, position);
+	return LinkUtil.FormatLink("playerCommunity", linkDisplayText, playerName, clubId, streamId, epoch, position);
 end
 
 function GetClubTicketLink(ticketId, clubName, clubType)
-	local link = FormatLink("clubTicket", CLUB_INVITE_HYPERLINK_TEXT:format(clubName), ticketId);
+	local link = LinkUtil.FormatLink("clubTicket", CLUB_INVITE_HYPERLINK_TEXT:format(clubName), ticketId);
 	if clubType == Enum.ClubType.BattleNet then
 		return BATTLENET_FONT_COLOR:WrapTextInColorCode(link);
 	else
@@ -495,13 +506,177 @@ function GetClubFinderLink(clubFinderId, clubName)
 	else
 		linkGlobalString = ""
 	end
-	return fontColor:WrapTextInColorCode(FormatLink("clubFinder", linkGlobalString:format(clubName), clubFinderId));
+	return fontColor:WrapTextInColorCode(LinkUtil.FormatLink("clubFinder", linkGlobalString:format(clubName), clubFinderId));
+end
+
+function DungeonScoreLinkAddDungeonsToTable()
+	local dungeonScoreDungeonTable = { };
+	local maps = C_ChallengeMode.GetMapScoreInfo(); 
+	for _, scoreInfo in ipairs(maps) do 
+		table.insert(dungeonScoreDungeonTable, scoreInfo.mapChallengeModeID);
+		table.insert(dungeonScoreDungeonTable, scoreInfo.completedInTime);
+		table.insert(dungeonScoreDungeonTable, scoreInfo.level);
+	end		
+	return dungeonScoreDungeonTable; 
+end		
+
+function DisplayPvpRatingLink(link)
+	
+	if ( not ItemRefTooltip:IsShown() ) then
+		ItemRefTooltip:SetOwner(UIParent, "ANCHOR_PRESERVE");
+	end 
+	
+	local splits  = StringSplitIntoTable(":", link);
+	if(not splits) then 
+		return; 
+	end 
+	local playerName = splits[3]; 
+	local playerClass = splits[4]; 
+	local playerItemLevel = tonumber(splits[5]);
+	local playerLevel = tonumber(splits[6]);
+	local className, classFileName = GetClassInfo(playerClass);
+	local classColor = C_ClassColor.GetClassColor(classFileName);
+	if(not playerName or not playerClass or not playerItemLevel or not playerLevel) then 
+		return; 
+	end 
+
+	if(not className or not classFileName or not classColor) then 
+		return;
+	end 
+
+	GameTooltip_SetTitle(ItemRefTooltip, classColor:WrapTextInColorCode(playerName));
+	GameTooltip_AddColoredLine(ItemRefTooltip, PVP_LINK_LEVEL_CLASS_FORMAT_STRING:format(playerLevel, className), HIGHLIGHT_FONT_COLOR)
+	GameTooltip_AddNormalLine(ItemRefTooltip, PVP_RATING_LINK_ITEM_LEVEL:format(playerItemLevel));
+
+	for i = PVP_LINK_INDEX_START, (#splits), PVP_LINK_ITERATE_BRACKET do
+		
+		GameTooltip_AddBlankLineToTooltip(ItemRefTooltip); 
+
+		local bracket = tonumber(splits[i]);
+		local rating = tonumber(splits[i + 1]);
+		local tier = tonumber(splits[i + 2]);
+		local seasonGamesPlayed = tonumber(splits[i + 3]);		
+
+		GameTooltip_AddNormalLine(ItemRefTooltip, PVPUtil.GetBracketName(bracket)); 
+		GameTooltip_AddColoredLine(ItemRefTooltip,  PVP_RATING_LINK_FORMAT_STRING:format(PVPUtil.GetTierName(tier), rating), HIGHLIGHT_FONT_COLOR);
+		GameTooltip_AddColoredLine(ItemRefTooltip, PVP_LINK_SEASON_GAMES:format(seasonGamesPlayed), HIGHLIGHT_FONT_COLOR);
+	end 
+	ShowUIPanel(ItemRefTooltip);
+
+	ItemRefTooltip:SetPadding(30, 0); 
+end
+
+function AddPvpRatingsToTable()
+	local pvpLinkInfoTable = { };
+	for i = 1, PVP_LINK_ITERATE do 
+		local bracketIndex = CONQUEST_BRACKET_INDEXES[i];
+		local rating, seasonBest, weeklyBest, seasonPlayed, seasonWon, weeklyPlayed, weeklyWon, lastWeeksBest, hasWon, pvpTier, ranking, roundsSeasonPlayed, roundsSeasonWon, roundsWeeklyPlayed, roundsWeeklyWon = GetPersonalRatedInfo(bracketIndex);
+		local tierInfo = C_PvP.GetPvpTierInfo(pvpTier);
+		if(not tierInfo or not tierInfo.pvpTierEnum) then 
+			return; 
+		end 
+		table.insert(pvpLinkInfoTable, bracketIndex);
+		table.insert(pvpLinkInfoTable, rating);
+		table.insert(pvpLinkInfoTable, tierInfo.pvpTierEnum);
+		table.insert(pvpLinkInfoTable, seasonPlayed);
+	end
+	return pvpLinkInfoTable;
+end
+
+function DisplayDungeonScoreLink(link)
+	if ( not ItemRefTooltip:IsShown() ) then
+		ItemRefTooltip:SetOwner(UIParent, "ANCHOR_PRESERVE");
+	end 
+
+	local splits  = StringSplitIntoTable(":", link);
+	
+	--Bad Link, Return. 
+	if(not splits) then 
+		return;
+	end		
+	local dungeonScore = tonumber(splits[2]);
+	local playerName = splits[4]; 
+	local playerClass = splits[5]; 
+	local playerItemLevel = tonumber(splits[6]);
+	local playerLevel = tonumber(splits[7]);
+	local className, classFileName = GetClassInfo(playerClass);
+	local classColor = C_ClassColor.GetClassColor(classFileName);
+	local runsThisSeason = tonumber(splits[8]);
+	local bestSeasonScore = tonumber(splits[9]);
+	local bestSeasonNumber = tonumber(splits[10]);
+
+	--Bad Link..
+	if(not playerName or not playerClass or not playerItemLevel or not playerLevel) then 
+		return; 
+	end 
+
+	--Bad Link..
+	if(not className or not classFileName or not classColor) then 
+		return;
+	end 
+
+	GameTooltip_SetTitle(ItemRefTooltip, classColor:WrapTextInColorCode(playerName));
+	GameTooltip_AddColoredLine(ItemRefTooltip, DUNGEON_SCORE_LINK_LEVEL_CLASS_FORMAT_STRING:format(playerLevel, className), HIGHLIGHT_FONT_COLOR);
+	GameTooltip_AddNormalLine(ItemRefTooltip, DUNGEON_SCORE_LINK_ITEM_LEVEL:format(playerItemLevel));
+
+	local color = C_ChallengeMode.GetDungeonScoreRarityColor(dungeonScore) or HIGHLIGHT_FONT_COLOR;
+	GameTooltip_AddNormalLine(ItemRefTooltip, DUNGEON_SCORE_LINK_RATING:format(color:WrapTextInColorCode(dungeonScore)));
+	GameTooltip_AddNormalLine(ItemRefTooltip, DUNGEON_SCORE_LINK_RUNS_SEASON:format(runsThisSeason));
+
+	if(bestSeasonScore ~= 0) then 
+		local bestSeasonColor = C_ChallengeMode.GetDungeonScoreRarityColor(bestSeasonScore) or HIGHLIGHT_FONT_COLOR; 
+		GameTooltip_AddNormalLine(ItemRefTooltip, DUNGEON_SCORE_LINK_PREVIOUS_HIGH:format(bestSeasonColor:WrapTextInColorCode(bestSeasonScore), bestSeasonNumber)); 
+	end		
+	GameTooltip_AddBlankLineToTooltip(ItemRefTooltip);
+
+	local sortTable = { };
+	for i = DUNGEON_SCORE_LINK_INDEX_START, (#splits), DUNGEON_SCORE_LINK_ITERATE do
+		local mapChallengeModeID = tonumber(splits[i]);
+		local completedInTime = tonumber(splits[i + 1]); 
+		local level = tonumber(splits[i + 2]);
+
+		local mapName = C_ChallengeMode.GetMapUIInfo(mapChallengeModeID);
+
+		--If any of the maps don't exist.. this is a bad link
+		if(not mapName) then 
+			return; 
+		end 
+
+		table.insert(sortTable, { mapName = mapName, completedInTime = completedInTime, level = level });
+	end
+
+	-- Sort Alphabetically. 
+	table.sort(sortTable, function(a, b) strcmputf8i(a.mapName, b.mapName); end);
+
+	for i = 1, #sortTable do 
+		local textColor = sortTable[i].completedInTime and HIGHLIGHT_FONT_COLOR or GRAY_FONT_COLOR; 
+		GameTooltip_AddColoredDoubleLine(ItemRefTooltip, DUNGEON_SCORE_LINK_TEXT1:format(sortTable[i].mapName), (sortTable[i].level > 0 and  DUNGEON_SCORE_LINK_TEXT2:format(sortTable[i].level) or DUNGEON_SCORE_LINK_NO_SCORE), NORMAL_FONT_COLOR, textColor); 
+	end
+	ItemRefTooltip:SetPadding(0, 0); 
+	ShowUIPanel(ItemRefTooltip);
+end		
+
+function GetDungeonScoreLink(dungeonScore, playerName)
+	local _, _, class = UnitClass("player");
+	local avgItemLevel, avgItemLevelEquipped, avgItemLevelPvP = GetAverageItemLevel();
+	local runHistory = C_MythicPlus.GetRunHistory(true, true);
+	local bestSeasonScore, bestSeasonNumber = C_MythicPlus.GetSeasonBestMythicRatingFromThisExpansion(); 
+	local dungeonScoreTable = { C_ChallengeMode.GetOverallDungeonScore(), UnitGUID("player"), playerName, class, math.ceil(avgItemLevel), UnitLevel("player"), runHistory and #runHistory or 0, bestSeasonScore, bestSeasonNumber, unpack(DungeonScoreLinkAddDungeonsToTable())};
+	return NORMAL_FONT_COLOR:WrapTextInColorCode(LinkUtil.FormatLink("dungeonScore", DUNGEON_SCORE_LINK, unpack(dungeonScoreTable)));
+end		
+
+function GetPvpRatingLink(playerName)
+	local fontColor = NORMAL_FONT_COLOR;
+	local _, _, class = UnitClass("player");
+	local avgItemLevel, avgItemLevelEquipped, avgItemLevelPvP = GetAverageItemLevel();
+	local pvpRatingTable = { UnitGUID("player"), playerName, class, math.ceil(avgItemLevelPvP), UnitLevel("player"), unpack(AddPvpRatingsToTable())};
+	return fontColor:WrapTextInColorCode(LinkUtil.FormatLink("pvpRating", PVP_PERSONAL_RATING_LINK, unpack(pvpRatingTable)));
 end
 
 function GetCalendarEventLink(monthOffset, monthDay, index)
 	local dayEvent = C_Calendar.GetDayEvent(monthOffset, monthDay, index);
 	if dayEvent then
-		return FormatLink("calendarEvent", dayEvent.title, monthOffset, monthDay, index);
+		return LinkUtil.FormatLink("calendarEvent", dayEvent.title, monthOffset, monthDay, index);
 	end
 
 	return nil;
@@ -510,7 +685,7 @@ end
 function GetCommunityLink(clubId)
 	local clubInfo = C_Club.GetClubInfo(clubId);
 	if clubInfo then
-		local link = FormatLink("community", COMMUNITY_REFERENCE_FORMAT:format(clubInfo.name), clubId);
+		local link = LinkUtil.FormatLink("community", COMMUNITY_REFERENCE_FORMAT:format(clubInfo.name), clubId);
 		if clubInfo.clubType == Enum.ClubType.BattleNet then
 			return BATTLENET_FONT_COLOR:WrapTextInColorCode(link);
 		else
@@ -521,36 +696,19 @@ function GetCommunityLink(clubId)
 	return nil;
 end
 
-
-LinkUtil = {};
-
-function LinkUtil.SplitLink(link) -- returns linkText and displayText
-	return link:match("^|H(.+)|h(.*)|h$");
-end
-
--- Extract the first link from the text given, ignoring leading and trailing characters.
--- returns linkType, linkOptions, displayText
-function LinkUtil.ExtractLink(text)
-	-- linkType: |H([^:]*): matches everything that's not a colon, up to the first colon.
-	-- linkOptions: ([^|]*)|h matches everything that's not a |, up to the first |h.
-	-- displayText: ([^|]*)|h matches everything that's not a |, up to the second |h.
-	-- Ex: |cffffffff|Htype:a:b:c:d|htext|h|r becomes type, a:b:c:d, text
-	return string.match(text, [[|H([^:]*):([^|]*)|h([^|]*)|h]]);
-end
-
-function LinkUtil.IsLinkType(link, matchLinkType)
-	local linkType, linkOptions, displayText = LinkUtil.ExtractLink(link);
-	return linkType == matchLinkType;
-end
-
 ItemRefTooltipMixin = {};
 
 function ItemRefTooltipMixin:OnLoad()
 	GameTooltip_OnLoad(self);
 	self:RegisterForDrag("LeftButton");
 	self.shoppingTooltips = { ItemRefShoppingTooltip1, ItemRefShoppingTooltip2 };
-	self.updateTooltipTimer = 0;
-	self.UpdateTooltip = function(self, elapsed)
+end
+
+function ItemRefTooltipMixin:OnUpdate(elapsed)
+	if self.shouldRefreshData then
+		self:RefreshData();
+	end
+	if self.updateTooltipTimer then
 		if ( IsModifiedClick("COMPAREITEMS") ) then
 			self.updateTooltipTimer = self.updateTooltipTimer - elapsed;
 			if ( self.updateTooltipTimer > 0 ) then
@@ -559,20 +717,8 @@ function ItemRefTooltipMixin:OnLoad()
 			self.updateTooltipTimer = TOOLTIP_UPDATE_TIME;
 			GameTooltip_ShowCompareItem(self);
 		else
-			for _, frame in pairs(self.shoppingTooltips) do
-				frame:Hide();
-			end
-						
-			self.needsReset = true;
-			self.comparing = false;
+			TooltipComparisonManager:Clear(self);
 		end
-	end
-end
-
-function ItemRefTooltipMixin:OnTooltipSetItem()
-	self.updateTooltipTimer = 0;
-	if ( IsModifiedClick("COMPAREITEMS") and self:IsMouseOver() ) then
-		GameTooltip_ShowCompareItem(self);
 	end
 end
 
@@ -583,27 +729,17 @@ end
 function ItemRefTooltipMixin:OnDragStop()
 	self:StopMovingOrSizing();
 	ValidateFramePosition(self);
-	if ( IsModifiedClick("COMPAREITEMS") ) then --We do this to choose where the comparison is shown
-		GameTooltip_ShowCompareItem(self);
-	end
 end
 
 function ItemRefTooltipMixin:OnEnter()
 	self.updateTooltipTimer = 0;
-	self:SetScript("OnUpdate", self.UpdateTooltip);
 end
 
 function ItemRefTooltipMixin:OnLeave()
 	for _, frame in pairs(self.shoppingTooltips) do
 		frame:Hide();
 	end
-	self:SetScript("OnUpdate", nil);
-end
-
-function ItemRefTooltipMixin:OnHide()
-	GameTooltip_OnHide(self);
-	--While it is true that OnUpdate won't fire while the frame is hidden, we don't want to have to check-and-unregister when we show it
-	self:SetScript("OnUpdate", nil);
+	self.updateTooltipTimer = nil;
 end
 
 function ItemRefTooltipMixin:ItemRefSetHyperlink(link)
@@ -614,4 +750,18 @@ function ItemRefTooltipMixin:ItemRefSetHyperlink(link)
 		local xPadding = 16;
 		self:SetPadding(xPadding, 0);
 	end
+end
+
+function ItemRefTooltipMixin:SetHyperlink(...)
+	-- it's the same hyperlink as current data, close instead
+	if self.info and self.info.getterName == "GetHyperlink" then
+		local getterArgs = {...};
+		if tCompare(self.info.getterArgs, getterArgs) then
+			self:Hide();
+			return false;
+		end
+	end
+
+	local tooltipInfo = CreateBaseTooltipInfo("GetHyperlink", ...);
+	return self:ProcessInfo(tooltipInfo);
 end

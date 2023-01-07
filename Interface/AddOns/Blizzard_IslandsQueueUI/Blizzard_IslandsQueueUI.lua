@@ -147,7 +147,8 @@ end
 local function WidgetInit(widgetFrame)
 	widgetFrame.Background:SetSize(451, 301);
 	widgetFrame.Text:SetSize(165, 50);
-	widgetFrame.Text:SetFontObjectsToTry(GameFontNormalLarge, GameFontNormalMed1, GameFontNormal);
+	widgetFrame.Text:SetFontObject(GameFontNormalLarge);
+	widgetFrame.Text:SetMinLineHeight(12);
 end
 
 local function WidgetsLayout(widgetContainer, sortedWidgets)
@@ -171,16 +172,9 @@ end
 function IslandsQueueFrameMixin:OnLoad()
 	UIPanelWindows[self:GetName()] = { area = "center", pushable = 0, whileDead = 0, checkFit = 1, allowOtherPanels = 1, };
 
-	self.portrait:Hide();
+	self.PortraitContainer.portrait:Hide();
 	SetPortraitToTexture(self.ArtOverlayFrame.portrait, "Interface\\Icons\\icon_treasuremap");
 	self.IslandCardsFrame:RegisterForWidgetSet(ISLANDS_QUEUE_WIDGET_SET_ID, WidgetsLayout, WidgetInit);
-	self:RegisterEvent("ISLANDS_QUEUE_CLOSE");
-end
-
-function IslandsQueueFrameMixin:OnEvent(event, ...)
-	if (event == "ISLANDS_QUEUE_CLOSE") then
-		HideUIPanel(self);
-	end
 end
 
 function IslandsQueueFrameMixin:OnShow()

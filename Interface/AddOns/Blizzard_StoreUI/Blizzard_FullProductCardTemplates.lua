@@ -197,7 +197,7 @@ function FullStoreCardMixin:GetTooltipOffsets()
 end
 
 function FullStoreCardMixin:ShouldShowIcon(entryInfo)
-	return StoreCardMixin.ShouldShowIcon(self, entryInfo) and entryInfo.sharedData.texture;
+	return StoreCardMixin.ShouldShowIcon(self, entryInfo) and (entryInfo.sharedData.texture or entryInfo.sharedData.overrideTexture);
 end
 
 function FullStoreCardMixin:ShowIcon(displayData)
@@ -214,21 +214,8 @@ function FullStoreCardMixin:ShowIcon(displayData)
 		self.IconBorder:Hide();
 		self.Icon:SetAtlas(overrideTexture, true);
 
-		local adjustX, adjustY;
-		local width, height = self.Icon:GetSize();
-		if (width > 64) then
-			adjustX = -(width - 64);
-		else
-			adjustX = 64 - width;
-		end
 
-		if (height > 64) then
-			adjustY = height - 64;
-		else
-			adjustY = -(64 - height);
-		end
-
-		self.Icon:SetPoint("TOPLEFT", 88 + math.floor(adjustX / 2), -99 + math.floor(adjustY / 2));
+		self.Icon:SetPoint("TOPLEFT", 4, -4);
 	else			
 		self.Icon:SetPoint("CENTER", self, "TOP", 0, -69);
 		self.Icon:SetSize(64, 64);
@@ -406,13 +393,14 @@ function HorizontalFullStoreCardMixin:SetStyle(entryInfo)
 	self.Description:ClearAllPoints();
 
 	if not self.ProductName.SetFontObjectsToTry then
-		SecureMixin(self.ProductName, ShrinkUntilTruncateFontStringMixin);
+		SecureMixin(self.ProductName, AutoScalingFontStringMixin);
 	end
 	self.ProductName:SetWidth(535);
 	self.ProductName:SetMaxLines(1);
 	self.ProductName:SetPoint("CENTER", 0, -63);
 	self.ProductName:SetJustifyH("CENTER");
-	self.ProductName:SetFontObjectsToTry("Game30Font", "GameFontNormalHuge2", "GameFontNormalLarge2");
+	self.ProductName:SetFontObject("Game30Font");
+	self.ProductName:SetMinLineHeight(18);
 	self.ProductName:SetShadowOffset(1, -1);
 	self.ProductName:SetShadowColor(0, 0, 0, 1);
 
@@ -465,13 +453,14 @@ function HorizontalFullStoreCardWithNydusLinkMixin:SetStyle(entryInfo)
 	self.Description:ClearAllPoints();
 
 	if not self.ProductName.SetFontObjectsToTry then
-		SecureMixin(self.ProductName, ShrinkUntilTruncateFontStringMixin);
+		SecureMixin(self.ProductName, AutoScalingFontStringMixin);
 	end
 	self.ProductName:SetWidth(535);
 	self.ProductName:SetMaxLines(1);
 	self.ProductName:SetPoint("CENTER", 0, -63);
 	self.ProductName:SetJustifyH("CENTER");
-	self.ProductName:SetFontObjectsToTry("Game30Font", "GameFontNormalHuge2", "GameFontNormalLarge2");
+	self.ProductName:SetFontObject("Game30Font");
+	self.ProductName:SetMinLineHeight(18);
 	self.ProductName:SetShadowOffset(1, -1);
 	self.ProductName:SetShadowColor(0, 0, 0, 1);
 
@@ -517,13 +506,14 @@ function VerticalFullStoreCardMixin:SetStyle(entryInfo)
 	self.Description:ClearAllPoints();
 
 	if not self.ProductName.SetFontObjectsToTry then
-		SecureMixin(self.ProductName, ShrinkUntilTruncateFontStringMixin);
+		SecureMixin(self.ProductName, AutoScalingFontStringMixin);
 	end
 	self.ProductName:SetWidth(300);
 	self.ProductName:SetMaxLines(1);
 	self.ProductName:SetPoint("TOPLEFT", self, "TOP", -83, -70);
 	self.ProductName:SetJustifyH("LEFT");
-	self.ProductName:SetFontObjectsToTry("GameFontNormalWTF2", "Game30Font", "GameFontNormalHuge3");
+	self.ProductName:SetFontObject("GameFontNormalWTF2");
+	self.ProductName:SetMinLineHeight(25);
 
 	self.CurrentPrice:SetPoint("TOPLEFT", self.Description, "BOTTOMLEFT", 0, -28);
 

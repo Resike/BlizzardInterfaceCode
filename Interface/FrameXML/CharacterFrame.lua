@@ -20,8 +20,17 @@ function ToggleCharacter (tab, onlyShow)
 				CharacterFrame_ShowSubFrame(tab);
 				ShowUIPanel(CharacterFrame);
 			end
+			CharacterFrame_UpdateTabBounds(CharacterFrame);
 		end
 	end
+end
+
+function CharacterFrame_ToggleTokenFrame()
+	if C_CurrencyInfo.GetCurrencyListSize() <= 0 then
+		return;
+	end
+
+	ToggleCharacter("TokenFrame");
 end
 
 function CharacterFrame_ShowSubFrame (frameName)
@@ -45,7 +54,7 @@ function CharacterFrameTab_OnClick (self, button)
 	elseif ( name == "CharacterFrameTab2" ) then
 		ToggleCharacter("ReputationFrame");
 	elseif ( name == "CharacterFrameTab3" ) then
-		ToggleCharacter("TokenFrame");
+		CharacterFrame_ToggleTokenFrame();
 	end
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB);
 end
@@ -60,8 +69,6 @@ function CharacterFrame_OnLoad (self)
 	self:SetTitleColor(HIGHLIGHT_FONT_COLOR);
 	self:SetTitleMaxLinesAndHeight(1, 13);
 
-	SetTextStatusBarTextPrefix(PlayerFrameHealthBar, HEALTH);
-	SetTextStatusBarTextPrefix(PlayerFrameManaBar, MANA);
 	-- Tab Handling code
 	PanelTemplates_SetNumTabs(self, NUM_CHARACTERFRAME_TABS);
 	PanelTemplates_SetTab(self, 1);
@@ -113,18 +120,45 @@ local function ShouldShowExaltedPlusHelpTip()
 	return false;
 end
 
+local function CompareFrameSize(frame1, frame2)
+	return frame1:GetWidth() > frame2:GetWidth();
+end
+
+function CharacterFrame_UpdateTabBounds(self)
+	if CharacterFrameTab3:IsShown() then
+		local diff = (CharacterFrameTab3:GetRight() or 0) - (self:GetRight() or 0);
+
+		if diff > 0 then
+			table.sort(self.Tabs, CompareFrameSize);
+
+			for _, tab in ipairs(self.Tabs) do
+				local change = min(10, diff);
+				diff = diff - change;
+				tab.Text:SetWidth(0);
+				PanelTemplates_TabResize(tab, -change, nil, 36-change, 88);
+				if diff <= 0 then
+					break;
+				end
+			end
+		end
+	end
+end
+
 function CharacterFrame_OnShow (self)
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN);
 	CharacterFrame_UpdatePortrait();
 	UpdateMicroButtons();
-	PlayerFrameHealthBar.showNumeric = true;
-	PlayerFrameManaBar.showNumeric = true;
+
+	local playerFrameHealthBar = PlayerFrame_GetHealthBar();
+	local playerFrameManaBar = PlayerFrame_GetManaBar();
+	playerFrameHealthBar.showNumeric = true;
+	playerFrameManaBar.showNumeric = true;
 	PlayerFrameAlternateManaBar.showNumeric = true;
 	MonkStaggerBar.showNumeric = true;
 	PetFrameHealthBar.showNumeric = true;
 	PetFrameManaBar.showNumeric = true;
-	ShowTextStatusBarText(PlayerFrameHealthBar);
-	ShowTextStatusBarText(PlayerFrameManaBar);
+	ShowTextStatusBarText(playerFrameHealthBar);
+	ShowTextStatusBarText(playerFrameManaBar);
 	ShowTextStatusBarText(PlayerFrameAlternateManaBar);
 	ShowTextStatusBarText(MonkStaggerBar);
 	ShowTextStatusBarText(PetFrameHealthBar);
@@ -150,14 +184,17 @@ end
 function CharacterFrame_OnHide (self)
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE);
 	UpdateMicroButtons();
-	PlayerFrameHealthBar.showNumeric = nil;
-	PlayerFrameManaBar.showNumeric = nil;
+
+	local playerFrameHealthBar = PlayerFrame_GetHealthBar();
+	local playerFrameManaBar = PlayerFrame_GetManaBar();
+	playerFrameHealthBar.showNumeric = nil;
+	playerFrameManaBar.showNumeric = nil;
 	PlayerFrameAlternateManaBar.showNumeric = nil;
 	MonkStaggerBar.showNumeric = nil;
 	PetFrameHealthBar.showNumeric = nil;
 	PetFrameManaBar.showNumeric = nil;
-	HideTextStatusBarText(PlayerFrameHealthBar);
-	HideTextStatusBarText(PlayerFrameManaBar);
+	HideTextStatusBarText(playerFrameHealthBar);
+	HideTextStatusBarText(playerFrameManaBar);
 	HideTextStatusBarText(PlayerFrameAlternateManaBar);
 	HideTextStatusBarText(MonkStaggerBar);
 	HideTextStatusBarText(PetFrameHealthBar);
@@ -171,7 +208,7 @@ function CharacterFrame_Collapse()
 	CharacterFrame:SetWidth(PANEL_DEFAULT_WIDTH);
 	CharacterFrame.Expanded = false;
 	for i = 1, #PAPERDOLL_SIDEBARS do
-		_G[PAPERDOLL_SIDEBARS[i].frame]:Hide();
+		GetPaperDollSideBarFrame(i):Hide();
 	end
 	CharacterFrame.InsetRight:Hide();
 	UpdateUIPanelPositions(CharacterFrame);
@@ -190,41 +227,6 @@ function CharacterFrame_Expand()
 	CharacterFrame.InsetRight:Show();
 	UpdateUIPanelPositions(CharacterFrame);
 	PaperDollFrame_SetLevel();
-end
-
-local function CompareFrameSize(frame1, frame2)
-	return frame1:GetWidth() > frame2:GetWidth();
-end
-local CharTabtable = {};
-function CharacterFrame_TabBoundsCheck(self)
-	if ( string.sub(self:GetName(), 1, 17) ~= "CharacterFrameTab" ) then
-		return;
-	end
-
-	for i=1, NUM_CHARACTERFRAME_TABS do
-		_G["CharacterFrameTab"..i.."Text"]:SetWidth(0);
-		PanelTemplates_TabResize(_G["CharacterFrameTab"..i], 0, nil, 36, 88);
-	end
-
-	local diff = _G["CharacterFrameTab"..NUM_CHARACTERFRAME_TABS]:GetRight() - CharacterFrame:GetRight();
-
-	if ( diff > 0 and CharacterFrameTab3:IsShown() ) then
-		--Find the biggest tab
-		for i=1, NUM_CHARACTERFRAME_TABS do
-			CharTabtable[i]=_G["CharacterFrameTab"..i];
-		end
-		table.sort(CharTabtable, CompareFrameSize);
-
-		local i=1;
-		while ( diff > 0 and i <= NUM_CHARACTERFRAME_TABS) do
-			local tabText = _G[CharTabtable[i]:GetName().."Text"]
-			local change = min(10, diff);
-			diff = diff - change;
-			tabText:SetWidth(0);
-			PanelTemplates_TabResize(CharTabtable[i], -change, nil, 36-change, 88);
-			i = i+1;
-		end
-	end
 end
 
 function CharacterFrameCorruption_OnLoad(self)
@@ -308,4 +310,11 @@ function CharacterFrameCorruption_OnLeave(self)
 	self.Eye:SetAtlas("Nzoth-charactersheet-icon", true);
 	GameTooltip_Hide();
 	PaperDollFrame_UpdateCorruptedItemGlows(false);
+end
+
+CharacterFrameTabButtonMixin = {};
+
+function CharacterFrameTabButtonMixin:OnClick(button)
+	PanelTemplates_Tab_OnClick(self, CharacterFrame);
+	CharacterFrameTab_OnClick(self, button);
 end

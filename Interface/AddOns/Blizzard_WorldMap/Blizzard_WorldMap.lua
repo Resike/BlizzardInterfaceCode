@@ -12,12 +12,12 @@ end
 
 function WorldMapMixin:SynchronizeDisplayState()
 	if self:IsMaximized() then
-		self.BorderFrame.TitleText:SetText(WORLD_MAP);
+		self.BorderFrame:SetTitle(WORLD_MAP);
 		GameTooltip:Hide();
 		self.BlackoutFrame:Show();
 		MaximizeUIPanel(self);
 	else
-		self.BorderFrame.TitleText:SetText(MAP_AND_QUEST_LOG);
+		self.BorderFrame:SetTitle(MAP_AND_QUEST_LOG);
 		self.BlackoutFrame:Hide();
 		RestoreUIPanelArea(self);
 	end
@@ -99,7 +99,6 @@ function WorldMapMixin:OnLoad()
 	self:RegisterEvent("DISPLAY_SIZE_CHANGED");
 	self:RegisterEvent("UI_SCALE_CHANGED");
 	self:RegisterEvent("WORLD_MAP_OPEN");
-	self:RegisterEvent("WORLD_MAP_CLOSE");
 
 	self:AttachQuestLog();
 
@@ -122,8 +121,6 @@ function WorldMapMixin:OnEvent(event, ...)
 	elseif event == "WORLD_MAP_OPEN" then
 		local mapID = ...;
 		OpenWorldMap(mapID);
-	elseif event == "WORLD_MAP_CLOSE" then
-		HideUIPanel(self);
 	end
 end
 
@@ -222,6 +219,7 @@ function WorldMapMixin:AddOverlayFrames()
 	self:AddOverlayFrame("WorldMapActionButtonTemplate", "FRAME", nil, self:GetCanvasContainer());
 	self:AddOverlayFrame("WorldMapZoneTimerTemplate", "FRAME", "BOTTOM", self:GetCanvasContainer(), "BOTTOM", 0, 20);
 	self:AddOverlayFrame("WorldMapThreatFrameTemplate", "FRAME", "BOTTOMLEFT", self:GetCanvasContainer(), "BOTTOMLEFT", 0, 0);
+	self:AddOverlayFrame("WorldMapActivityTrackerTemplate", "BUTTON", "BOTTOMLEFT", self:GetCanvasContainer(), "BOTTOMLEFT", 0, 0);
 
 	self.NavBar = self:AddOverlayFrame("WorldMapNavBarTemplate", "FRAME");
 	self.NavBar:SetPoint("TOPLEFT", self.TitleCanvasSpacerFrame, "TOPLEFT", 64, -25);
@@ -277,6 +275,8 @@ function WorldMapMixin:OnHide()
 	self:OnUIClose();
 	self:TriggerEvent("WorldMapOnHide");
 	C_Map.CloseWorldMapInteraction();
+
+	UpdateMicroButtons();
 end
 
 function WorldMapMixin:RefreshOverlayFrames()

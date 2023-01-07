@@ -40,7 +40,7 @@ function DropDownExpandArrowMixin:OnEnter()
 
 	if self:IsEnabled() then
 		local listFrame = _G["DropDownList"..level];
-		if ( not listFrame or not listFrame:IsShown() or select(2, listFrame:GetPoint()) ~= self ) then
+		if ( not listFrame or not listFrame:IsShown() or select(2, listFrame:GetPoint(1)) ~= self ) then
 			ToggleDropDownMenu(level, self:GetParent().value, nil, nil, nil, nil, self:GetParent().menuList, self);
 		end
 	end
@@ -55,8 +55,11 @@ end
 UIDropDownCustomMenuEntryMixin = {};
 
 function UIDropDownCustomMenuEntryMixin:GetPreferredEntryWidth()
-	-- NOTE: Only width is currently supported, dropdown menus size vertically based on how many buttons are present.
 	return self:GetWidth();
+end
+
+function UIDropDownCustomMenuEntryMixin:GetPreferredEntryHeight()
+	return self:GetHeight();
 end
 
 function UIDropDownCustomMenuEntryMixin:OnSetOwningButton()

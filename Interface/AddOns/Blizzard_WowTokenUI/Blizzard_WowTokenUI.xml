@@ -1,5 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
-..\FrameXML\UI.xsd">
+..\..\FrameXML\UI.xsd">
 	<Script file="Blizzard_WowTokenUIInbound.lua" />
 	<Script file="Blizzard_WowTokenUI.lua"/>
 	<Script file="Blizzard_WowTokenUIOutbound.lua"/>
@@ -89,7 +89,7 @@
 			<Frames>
 				<Button parentKey="CloseButton" inherits="UIPanelCloseButtonNoScripts">
 					<Anchors>
-						<Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="5" y="4"/>
+						<Anchor point="TOPRIGHT" x="1" y="-1"/>
 					</Anchors>
 					<Scripts>
 						<OnClick function="WowTokenRedemptionFrameCloseButton_OnClick" />
@@ -145,11 +145,6 @@
 							<Anchors>
 								<Anchor point="TOP" x="0" y="-235"/>
 							</Anchors>
-							<Scripts>
-								<OnLoad>
-									self.Anim:Play();
-								</OnLoad>
-							</Scripts>
 						</Frame>
 						<Button parentKey="RedeemButton" inherits="WowTokenButtonTemplate" text="TOKEN_REDEEM_GAME_TIME_BUTTON_LABEL" id="1">
 							<Size x="234" y="28"/>
@@ -210,11 +205,6 @@
 							<Anchors>
 								<Anchor point="TOP" x="0" y="-235"/>
 							</Anchors>
-							<Scripts>
-								<OnLoad>
-									self.Anim:Play();
-								</OnLoad>
-							</Scripts>
 						</Frame>
 						<Button parentKey="RedeemButton" inherits="WowTokenButtonTemplate" text="TOKEN_REDEEM_BALANCE_BUTTON_LABEL" id="2">
 							<Size x="234" y="28"/>
@@ -301,11 +291,6 @@
 					<Anchors>
 						<Anchor point="BOTTOM" x="0" y="16"/>
 					</Anchors>
-					<Scripts>
-						<OnLoad>
-							self.Anim:Play();
-						</OnLoad>
-					</Scripts>
 				</Frame>
 				<Button parentKey="Button1" inherits="WowTokenButtonTemplate" text="OKAY" id="1">
 					<Size x="120" y="22"/>

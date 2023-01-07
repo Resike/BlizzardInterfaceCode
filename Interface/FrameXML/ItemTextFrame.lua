@@ -29,7 +29,7 @@ ITEM_TEXT_FONTS = {
 
 function ItemTextFrame_OnEvent(self, event, ...)
 	if ( event == "ITEM_TEXT_BEGIN" ) then
-		self.TitleText:SetText(ItemTextGetItem());
+		self:SetTitle(ItemTextGetItem());
 		ItemTextScrollFrame:Hide();
 		ItemTextCurrentPage:Hide();
 		ItemTextStatusBar:Hide();
@@ -136,7 +136,7 @@ function ItemTextFrame_OnEvent(self, event, ...)
 			ItemTextMaterialBotLeft:Hide();
 			ItemTextMaterialBotRight:Hide();
 			ItemTextFramePageBg:Show();
-			ItemTextFramePageBg:SetAtlas("QuestBG-Parchment");
+			ItemTextFramePageBg:SetAtlas(QuestUtil.GetDefaultQuestBackgroundTexture());
 			ItemTextFramePageBg:SetWidth(299);
 			ItemTextFramePageBg:SetHeight(357);
 		elseif ( material == "ParchmentLarge" ) then

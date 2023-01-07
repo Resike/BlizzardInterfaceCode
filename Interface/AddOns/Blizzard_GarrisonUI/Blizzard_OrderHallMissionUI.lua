@@ -163,20 +163,17 @@ function OrderHallMission:SetupTabs()
 	-- don't show any tabs if there's only 1
 	if (#tabList > 1) then
 		local tab = self["Tab"..tabList[1]];
-		local prevTab = tab;
 		tab:ClearAllPoints();
-
 		tab:SetPoint("BOTTOMLEFT", self, tab.xOffset or 7, tab.yOffset or -31);
 		tab:Show();
 
 		for i = 2, #tabList do
 			tab = self["Tab"..tabList[i]];
-			tab:ClearAllPoints();
-			tab:SetPoint("LEFT", prevTab, "RIGHT", -16, 0);
 			tab:Show();
-			prevTab = tab;
 		end
 	end
+
+	 PanelTemplates_SetNumTabs(self, #tabList);
 
 	-- If the selected tab is not a valid one, switch to the default. Additionally, if the missions tab is newly available, then select it.
 	local selectedTab = PanelTemplates_GetSelectedTab(self);
@@ -186,9 +183,13 @@ function OrderHallMission:SetupTabs()
 end
 
 function OrderHallMission:SetupMissionList()
-	self.MissionTab.MissionList.listScroll.update = function() self.MissionTab.MissionList:Update(); end;
-	HybridScrollFrame_CreateButtons(self.MissionTab.MissionList.listScroll, "OrderHallMissionListButtonTemplate", 13, -8, nil, nil, nil, -4);
-	self.MissionTab.MissionList:Update();
+	local view = CreateScrollBoxListLinearView();
+	view:SetElementInitializer("GarrisonMissionListButtonTemplate", function(button, elementData)
+		GarrisonMissionList_InitButton(button, elementData, self);
+	end);
+	view:SetPadding(8,0,13,13,4);
+
+	ScrollUtil.InitScrollBoxListWithScrollBar(self.MissionTab.MissionList.ScrollBox, self.MissionTab.MissionList.ScrollBar, view);
 
 	GarrisonMissionListTab_SetTab(self.MissionTab.MissionList.Tab1);
 end
@@ -728,15 +729,12 @@ local function CheckOpenMissionPageAndHasBossMechanic(missionFrame)
 	end
 
 	-- see if you have a follower that has that spec
-	for _, index in ipairs(missionFrame.FollowerList.followersList) do
-		if (index ~= 0) then
-			local follower = missionFrame.FollowerList.followers[index];
-			if (not follower.status) then
-				local abilities = C_Garrison.GetFollowerAbilities(follower.followerID);
-				for _, ability in ipairs(abilities) do
-					if (ability.id == missionFrame.MissionTab.MissionPage.Enemy1.counterAbility.id) then
-						return true;
-					end
+	for _, follower in ipairs(missionFrame.FollowerList.followers) do
+		if not follower.status then
+			local abilities = C_Garrison.GetFollowerAbilities(follower.followerID);
+			for _, ability in ipairs(abilities) do
+				if (ability.id == missionFrame.MissionTab.MissionPage.Enemy1.counterAbility.id) then
+					return true;
 				end
 			end
 		end
@@ -787,16 +785,14 @@ local function CheckOpenMissionPageAndHasTroopInList(missionFrame)
 	end
 
 	-- find a follower that is a troop
-	for _, index in ipairs(missionFrame.FollowerList.followersList) do
-		if (index ~= 0) then
-			local follower = missionFrame.FollowerList.followers[index];
-			if (not follower.status) then
-				if (follower.isTroop) then
-					return true;
-				end
+	for _, follower in ipairs(missionFrame.FollowerList.followers) do
+		if (not follower.status) then
+			if (follower.isTroop) then
+				return true;
 			end
 		end
 	end
+	
 	return false;
 end
 
@@ -871,30 +867,25 @@ local function PositionAtFirstEnemy(missionFrame)
 end
 
 local function PositionAtFirstTroop(missionFrame)
-	local troopButtonIndex;
-
 	-- find a follower that is a troop
-	for buttonIndex, index in ipairs(missionFrame.FollowerList.followersList) do
-		if (index ~= 0) then
-			local follower = missionFrame.FollowerList.followers[index];
-			if (not follower.status) then
-				if (follower.isTroop) then
-					troopButtonIndex = buttonIndex;
-					break;
-				end
-			end
-		end
-	end
+	local firstTroopFrame = missionFrame.FollowerList.ScrollBox:FindFrameByPredicate(function(frame, elementData)
+		local follower = elementData.follower or nil;
+		return follower and not follower.status and follower.isTroop;
+	end);
 
-	if (troopButtonIndex) then
-		return HelpTip.Point.TopEdgeCenter, 8, 25, OrderHallMissionFrame.FollowerList.listScroll.buttons[troopButtonIndex].Follower.DurabilityFrame;
+	if (firstTroopFrame and firstTroopFrame.Follower and firstTroopFrame.Follower.DurabilityFrame) then
+		return HelpTip.Point.TopEdgeCenter, 8, 25, firstTroopFrame.Follower.DurabilityFrame;
 	else
-		return HelpTip.Point.TopEdgeCenter, -10, -520, OrderHallMissionFrame.FollowerList.listScroll;
+		return HelpTip.Point.TopEdgeCenter, -10, -520, OrderHallMissionFrame.FollowerList.ScrollBox;
 	end
 end
 
 local function PositionAtFirstMission(missionFrame)
-	return HelpTip.Point.BottomEdgeCenter, -120, 6, missionFrame.MissionTab.MissionList.listScroll.buttons[1];
+	local frame = missionFrame.MissionTab.MissionList.ScrollBox:FindFrameByPredicate(function(frame, elementData)
+		return frame.id == 1;
+	end);
+
+	return HelpTip.Point.BottomEdgeCenter, -120, 6, frame;
 end
 
 local function PositionAtCombatAlly(missionFrame)
@@ -907,15 +898,12 @@ local function TextBossSpec(missionFrame, tutorial)
 	local followerName = "";
 
 	-- find a follower that has the correct spec
-	for _, index in ipairs(missionFrame.FollowerList.followersList) do
-		if (index ~= 0) then
-			local follower = missionFrame.FollowerList.followers[index];
-			local abilities = C_Garrison.GetFollowerAbilities(follower.followerID);
-			for _, ability in ipairs(abilities) do
-				if (ability.id == missionFrame.MissionTab.MissionPage.Enemy1.counterAbility.id) then
-					followerName = follower.name;
-					break;
-				end
+	for _, follower in ipairs(missionFrame.FollowerList.followers) do
+		local abilities = C_Garrison.GetFollowerAbilities(follower.followerID);
+		for _, ability in ipairs(abilities) do
+			if (ability.id == missionFrame.MissionTab.MissionPage.Enemy1.counterAbility.id) then
+				followerName = follower.name;
+				break;
 			end
 		end
 	end
@@ -1034,6 +1022,35 @@ local function WriteTutorialCVAR(lastTutorial, tutorialFlags)
 	SetCVar("orderHallMissionTutorial", cvarVal);
 end
 
+function OrderHallMission:TryShowTutorial(tutorial)
+	if tutorial and tutorial.openConditionFunc and tutorial.openConditionFunc(self) then
+		local targetPoint, offsetX, offsetY, relativeFrame = tutorial.positionFunc(self);
+		if targetPoint then
+			local helpTipInfo = {
+				text = tutorial.textFunc and tutorial.textFunc(self, tutorial) or tutorial.text,
+				buttonStyle = HelpTip.ButtonStyle.Close,
+				targetPoint = targetPoint,
+				offsetX = offsetX,
+				offsetY = offsetY,
+				onHideCallback = GenerateClosure(self.CheckTutorials, self),
+			};
+			HelpTip:Show(OrderHallMissionTutorialFrame, helpTipInfo, relativeFrame);
+
+			-- parent frame
+			OrderHallMissionTutorialFrame:SetParent(self.MissionTab[tutorial.parent]);
+			OrderHallMissionTutorialFrame:SetFrameStrata("DIALOG");
+			OrderHallMissionTutorialFrame:SetPoint("TOPLEFT", self, 0, -21);
+			OrderHallMissionTutorialFrame:SetPoint("BOTTOMRIGHT", self);
+			OrderHallMissionTutorialFrame.id = tutorial.id;
+			OrderHallMissionTutorialFrame:Show();
+
+			return true;
+		end
+	end
+
+	return false;
+end
+
 function OrderHallMission:CheckTutorials(advance)
 	if (not OrderHallMissionTutorialFrame) then
 		return;
@@ -1043,7 +1060,8 @@ function OrderHallMission:CheckTutorials(advance)
 		return;
 	end
 
-	local tutorial = tutorials[lastTutorial + 1];
+	local nextTutorial = lastTutorial + 1;
+	local tutorial = tutorials[nextTutorial];
 
 	if (OrderHallMissionTutorialFrame.id) then
 		tutorial = tutorials[OrderHallMissionTutorialFrame.id];
@@ -1055,23 +1073,26 @@ function OrderHallMission:CheckTutorials(advance)
 		if ( advance ) then
 			if (tutorial.advanceOnClick) then
 				lastTutorial = OrderHallMissionTutorialFrame.id;
+				nextTutorial = lastTutorial + 1;
 			else
 				tutorialFlags = bit.bor(tutorialFlags, OrderHallMissionTutorialFrame.id);
 			end
 			WriteTutorialCVAR(lastTutorial, tutorialFlags);
 			OrderHallMissionTutorialFrame:Hide();
 			OrderHallMissionTutorialFrame.id = nil;
+		elseif (tutorial.cancelConditionFunc and tutorial.cancelConditionFunc(self, tutorial)) then
+			OrderHallMissionTutorialFrame:Hide();
+			OrderHallMissionTutorialFrame.id = nil;
 		else
-			if (tutorial.cancelConditionFunc and tutorial.cancelConditionFunc(self, tutorial)) then
-				OrderHallMissionTutorialFrame:Hide();
-				OrderHallMissionTutorialFrame.id = nil;
-			end
+			-- We have a tutorial showing already, and it's not ready to close or advance, so just call TryShowTutorial on that (it may have been hidden by other means)
+			self:TryShowTutorial(tutorial);
+			return;
 		end
 	end
 
 	local eligibleTutorialIDs = { }
-	if (tutorials[lastTutorial + 1]) then
-		tinsert(eligibleTutorialIDs, lastTutorial + 1);
+	if (tutorials[nextTutorial]) then
+		tinsert(eligibleTutorialIDs, nextTutorial);
 	end
 
 	local tutorialFlag = 0x10000;
@@ -1084,33 +1105,8 @@ function OrderHallMission:CheckTutorials(advance)
 
 	for _, id in ipairs(eligibleTutorialIDs) do
 		tutorial = tutorials[id];
-		if (tutorial.openConditionFunc and tutorial.openConditionFunc(self)) then
-			-- parent frame
-			OrderHallMissionTutorialFrame:SetParent(self.MissionTab[tutorial.parent]);
-			OrderHallMissionTutorialFrame:SetFrameStrata("DIALOG");
-			OrderHallMissionTutorialFrame:SetPoint("TOPLEFT", self, 0, -21);
-			OrderHallMissionTutorialFrame:SetPoint("BOTTOMRIGHT", self);
-			OrderHallMissionTutorialFrame.id = id;
-
-			local text = tutorial.text;
-			if tutorial.textFunc then
-				text = tutorial.textFunc(self, tutorial);
-			end
-			local targetPoint, offsetX, offsetY, relativeFrame = tutorial.positionFunc(self);
-			if targetPoint then
-				local helpTipInfo = {
-					text = text,
-					buttonStyle = HelpTip.ButtonStyle.Close,
-					targetPoint = targetPoint,
-					offsetX = offsetX,
-					offsetY = offsetY,
-					onHideCallback = GenerateClosure(self.CheckTutorials, self),
-				};
-				HelpTip:Show(OrderHallMissionTutorialFrame, helpTipInfo, relativeFrame);
-
-				OrderHallMissionTutorialFrame:Show();
-				break;
-			end
+		if self:TryShowTutorial(tutorial) then
+			break;
 		end
 	end
 end

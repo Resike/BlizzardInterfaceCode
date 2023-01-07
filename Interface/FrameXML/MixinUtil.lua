@@ -306,7 +306,7 @@ function TextureLoadingGroupMixin:AddTexture(texture)
 	self.textures[texture] = true;
 end
 
-function TextureLoadingGroupMixin:RemoveTexture()
+function TextureLoadingGroupMixin:RemoveTexture(texture)
 	if self.textures then
 		self.textures[texture] = nil;
 	end
@@ -332,4 +332,21 @@ function TextureLoadingGroupMixin:IsFullyLoaded()
 		end
 	end
 	return true;
+end
+
+DirtiableMixin = {};
+
+function DirtiableMixin:SetDirtyMethod(method)
+	self.dirtyCallback = function()
+		method(self);
+		self.dirty = nil;
+	end;
+end
+
+function DirtiableMixin:MarkDirty()
+	if not self.dirty then
+		RunNextFrame(self.dirtyCallback);
+	end
+
+	self.dirty = true;
 end

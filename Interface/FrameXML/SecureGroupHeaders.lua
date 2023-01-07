@@ -1023,21 +1023,45 @@ function SecureAuraHeader_Update(self)
 		end
 
 		local i = 1;
-		AuraUtil.ForEachAura(unit, fullFilter, nil, function(...)
-			local aura, _, duration = freshTable();
-			aura.name, _, _, _, duration, aura.expires, aura.caster, _, aura.shouldConsolidate, _ = ...;
-			aura.filter = fullFilter;
-			aura.index = i;
-			local targetList = sortingTable;
-			if ( consolidateTable and aura.shouldConsolidate ) then
-				if ( not aura.expires or duration > consolidateDuration or (aura.expires - time >= max(consolidateThreshold, duration * consolidateFraction)) ) then
-					targetList = consolidateTable;
+		if (AuraUtil.ForEachAura) then
+			-- Mainline iteration-style.
+			AuraUtil.ForEachAura(unit, fullFilter, nil, function(...)
+				local aura, _, duration = freshTable();
+				aura.name, _, _, _, duration, aura.expires, aura.caster, _, _, _ = ...;
+				aura.filter = fullFilter;
+				aura.index = i;
+				aura.shouldConsolidate = false; -- Deprecated for mainline.
+				local targetList = sortingTable;
+				if ( consolidateTable and aura.shouldConsolidate ) then
+					if ( not aura.expires or duration > consolidateDuration or (aura.expires - time >= max(consolidateThreshold, duration * consolidateFraction)) ) then
+						targetList = consolidateTable;
+					end
 				end
-			end
-			tinsert(targetList, aura);
-			i = i + 1;
-			return false;
-		end);
+				tinsert(targetList, aura);
+				i = i + 1;
+				return false;
+			end);
+		else
+			-- Classic iteration-style. (TODO: Unify me!)
+			repeat
+				local aura, _, duration = freshTable();
+				aura.name, _, _, _, duration, aura.expires, aura.caster, _, _, _, _, _, _, _, _, aura.shouldConsolidate = UnitAura(unit, i, fullFilter);
+				if ( aura.name ) then
+					aura.filter = fullFilter;
+					aura.index = i;
+					local targetList = sortingTable;
+					if ( consolidateTable and aura.shouldConsolidate ) then
+						if ( not aura.expires or duration > consolidateDuration or (aura.expires - time >= max(consolidateThreshold, duration * consolidateFraction)) ) then
+							targetList = consolidateTable;
+						end
+					end
+					tinsert(targetList, aura);
+				else
+					releaseTable(aura);
+				end
+				i = i + 1;
+			until ( not aura.name );
+		end
 	end
 	if ( includeWeapons and not weaponPosition ) then
 		weaponPosition = 0;

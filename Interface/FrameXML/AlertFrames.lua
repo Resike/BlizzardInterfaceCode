@@ -106,6 +106,9 @@ end
 
 function AlertFrameQueueMixin:OnFrameHide(frame)
 	self.alertFramePool:Release(frame);
+	if frame.OnRelease then
+		frame:OnRelease();
+	end
 end
 
 function AlertFrameQueueMixin:AddAlert(...)
@@ -260,18 +263,17 @@ function AlertContainerMixin:OnLoad()
 	self.shouldQueueAlertsFlags = {
 		playerEnteredWorld = false,
 		variablesLoaded = false,
+		firstFrameRendered = false;
 	};
 
-	self:RegisterEvent("PLAYER_ENTERING_WORLD");
-	self:RegisterEvent("VARIABLES_LOADED");
-end
-
-function AlertContainerMixin:OnEvent(event, ...)
-	if event == "PLAYER_ENTERING_WORLD" then
-		self:SetPlayerEnteredWorld();
-	elseif event == "VARIABLES_LOADED" then
-		self:SetVariablesLoaded();
+	local function Callback()
+		self:SetEnabledFlag("playerEnteredWorld", true);
+		self:SetEnabledFlag("variablesLoaded", true);
+		-- The first frame immediately after a load can take a long time and miss alert frames, so we enable this flag the frame after
+		C_Timer.After(0, GenerateClosure(self.SetEnabledFlag, self, "firstFrameRendered", true));
 	end
+
+	EventUtil.ContinueAfterAllEvents(Callback, "VARIABLES_LOADED", "PLAYER_ENTERING_WORLD", "FIRST_FRAME_RENDERED");
 end
 
 function AlertContainerMixin:SetEnabledFlag(flagName, enabled)
@@ -284,16 +286,6 @@ function AlertContainerMixin:SetEnabledFlag(flagName, enabled)
 			alertFrameSubSystem:CheckQueuedAlerts();
 		end
 	end
-end
-
-function AlertContainerMixin:SetPlayerEnteredWorld()
-	self:UnregisterEvent("PLAYER_ENTERING_WORLD");
-	self:SetEnabledFlag("playerEnteredWorld", true);
-end
-
-function AlertContainerMixin:SetVariablesLoaded()
-	self:UnregisterEvent("VARIABLES_LOADED");
-	self:SetEnabledFlag("variablesLoaded", true);
 end
 
 function AlertContainerMixin:SetAlertsEnabled(enabled, reason)
@@ -370,7 +362,10 @@ function AlertContainerMixin:UpdateAnchors()
 
 	local relativeFrame = self;
 	for i, alertFrameSubSystem in ipairs(self.alertFrameSubSystems) do
-		relativeFrame = alertFrameSubSystem:AdjustAnchors(relativeFrame);
+		local resultFrame = alertFrameSubSystem:AdjustAnchors(relativeFrame);
+		if not resultFrame or not resultFrame.IsInDefaultPosition or resultFrame:IsInDefaultPosition() then
+			relativeFrame = resultFrame;
+		end
 	end
 end
 
@@ -443,6 +438,8 @@ function AlertFrameMixin:OnLoad()
 	self:RegisterEvent("NEW_MOUNT_ADDED");
 	self:RegisterEvent("NEW_TOY_ADDED");
 	self:RegisterEvent("NEW_RUNEFORGE_POWER_ADDED");
+	self:RegisterEvent("TRANSMOG_COSMETIC_COLLECTION_SOURCE_ADDED");
+	self:RegisterEvent("SKILL_LINE_SPECS_UNLOCKED");
 end
 
 function CreateContinuableContainerForLFGRewards()
@@ -459,8 +456,6 @@ function CreateContinuableContainerForLFGRewards()
 end
 
 function AlertFrameMixin:OnEvent(event, ...)
-	AlertContainerMixin.OnEvent(self, event, ...);
-
 	if ( event == "ACHIEVEMENT_EARNED" ) then
 		if (Kiosk.IsEnabled()) then
 			return;
@@ -485,7 +480,7 @@ function AlertFrameMixin:OnEvent(event, ...)
 		if ( C_Scenario.IsInScenario() and not C_Scenario.TreatScenarioAsDungeon() ) then
 			local scenarioType = select(10, C_Scenario.GetInfo());
 			if scenarioType ~= LE_SCENARIO_TYPE_LEGION_INVASION then
-				if (not self:ShouldSupressDungeonOrScenarioAlert()) then 
+				if (not self:ShouldSupressDungeonOrScenarioAlert()) then
 					local continuableContainer = CreateContinuableContainerForLFGRewards();
 					if continuableContainer then
 						continuableContainer:ContinueOnLoad(function()
@@ -495,7 +490,7 @@ function AlertFrameMixin:OnEvent(event, ...)
 				end
 			end
 		else
-			if (not self:ShouldSupressDungeonOrScenarioAlert()) then 
+			if (not self:ShouldSupressDungeonOrScenarioAlert()) then
 				local continuableContainer = CreateContinuableContainerForLFGRewards();
 				if continuableContainer then
 					continuableContainer:ContinueOnLoad(function()
@@ -560,7 +555,7 @@ function AlertFrameMixin:OnEvent(event, ...)
 		local buildingName, garrisonType = ...;
 		if ( garrisonType == C_Garrison.GetLandingPageGarrisonType() ) then
 			GarrisonBuildingAlertSystem:AddAlert(buildingName, garrisonType);
-			GarrisonLandingPageMinimapButton.MinimapLoopPulseAnim:Play();
+			ExpansionLandingPageMinimapButton.MinimapLoopPulseAnim:Play();
 		end
     elseif ( event == "GARRISON_TALENT_COMPLETE") then
     	local garrisonType, doAlert = ...;
@@ -581,7 +576,7 @@ function AlertFrameMixin:OnEvent(event, ...)
 			if ( validInstance and not UnitAffectingCombat("player") ) then
 				local missionFrame = _G[GarrisonFollowerOptions[followerTypeID].missionFrame];
 				if (not missionFrame or not missionFrame:IsShown()) then
-					GarrisonLandingPageMinimapButton.MinimapLoopPulseAnim:Play();
+					ExpansionLandingPageMinimapButton.MinimapLoopPulseAnim:Play();
 
 					local missionInfo = C_Garrison.GetBasicMissionInfo(missionID);
 
@@ -607,6 +602,8 @@ function AlertFrameMixin:OnEvent(event, ...)
 		GarrisonRandomMissionAlertSystem:AddAlert(missionInfo);
 	elseif ( event == "NEW_RECIPE_LEARNED" ) then
 		NewRecipeLearnedAlertSystem:AddAlert(...);
+	elseif ( event == "SKILL_LINE_SPECS_UNLOCKED" ) then
+		SkillLineSpecsUnlockedAlertSystem:AddAlert(...);
 	elseif ( event == "SHOW_LOOT_TOAST_LEGENDARY_LOOTED") then
 		local itemLink = ...;
 		LegendaryItemAlertSystem:AddAlert(itemLink);
@@ -639,6 +636,9 @@ function AlertFrameMixin:OnEvent(event, ...)
 	elseif ( event == "NEW_RUNEFORGE_POWER_ADDED") then
 		local powerID = ...;
 		NewRuneforgePowerAlertSystem:AddAlert(powerID);
+	elseif ( event == "TRANSMOG_COSMETIC_COLLECTION_SOURCE_ADDED") then
+		local itemModifiedAppearanceID = ...;
+		NewCosmeticAlertFrameSystem:AddAlert(itemModifiedAppearanceID);
 	end
 end
 
@@ -713,12 +713,12 @@ function AlertFrameMixin:BuildQuestData(questID)
 end
 
 function AlertFrameMixin:ShouldSupressDungeonOrScenarioAlert()
-	if	(IslandsPartyPoseFrame) then 
-		if (IslandsPartyPoseFrame:IsVisible()) then 
-			return true; 
+	if	(IslandsPartyPoseFrame) then
+		if (IslandsPartyPoseFrame:IsVisible()) then
+			return true;
 		end
-	elseif (WarfrontsPartyPoseFrame) then 
-		if(WarfrontsPartyPoseFrame:IsVisible()) then 
+	elseif (WarfrontsPartyPoseFrame) then
+		if(WarfrontsPartyPoseFrame:IsVisible()) then
 			return true;
 		end
 	end

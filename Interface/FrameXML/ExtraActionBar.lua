@@ -18,13 +18,47 @@ function ExtraActionBar_Update()
 		bar.outro:Stop();
 		bar.intro:Play();
 	elseif( bar:IsShown() ) then
-		bar.intro:Stop();
-		bar.outro:Play();
+		if KeybindFrames_InQuickKeybindMode() then
+			ExtraActionBar_ForceEmpty();
+		else
+			bar.intro:Stop();
+			bar.outro:Play();
+		end
 	else
 		ExtraAbilityContainer:RemoveFrame(self);
 	end
 end
 
+function ExtraActionBar_ForceEmpty()
+	local bar = ExtraActionBarFrame;
+	bar.button.style:Hide();
+	bar.button.icon:SetAlpha(0);
+end
+
+function ExtraActionBar_ForceShowIfNeeded()
+	local bar = ExtraActionBarFrame;
+	if not bar:IsShown() then
+		ExtraActionBar_ForceEmpty();
+		bar.button:Show();
+		bar:Show();
+		bar.button:UpdateUsable();
+		ExtraAbilityContainer:AddFrame(bar, ExtraActionButtonPriority);
+		bar.outro:Stop();
+		bar.intro:Play();
+	end
+end
+
+function ExtraActionBar_CancelForceShow()
+	local bar = ExtraActionBarFrame;
+	if not HasExtraActionBar() and bar:IsShown() then
+		bar.button.style:Show();
+		bar.button.icon:SetAlpha(1);
+		bar:Hide();
+		bar:SetAlpha(0.0);
+		bar:Hide();
+		ExtraAbilityContainer:RemoveFrame(bar);
+	end
+end
 
 function ExtraActionButtonKey(id, isDown)
 	if not HasExtraActionBar() then
@@ -32,22 +66,23 @@ function ExtraActionButtonKey(id, isDown)
 	end
 
 	local button = _G["ExtraActionButton"..id];
-	
 	if isDown then
 		if ( button:GetButtonState() == "NORMAL" ) then
 			button:SetButtonState("PUSHED");
 		end
-		if (GetCVarBool("ActionButtonUseKeyDown")) then
-			SecureActionButton_OnClick(button, "LeftButton");
-			button:UpdateState();
-		end
+		TryUseActionButton(button, isDown);
 	else
 		if ( button:GetButtonState() == "PUSHED" ) then
 			button:SetButtonState("NORMAL");
-			if (not GetCVarBool("ActionButtonUseKeyDown")) then
-				SecureActionButton_OnClick(button, "LeftButton");
-				button:UpdateState();
-			end
+			TryUseActionButton(button, isDown);
 		end
 	end
+end
+
+ExtraActionButtonMixin = {};
+
+function ExtraActionButtonMixin:ExtraActionButton_OnLoad()
+	self.QuickKeybindHighlightTexture:ClearAllPoints();
+	self.QuickKeybindHighlightTexture:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -1);
+	self.QuickKeybindHighlightTexture:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 1.8, -1);
 end

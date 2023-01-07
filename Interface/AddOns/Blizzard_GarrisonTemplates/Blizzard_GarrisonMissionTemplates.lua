@@ -7,6 +7,7 @@ GarrisonMission = {};
 
 function GarrisonMission:OnLoadMainFrame()
 	PanelTemplates_SetNumTabs(self, 2);
+	self.Tab2:SetPoint("TOPLEFT", self.Tab1, "TOPRIGHT", 10, 0);
 	self.selectedTab = 1;
 	PanelTemplates_UpdateTabs(self);
 end
@@ -112,6 +113,11 @@ function GarrisonMission:SetTitle(title, ignoreTruncation)
 	if(ignoreTruncation) then 
 		GarrisonTruncationFrame_Check(missionPage.Stage.Title);
 	end 
+end
+
+function GarrisonMission:GetNumTitleLines()
+	local missionPage = self:GetMissionPage();
+	return missionPage.Stage.Title:GetNumLines();
 end
 
 function GarrisonMission:SetEnvironmentTexture(environmentTexture)
@@ -2060,21 +2066,8 @@ end
 ---------------------------------------------------------------------------------
 --- Common Functions                                                          ---
 ---------------------------------------------------------------------------------
-
-function GarrisonMissionFrameTab_OnEnter(self)
-	self.LeftHighlight:Show();
-	self.MiddleHighlight:Show();
-	self.RightHighlight:Show();
-end
-
-function GarrisonMissionFrameTab_OnLeave(self)
-	self.LeftHighlight:Hide();
-	self.MiddleHighlight:Hide();
-	self.RightHighlight:Hide();
-end
-
 function GarrisonMissionFrame_SetItemRewardDetails(frame)
-	local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(frame.itemID);
+	local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(frame.itemLink or frame.itemID);
 	frame.Icon:SetTexture(itemTexture);
 	local color = ITEM_QUALITY_COLORS[itemRarity];
 	if(color) then
@@ -2969,7 +2962,7 @@ end
 function GarrisonMissionPageCostWithTooltipMixin:OnEnter()
 	if self.currency then
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-		GameTooltip:SetCurrencyTokenByID(self.currency);
+		GameTooltip:SetCurrencyByID(self.currency);
 		GameTooltip:Show();
 	end
 end

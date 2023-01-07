@@ -5,6 +5,9 @@
 --This mission specifically has a tutorial flow to show 
 local STRATEGIC_POSITIONING_TUTORIAL_MISSION_ID = 2295;
 
+--This file also represents the DF adventure map so we use this ID to determine when we should apply DF style data.
+local DRAGON_ISLES_MAP_ID = 2057;
+
 -- These are follower options that depend on this AddOn being loaded, and so they can't be set in GarrisonBaseUtils.
 GarrisonFollowerOptions[Enum.GarrisonFollowerType.FollowerType_9_0].missionFollowerSortFunc =  GarrisonFollowerList_DefaultMissionSort;
 GarrisonFollowerOptions[Enum.GarrisonFollowerType.FollowerType_9_0].missionFollowerInitSortFunc = GarrisonFollowerList_InitializeDefaultMissionSort;
@@ -62,10 +65,13 @@ local covenantGarrisonStyleData =
 	BackgroundTile = "Adventures-Missions-BG-02",
 };
 
-local function SetupMissionList(self, styleData)
-	HybridScrollFrame_CreateButtons(self.MissionTab.MissionList.listScroll, "CovenantMissionListButtonTemplate", 13, -8, nil, nil, nil, -4);
-	self.MissionTab.MissionList:Update();
-end
+local dragonflightStyleData =
+{
+	closeButtonX = -5,
+	closeButtonY = -6,
+
+	nineSliceLayout = "DragonflightMissionFrame",
+};
 
 local function SetupBorder(self, styleData)
 	self.GarrCorners:Hide();
@@ -116,21 +122,28 @@ function CovenantMission:OnLoadMainFrame()
 	GarrisonMission.OnLoadMainFrame(self);
 
 	self.TitleText:Hide();
+	
+	SetupTabOffset(self);
+
+	local view = CreateScrollBoxListLinearView();
+	view:SetElementInitializer("CovenantMissionListButtonTemplate", function(button, elementData)
+		CovenantMissionButton_InitButton(button, elementData);
+	end);
+	view:SetPadding(8,0,13,0,-4);
+
+	ScrollUtil.InitScrollBoxListWithScrollBar(self.MissionTab.MissionList.ScrollBox, self.MissionTab.MissionList.ScrollBar, view);
 
 	self:SetupCompleteDialog();
 	self:UpdateCurrencyInfo();
 	self:UpdateTextures();
+	self.MissionTab.MissionList:Update();
+
 	PanelTemplates_SetNumTabs(self, 3);
 	self:SelectTab(self:DefaultTab());
 
 	self.FollowerList:SetSortFuncs(GarrisonFollowerList_DefaultSort, GarrisonFollowerList_InitializeDefaultSort);
 
 	self:GetMissionPage().Board:Reset();
-
-	self:GetMissionPage().Stage.EnemyPowerValue:SetFontObjectsToTry("GameFontHighlight", "GameFontHighlightSmall");
-	self:GetMissionPage().Stage.EnemyHealthValue:SetFontObjectsToTry("GameFontHighlight", "GameFontHighlightSmall");
-	self:GetMissionPage().Board.AllyPowerValue:SetFontObjectsToTry("GameFontHighlight", "GameFontHighlightSmall");
-	self:GetMissionPage().Board.AllyHealthValue:SetFontObjectsToTry("GameFontHighlight", "GameFontHighlightSmall");
 
 	for followerFrame in self:GetMissionPage().Board:EnumerateFollowers() do
 		followerFrame:SetMainFrame(self);
@@ -173,7 +186,7 @@ end
 function CovenantMission:OnShowMainFrame()
 	GarrisonMission.OnShowMainFrame(self);
 	AdventureMapMixin.OnShow(self.MapTab);
-	FrameUtil.RegisterFrameForEvents(self, COVENANT_MISSION_EVENTS); 
+	FrameUtil.RegisterFrameForEvents(self, COVENANT_MISSION_EVENTS);
 
 	self:RegisterCallback(CovenantMission.Event.OnFollowerFrameMouseUp, self.OnMouseUpMissionFollower, self);
 	self:RegisterCallback(CovenantMission.Event.OnFollowerFrameDragStart, self.OnFollowerFrameDragStart, self);
@@ -187,6 +200,7 @@ function CovenantMission:OnShowMainFrame()
 	self:SetupTabs();
 
 	self:UpdateCurrency();
+	self:UpdateTextures();
 
 	PlaySound(SOUNDKIT.UI_GARRISON_COMMAND_TABLE_OPEN);
 end
@@ -220,7 +234,14 @@ function CovenantMission:SelectTab(id)
 	GarrisonFollowerMission.SelectTab(self, id);
 	self.BackgroundTile:SetShown(id ~= 3);
 	self:HideStaticPopups();
-	self:ClearQueuedTutorials();
+
+	self:UpdateMissionParty();
+
+	if self.MissionTab:IsShown() and self.queuedTutorials then
+		self.tutorialIndex = 1;
+		self.currentTutorial = nil;
+		self:ProcessTutorials();
+	end
 end
 
 function CovenantMission:CloseMission()
@@ -254,6 +275,10 @@ function CovenantMission:SetupTabs()
 		if (not defaultTab) then
 			defaultTab = 3;
 		end
+
+		self.MapTab:Show();
+	else
+		self.MapTab:Hide();
 	end
 
    self.Tab1:Hide();
@@ -263,20 +288,17 @@ function CovenantMission:SetupTabs()
    -- don't show any tabs if there's only 1
    if (#tabList > 1) then
 		local tab = self["Tab"..tabList[1]];
-		local prevTab = tab;
 		tab:ClearAllPoints();
-		
 		tab:SetPoint("BOTTOMLEFT", self, tab.xOffset or 7, tab.yOffset or -31);
 		tab:Show();
 		
 		for i = 2, #tabList do
 			tab = self["Tab"..tabList[i]];
-			tab:ClearAllPoints();
-			tab:SetPoint("LEFT", prevTab, "RIGHT", -16, 0);
 			tab:Show();
-			prevTab = tab;
 		end
    end
+
+   PanelTemplates_SetNumTabs(self, #tabList);
 
    -- If the selected tab is not a valid one, switch to the default. Additionally, if the missions tab is newly available, then select it.
    local selectedTab = PanelTemplates_GetSelectedTab(self);
@@ -313,8 +335,16 @@ function CovenantMission:ShowMission(missionInfo)
 		missionDuration = format(PARENS_TEMPLATE, missionInfo.duration);
 	end
 
+	-- First we test if the title and duration fit on one line.
 	local ignoreTruncation = true;
 	self:SetTitle(COVENANT_MISSION_TITLE_FORMAT:format(missionInfo.name, missionDuration), ignoreTruncation);
+
+	local numLines = self:GetNumTitleLines();
+	if numLines > 1 then
+		self:SetTitle(COVENANT_MISSION_TITLE_FORMAT_WITH_XP:format(missionInfo.name, missionDuration, missionInfo.xp), ignoreTruncation);
+	else
+		self:SetTitle(COVENANT_MISSION_TITLE_FORMAT_WITH_XP_SECOND_LINE:format(missionInfo.name, missionDuration, missionInfo.xp), ignoreTruncation);
+	end
 	
 	local missionDeploymentInfo =  C_Garrison.GetMissionDeploymentInfo(missionInfo.missionID);
 	missionPage.environment = missionDeploymentInfo.environment;
@@ -568,7 +598,7 @@ function CovenantMission:UpdateCurrencyInfo()
 	self.FollowerTab.HealFollowerFrame.CostFrame.CostIcon:SetSize(18, 18);
 	self.FollowerTab.HealFollowerFrame.CostFrame.Cost:SetPoint("RIGHT", self.FollowerTab.HealFollowerFrame.CostFrame.CostIcon, "LEFT", -8, -1);
 
-	self.FollowerList.HealAllButton.currencyInfo = currencyInfo;
+	self.FollowerList.HealAllButton.currencyID = secondaryCurrency;
 
 	SetupMaterialFrame(self.FollowerList.MaterialFrame, secondaryCurrency, currencyTexture);
 	SetupMaterialFrame(self.MissionTab.MissionList.MaterialFrame, secondaryCurrency, currencyTexture);
@@ -617,10 +647,12 @@ function CovenantMission:UpdateTextures()
 
 	self.BackgroundTile:SetAtlas("Adventures-Missions-BG-02");
 
-	local styleData = covenantGarrisonStyleData;
-	SetupTabOffset(self);
-	SetupMissionList(self, styleData);
-	SetupBorder(self, styleData);
+	-- Check that the map is Dragon Isles (ID 2057)
+	if C_AdventureMap.GetMapID() == DRAGON_ISLES_MAP_ID then
+		SetupBorder(self, dragonflightStyleData);
+	else
+		SetupBorder(self, covenantGarrisonStyleData);
+	end
 end
 
 function CovenantMission:AssignFollowerToMission(frame, info)
@@ -742,34 +774,23 @@ function CovenantMission:TriggerOnAssignFollowerTutorials(followerInfo)
 end
 
 function CovenantMission:QueueAutoTroopsTutorial()
-	local scrollFrame = self.FollowerList.listScroll;
-	local offset = HybridScrollFrame_GetOffset(scrollFrame);
-	local buttons = scrollFrame.buttons;
-	local numFollowers = #self.FollowerList.followersList;
-	local numButtons = #buttons;
+	local frame = self.FollowerList.ScrollBox:FindFrameByPredicate(function(frame, elementData)
+		return frame.Follower.info and frame.Follower.info.isAutoTroop;
+	end);
+	if frame then
+		local helpTipInfo = {
+			text = COVENANT_MISSIONS_TUTORIAL_TROOPS,
+			buttonStyle = HelpTip.ButtonStyle.Close,
+			cvarBitfield = "covenantMissionTutorial",
+			bitfieldFlag = Enum.GarrAutoCombatTutorial.TroopTutorial,
+			targetPoint = HelpTip.Point.RightEdgeCenter,
+			offsetX = 0,
+			offsetY = 0,
+			onHideCallback = function(acknowledged, closeFlag) self:ProcessTutorials(); end;
+			checkCVars = true,
+		}
 
-	--Make sure the troops section is visible if we're showing this tutorial
-	local maxVisibleElements = 11;
-	if (numFollowers - offset) < maxVisibleElements then 
-		for i = 1, numButtons do
-			local button = buttons[i];
-			if button.Follower.info and button.Follower.info.isAutoTroop then
-				local helpTipInfo = {
-					text = COVENANT_MISSIONS_TUTORIAL_TROOPS,
-					buttonStyle = HelpTip.ButtonStyle.Close,
-					cvarBitfield = "covenantMissionTutorial",
-					bitfieldFlag = Enum.GarrAutoCombatTutorial.TroopTutorial,
-					targetPoint = HelpTip.Point.RightEdgeCenter,
-					offsetX = 0,
-					offsetY = 0,
-					onHideCallback = function(acknowledged, closeFlag) self:ProcessTutorials(); end;
-					checkCVars = true,
-				}
-
-				self:QueueTutorial(self, helpTipInfo, button);
-				return;
-			end
-		end
+		self:QueueTutorial(helpTipInfo, frame);
 	end
 end
 
@@ -792,7 +813,7 @@ function CovenantMission:QueueSingleTargetTutorial(abilityTargetInfos)
 					checkCVars = true,
 				}
 
-				self:QueueTutorial(self, helpTipInfo, anchorFrame);
+				self:QueueTutorial(helpTipInfo, anchorFrame);
 				return;
 			end
 		end
@@ -818,7 +839,7 @@ function CovenantMission:QueueTargetColumnTutorial(abilityTargetInfos)
 					checkCVars = true,
 				}
 				
-				self:QueueTutorial(self, helpTipInfo, anchorFrame);
+				self:QueueTutorial(helpTipInfo, anchorFrame);
 				return;
 			end
 		end
@@ -848,7 +869,7 @@ function CovenantMission:QueueTargetRowTutorial(abilityTargetInfos)
 			checkCVars = true,
 		}
 
-		self:QueueTutorial(self, helpTipInfo, anchorFrame);
+		self:QueueTutorial(helpTipInfo, anchorFrame);
 	end
 end
 
@@ -868,7 +889,7 @@ function CovenantMission:QueueTargetAllTutorial()
 			checkCVars = true,
 		}
 
-		self:QueueTutorial(self, helpTipInfo, anchorFrame);
+		self:QueueTutorial(helpTipInfo, anchorFrame);
 	end
 end
 
@@ -886,20 +907,36 @@ function CovenantMission:QueueTargetingTutorials(autoSpellInfos, abilityTargetIn
 	end
 end
 
-function CovenantMission:QueueTutorial(parentFrame, helptip, anchorFrame)
-	table.insert(self.queuedTutorials, {parent = parentFrame, helpTipInfo = helptip, anchor = anchorFrame});
+function CovenantMission:QueueTutorial(helptip, anchorFrame)
+	local missionPage = self:GetMissionPage();
+	if not missionPage:IsVisible() then
+		return;
+	end
+
+	for i, tutorialInfo in ipairs(self.queuedTutorials) do
+		if tutorialInfo.helpTipInfo.text == helptip.text then
+			return;
+		end
+	end
+
+	table.insert(self.queuedTutorials, {helpTipInfo = helptip, anchor = anchorFrame});
 end
 
 function CovenantMission:ClearQueuedTutorials()
 	self.queuedTutorials = {};
 	if self.currentTutorial then
-		HelpTip:Hide(self, self.currentTutorial);
+		HelpTip:Hide(self:GetMissionPage(), self.currentTutorial);
 	end
 	self.currentTutorial = nil;
 	self.tutorialIndex = 1;
 end
 
 function CovenantMission:ProcessTutorials()
+	local missionPage = self:GetMissionPage();
+	if HelpTip:IsShowingAnyInSystem("CovenantMissionStrategy") or not missionPage:IsVisible() then
+		return;
+	end
+
 	if self.currentTutorial then
 		HelpTip:Acknowledge(self.currentTutorial);
 	end
@@ -908,7 +945,7 @@ function CovenantMission:ProcessTutorials()
 		local nextTutorial = self.queuedTutorials[i];
 		if not GetCVarBitfield(nextTutorial.helpTipInfo.cvarBitfield, nextTutorial.helpTipInfo.bitfieldFlag) then
 			
-			HelpTip:Show(nextTutorial.parent, nextTutorial.helpTipInfo, nextTutorial.anchor);
+			HelpTip:Show(missionPage, nextTutorial.helpTipInfo, nextTutorial.anchor);
 			self.currentTutorial = nextTutorial.helpTipInfo.text;
 			self.tutorialIndex = i + 1;
 			return;
@@ -917,32 +954,40 @@ function CovenantMission:ProcessTutorials()
 end
 
 function CovenantMission:ShowStrategicPositioningTutorials()
+	local missionPage = self:GetMissionPage();
+
 	local showSecondTutorial = function () 
 		local secondAnchorIndex = Enum.GarrAutoBoardIndex.AllyRightFront;
-		local secondAnchorFrame = self:GetMissionPage().Board:GetSocketByBoardIndex(secondAnchorIndex);
+		local secondAnchorFrame = missionPage.Board:GetSocketByBoardIndex(secondAnchorIndex);
 		local secondHelpTip = {
 			text = COVENANT_MISSIONS_TUTORIAL_STRATEGY2,
 			buttonStyle = HelpTip.ButtonStyle.Close,
 			targetPoint = HelpTip.Point.RightEdgeCenter,
 			offsetX = 0,
 			offsetY = 0,
+			onHideCallback = GenerateClosure(self.ProcessTutorials, self); 
 		}
 
-		HelpTip:Show(self, secondHelpTip, secondAnchorFrame);
+		HelpTip:Show(missionPage, secondHelpTip, secondAnchorFrame);
 	end
 
 	local anchorIndex = Enum.GarrAutoBoardIndex.EnemyLeftBack;
-	local anchorFrame = self:GetMissionPage().Board:GetSocketByBoardIndex(anchorIndex);
+	local anchorFrame = missionPage.Board:GetSocketByBoardIndex(anchorIndex);
 	local helpTipInfo = {
 		text = COVENANT_MISSIONS_TUTORIAL_STRATEGY1,
 		buttonStyle = HelpTip.ButtonStyle.Close,
 		targetPoint = HelpTip.Point.RightEdgeCenter,
 		offsetX = 0,
 		offsetY = 0,
-		onHideCallback = function(acknowledged, closeFlag) showSecondTutorial(); end;
+		onHideCallback = function(acknowledged, closeFlag)
+			if missionPage:IsVisible() then
+				showSecondTutorial();
+			end;
+		end,
+		system = "CovenantMissionStrategy",
 	}
 
-	HelpTip:Show(self, helpTipInfo, anchorFrame);
+	HelpTip:Show(missionPage, helpTipInfo, anchorFrame);
 end
 
 function CovenantMission:ClearStrategicPositioningTutorials()
@@ -957,6 +1002,12 @@ function CovenantMission:GetSystemSpecificStartMissionFailureMessage()
 		end
 	end
 end
+
+function CovenantMission:GetActiveMissionID()
+	local missionInfo = self:GetMissionPage().missionInfo;
+	return (missionInfo ~= nil) and missionInfo.missionID or nil;
+end
+
 ---------------------------------------------------------------------------------
 --- Mission Page Follower Mixin                                               ---
 ---------------------------------------------------------------------------------
@@ -967,7 +1018,9 @@ function CovenantFollowerMissionPageMixin:AddFollower(followerID)
 	local missionFrame = self:GetParent():GetParent();
 
 	local followerInfo = C_Garrison.GetFollowerInfo(followerID);
-	followerInfo.autoCombatSpells = C_Garrison.GetFollowerAutoCombatSpells(followerID, followerInfo.level);
+	local autoCombatSpells, autoCombatAutoAttack = C_Garrison.GetFollowerAutoCombatSpells(followerID, followerInfo.level);
+	followerInfo.autoCombatSpells = autoCombatSpells;
+	followerInfo.autoCombatAutoAttack = autoCombatAutoAttack;
 
 	for i, boardIndex in ipairs(AutoAssignmentFollowerOrder) do
 		local puck = self.Board:GetFrameByBoardIndex(boardIndex);
@@ -1005,6 +1058,9 @@ function CovenantMissionPage_OnShow(self)
 	mainFrame.FollowerList.showUncollected = false;
 	mainFrame.FollowerList:Show();
 	mainFrame:UpdateStartButton(self);
+	if self.missionInfo then
+		mainFrame:SetupShowMissionTutorials(self.missionInfo);
+	end
 end
 
 function CovenantMissionPage_OnHide(self)
@@ -1075,7 +1131,6 @@ end
 function CovenantFollowerListMixin:CalculateHealAllFollowersCost()
 	local healAllCost = 0;
 	self.HealAllButton.tooltip = nil;
-	self:SetScript("OnUpdate", nil);
 
 	for _, follower in ipairs(self.followers) do
 		if follower.status ~= GARRISON_FOLLOWER_ON_MISSION then
@@ -1094,12 +1149,11 @@ function CovenantFollowerListMixin:CalculateHealAllFollowersCost()
 	if healAllCost == 0 then
 		self.HealAllButton.tooltip = COVENANT_MISSIONS_HEAL_ERROR_ALL_ADVENTURERS_FULL;
 		self.HealAllButton:SetEnabled(false);
-	elseif healAllCost > self.HealAllButton.currencyInfo.quantity then
-		self.HealAllButton.tooltip = COVENANT_MISSIONS_HEAL_ERROR_RESOURCES;
-		self.HealAllButton:SetEnabled(false)
-	else	
-		self:SetScript("OnUpdate", self.OnUpdate);
-		self.HealAllButton:SetEnabled(true);
+	else
+		local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(self.HealAllButton.currencyID);
+		local healAllDisabled = currencyInfo and (healAllCost > currencyInfo.quantity);
+		self.HealAllButton.tooltip = healAllDisabled and COVENANT_MISSIONS_HEAL_ERROR_RESOURCES or nil;
+		self.HealAllButton:SetEnabled(not healAllDisabled)
 	end
 end
 
@@ -1120,7 +1174,8 @@ function CovenantMissionHealAllButton_OnLeave(self)
 end
 
 function CovenantMissionHealAllButton_OnClick(self)
-	local currencyString = CreateTextureMarkup(self.currencyInfo.iconFileID, 64, 64, 16, 16, 0, 1, 0, 1, 0, 0)..format(CURRENCY_QUANTITY_TEMPLATE, self.healAllCost, self.currencyInfo.name);
+	local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(self.currencyID);
+	local currencyString = CreateTextureMarkup(currencyInfo.iconFileID, 64, 64, 16, 16, 0, 1, 0, 1, 0, 0)..format(CURRENCY_QUANTITY_TEMPLATE, self.healAllCost, currencyInfo.name);
 	StaticPopup_Show("COVENANT_MISSIONS_HEAL_ALL_CONFIRMATION", currencyString, "", {followerType = self.followerType});
 end
 

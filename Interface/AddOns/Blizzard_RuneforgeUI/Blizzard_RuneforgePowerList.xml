@@ -38,6 +38,13 @@
 				</MaskTexture>
 			</Layer>
 		</Layers>
+		<Frames>
+			<Frame parentKey="CovenantSigil" inherits="RuneforgeCovenantSigilTemplate" hidden="true">
+				<Anchors>
+					<Anchor point="CENTER" relativeKey="$parent.Icon" relativePoint="BOTTOMRIGHT" x="-12" y="12"/>
+				</Anchors>
+			</Frame>
+		</Frames>
 		<Scripts>
 			<OnHide method="OnHide"/>
 			<OnEvent method="OnEvent"/>
@@ -111,7 +118,7 @@
 		<Size x="286" y="222"/>
 		<Layers>
 			<Layer level="OVERLAY">
-				<FontString parentKey="OtherSpecializationsLabel" inherits="GameFontNormal" text="RUNEFORGE_LEGENDARY_POWER_LIST_OTHER_SPEC_LABEL" hidde="true">
+				<FontString parentKey="OtherSpecializationsLabel" inherits="GameFontNormal" text="RUNEFORGE_LEGENDARY_POWER_LIST_OTHER_SPEC_LABEL" hidden="true">
 					<Anchors>
 						<Anchor point="CENTER"/>
 					</Anchors>

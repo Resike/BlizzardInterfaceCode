@@ -8,7 +8,6 @@ local COMMUNITIES_CHAT_FRAME_EVENTS = {
 	"CLUB_MESSAGE_UPDATED",
 	"CLUB_MESSAGE_HISTORY_RECEIVED",
 	"CLUB_UPDATED",
-	"CLUB_STREAM_SUBSCRIBED",
 };
 
 function GetCommunitiesChatPermissionOptions()
@@ -91,12 +90,6 @@ function CommunitiesChatMixin:OnEvent(event, ...)
 		local clubId = ...;
 		if clubId == self:GetCommunitiesFrame():GetSelectedClubId() then
 			self:AddBroadcastMessage(clubId);
-		end
-	elseif event == "CLUB_STREAM_SUBSCRIBED" then
-		local clubId, streamId = ...;
-		local communitiesFrame = self:GetCommunitiesFrame();
-		if clubId == communitiesFrame:GetSelectedClubId() and streamId == communitiesFrame:GetSelectedStreamId() then
-			self:RequestInitialMessages(clubId, streamId);
 		end
 	end
 end
@@ -198,7 +191,7 @@ end
 function CommunitiesChatMixin:BackfillMessages(maxCount)
 	local clubId = self:GetCommunitiesFrame():GetSelectedClubId();
 	local streamId = self:GetCommunitiesFrame():GetSelectedStreamId();
-	if not clubId or not streamId then
+	if not clubId or not streamId or not self.messageRangeOldest then
 		return;
 	end
 	
@@ -322,8 +315,9 @@ function CommunitiesChatMixin:FormatMessage(clubId, streamId, message)
 		content = message.content;
 	end
 	
-	if CHAT_TIMESTAMP_FORMAT then
-		return BetterDate(CHAT_TIMESTAMP_FORMAT, message.messageId.epoch / 1000000)..COMMUNITIES_CHAT_MESSAGE_FORMAT:format(link or name, content);
+	local format = GetChatTimestampFormat();
+	if format then
+		return BetterDate(format, message.messageId.epoch / 1000000)..COMMUNITIES_CHAT_MESSAGE_FORMAT:format(link or name, content);
 	else
 		return COMMUNITIES_CHAT_MESSAGE_FORMAT:format(link or name, content);
 	end

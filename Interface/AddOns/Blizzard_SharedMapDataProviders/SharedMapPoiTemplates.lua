@@ -45,7 +45,7 @@ function BaseMapPoiPinMixin:SetTexture(poiInfo)
 			self.HighlightTexture:SetTexture("Interface/Minimap/POIIcons");
 		end
 
-		local x1, x2, y1, y2 = GetPOITextureCoords(poiInfo.textureIndex);
+		local x1, x2, y1, y2 = C_Minimap.GetPOITextureCoords(poiInfo.textureIndex);
 		self.Texture:SetTexCoord(x1, x2, y1, y2);
 		if self.HighlightTexture then
 			self.HighlightTexture:SetTexCoord(x1, x2, y1, y2);
@@ -103,20 +103,77 @@ function MapPinSupertrackHighlightMixin:SetHighlightShown(shown, texture, params
 	end
 end
 
-function MapPinHighlight_CheckHighlightPin(highlight, parentPin, regionToHighlight, params)
-	if highlight and not parentPin.SupertrackedHighlight then
-		local frame = CreateFrame("Frame", nil, parentPin, "MapPinSupertrackHighlightTemplate");
-		parentPin.SupertrackedHighlight = frame;
-		frame:SetPoint("CENTER");
+MapPinHighlightType = EnumUtil.MakeEnum(
+	"None",
+	"BountyRing", -- Golden ring around the pin, used by the Emissary/Bounty Board
+	"SupertrackedHighlight" -- Blue glow + animated icon pulse, used by Covenant Callings and the World Map Activity Tracker
+);
 
-		frame.BackHighlight:SetParent(parentPin)
-		frame.BackHighlight:SetDrawLayer("BACKGROUND", -8);
+function MapPinHighlight_SetUpSupertrackedHighlight(parentPin)
+	local frame = CreateFrame("Frame", nil, parentPin, "MapPinSupertrackHighlightTemplate");
+	parentPin.SupertrackedHighlight = frame;
+	frame:SetPoint("CENTER");
 
-		frame.TopHighlight:SetParent(parentPin)
-		frame.TopHighlight:SetDrawLayer("OVERLAY", 7);
+	frame.BackHighlight:SetParent(parentPin)
+	frame.BackHighlight:SetDrawLayer("BACKGROUND", -8);
+
+	frame.TopHighlight:SetParent(parentPin)
+	frame.TopHighlight:SetDrawLayer("OVERLAY", 7);
+end
+
+function MapPinHighlight_CheckHighlightPin(highlightType, parentPin, regionToHighlight, params)
+	if not parentPin then
+		return;
 	end
 
+	if parentPin.BountyRing then
+		parentPin.BountyRing:SetShown(highlightType == MapPinHighlightType.BountyRing);
+	end
+		
+	if highlightType == MapPinHighlightType.SupertrackedHighlight and not parentPin.SupertrackedHighlight then
+		MapPinHighlight_SetUpSupertrackedHighlight(parentPin);
+	end
+		
 	if parentPin.SupertrackedHighlight then
-		parentPin.SupertrackedHighlight:SetHighlightShown(highlight, regionToHighlight, params);
+		parentPin.SupertrackedHighlight:SetHighlightShown(highlightType == MapPinHighlightType.SupertrackedHighlight, regionToHighlight, params);
 	end
+end
+
+function ClearCachedActivitiesForPlayer()
+	ClearCachedQuestsForPlayer();
+	ClearCachedAreaPOIsForPlayer();
+end
+
+-- Cache for C_TaskQuest.GetQuestsForPlayerByMapID
+local questCache = {};
+function GetQuestsForPlayerByMapIDCached(mapID)
+	local entry = questCache[mapID];
+	if entry then
+		return entry;
+	end
+
+	local quests = C_TaskQuest.GetQuestsForPlayerByMapID(mapID);
+	questCache[mapID] = quests;
+	return quests;
+end
+
+function ClearCachedQuestsForPlayer()
+	questCache = {};
+end
+
+-- Cache for C_AreaPoiInfo.GetAreaPOIForMap
+local areaPOICache = {};
+function GetAreaPOIsForPlayerByMapIDCached(mapID)
+	local entry = areaPOICache[mapID];
+	if entry then
+		return entry;
+	end
+
+	local areaPOIs = C_AreaPoiInfo.GetAreaPOIForMap(mapID);
+	areaPOICache[mapID] = areaPOIs;
+	return areaPOIs;
+end
+
+function ClearCachedAreaPOIsForPlayer()
+	areaPOICache = {};
 end

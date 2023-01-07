@@ -139,14 +139,14 @@
 				</Layers>
 				<Scripts>
 					<OnEnter>
-						if (self.tooltipText) then 
+						if (self.tooltipText) then
 							GameTooltip:SetOwner(self, ANCHOR_RIGHT, 270);
 							GameTooltip_AddColoredLine(GameTooltip, self.tooltipText, HIGHLIGHT_FONT_COLOR);
 							GameTooltip:Show();
 						end
 					</OnEnter>
 					<OnLeave>
-						GameTooltip:Hide(); 
+						GameTooltip:Hide();
 					</OnLeave>
 				</Scripts>
 				<HighlightTexture alphaMode="ADD" file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight">
@@ -252,7 +252,7 @@
 						end
 					</OnEnter>
 					<OnLeave>
-						GameTooltip:Hide(); 
+						GameTooltip:Hide();
 					</OnLeave>
 				</Scripts>
 			</Button>
@@ -262,7 +262,7 @@
 					<Anchor point="BOTTOMRIGHT"/>
 				</Anchors>
 				<KeyValues>
-					<KeyValue key="frame" value="GuildControlUI" type="Global"/>
+					<KeyValue key="frame" value="GuildControlUI" type="global"/>
 				</KeyValues>
 			</Button>
 			<Button parentKey="GuildRecruitmentButton" inherits="UIPanelButtonTemplate" motionScriptsWhileDisabled="true" text="GUILD_RECRUITMENT">
@@ -311,9 +311,9 @@
 				<Layers>
 					<Layer level="BACKGROUND" textureSubLevel="1">
 						<Texture parentKey="Portrait">
-							<Size x="61" y="61"/>
+							<Size x="60" y="60"/>
 							<Anchors>
-								<Anchor point="TOPLEFT" x="-6" y="8" />
+								<Anchor point="TOPLEFT" x="-5" y="8" />
 							</Anchors>
 						</Texture>
 						<MaskTexture parentKey="CircleMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
@@ -326,9 +326,9 @@
 							</MaskedTextures>
 						</MaskTexture>
 						<Texture parentKey="TabardBackground" file="Interface\GuildFrame\GuildFrame" hidden="true">
-							<Size x="62" y="62"/>
+							<Size x="60" y="60"/>
 							<Anchors>
-								<Anchor point="TOPLEFT" x="-7" y="8"/>
+								<Anchor point="TOPLEFT" x="-5" y="8"/>
 							</Anchors>
 							<TexCoords left="0.63183594" right="0.69238281" top="0.61914063" bottom="0.74023438"/>
 						</Texture>
@@ -337,15 +337,15 @@
 						<Texture parentKey="TabardEmblem" file="Interface\GuildFrame\GuildEmblemsLG_01" hidden="true">
 							<Size x="56" y="64"/>
 							<Anchors>
-								<Anchor point="CENTER" relativeKey="$parent" relativePoint="TOPLEFT" x="24" y="-24"/>
+								<Anchor point="CENTER" relativeKey="$parent" relativePoint="TOPLEFT" x="25" y="-23"/>
 							</Anchors>
 						</Texture>
 					</Layer>
 					<Layer level="BACKGROUND" textureSubLevel="3">
 						<Texture parentKey="TabardBorder" file="Interface\GuildFrame\GuildFrame" hidden="true">
-							<Size x="61" y="60"/>
+							<Size x="60" y="59"/>
 							<Anchors>
-								<Anchor point="TOPLEFT" x="-6" y="7"/>
+								<Anchor point="TOPLEFT" x="-5" y="7"/>
 							</Anchors>
 							<TexCoords left="0.63183594" right="0.69238281" top="0.74414063" bottom="0.86523438"/>
 						</Texture>
@@ -354,7 +354,7 @@
 			</Frame>
 			<Frame parentKey="MaximizeMinimizeFrame" inherits="MaximizeMinimizeButtonFrameTemplate">
 				<Anchors>
-					<Anchor point="RIGHT" relativeKey="$parent.CloseButton" relativePoint="LEFT" x="8.5" y="0"/>
+					<Anchor point="RIGHT" relativeKey="$parent.CloseButton" relativePoint="LEFT" x="0" y="0"/>
 				</Anchors>
 				<Scripts>
 					<OnLoad function="CommunitiesFrameMaximizeMinimizeButton_OnLoad" inherit="append"/>
@@ -366,12 +366,26 @@
 					<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="170" y="29"/>
 				</Anchors>
 			</Frame>
-			<CheckButton parentKey="ChatTab" hidden="true" inherits="CommunitiesChatTabTemplate">
+			<CheckButton parentKey="ChatTab" hidden="true" inherits="CommunitiesFrameTabTemplate" mixin="CommunitiesChatTabMixin" motionScriptsWhileDisabled="true">
+				<KeyValues>
+					<KeyValue key="tooltip" value="COMMUNITIES_CHAT_TAB_TOOLTIP" type="global"/>
+					<KeyValue key="iconTexture" value="Interface/Icons/UI_Chat" type="string"/>
+					<KeyValue key="displayMode" value="COMMUNITIES_FRAME_DISPLAY_MODES.CHAT" type="global"/>
+				</KeyValues>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="0" y="-36"/>
 				</Anchors>
+				<Scripts>
+					<!--CommunitiesFrameTabTemplate:OnClick() is called conditionally. See CommunitiesChatTabMixin:OnClick().-->
+					<OnClick method="OnClick"/>
+				</Scripts>
 			</CheckButton>
-			<CheckButton parentKey="RosterTab" hidden="true" inherits="CommunitiesRosterTabTemplate">
+			<CheckButton parentKey="RosterTab" hidden="true" inherits="CommunitiesFrameTabTemplate">
+				<KeyValues>
+					<KeyValue key="tooltip" value="COMMUNITIES_ROSTER_TAB_TOOLTIP" type="global"/>
+					<KeyValue key="iconTexture" value="Interface/Icons/achievement_guildperk_everybodysfriend" type="string"/>
+					<KeyValue key="displayMode" value="COMMUNITIES_FRAME_DISPLAY_MODES.ROSTER" type="global"/>
+				</KeyValues>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeKey="$parent.ChatTab" relativePoint="BOTTOMLEFT" x="0" y="-20"/>
 				</Anchors>
@@ -391,12 +405,22 @@
 					</Frame>
 				</Frames>
 			</CheckButton>
-			<CheckButton parentKey="GuildBenefitsTab" hidden="true" inherits="CommunitiesGuildBenefitsTabTemplate">
+			<CheckButton parentKey="GuildBenefitsTab" hidden="true" inherits="CommunitiesFrameTabTemplate">
+				<KeyValues>
+					<KeyValue key="tooltip" value="COMMUNITIES_GUILD_BENEFITS_TAB_TOOLTIP" type="global"/>
+					<KeyValue key="iconTexture" value="Interface/Icons/achievement_guildperk_honorablemention" type="string"/>
+					<KeyValue key="displayMode" value="COMMUNITIES_FRAME_DISPLAY_MODES.GUILD_BENEFITS" type="global"/>
+				</KeyValues>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeKey="$parent.RosterTab" relativePoint="BOTTOMLEFT" x="0" y="-20"/>
 				</Anchors>
 			</CheckButton>
-			<CheckButton parentKey="GuildInfoTab" hidden="true" inherits="CommunitiesGuildInfoTabTemplate">
+			<CheckButton parentKey="GuildInfoTab" hidden="true" inherits="CommunitiesFrameTabTemplate">
+				<KeyValues>
+					<KeyValue key="tooltip" value="COMMUNITIES_GUILD_INFO_TAB_TOOLTIP" type="global"/>
+					<KeyValue key="iconTexture" value="Interface/Icons/inv_misc_scrollunrolled01" type="string"/>
+					<KeyValue key="displayMode" value="COMMUNITIES_FRAME_DISPLAY_MODES.GUILD_INFO" type="global"/>
+				</KeyValues>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeKey="$parent.GuildBenefitsTab" relativePoint="BOTTOMLEFT" x="0" y="-20"/>
 				</Anchors>
@@ -418,7 +442,7 @@
 				<Anchors>
 					<Anchor point="TOPRIGHT" x="-10" y="-27"/>
 				</Anchors>
-			</Frame> 
+			</Frame>
 			<Frame parentKey="CommunitiesListDropDownMenu" inherits="CommunitiesListDropDownMenuTemplate">
 				<Size x="40" y="28"/>
 				<Anchors>
@@ -426,12 +450,12 @@
 				</Anchors>
 			</Frame>
 			<Frame parentKey="VoiceChatHeadset" inherits="VoiceChatHeadsetTemplate">
-				<Size x="30" y="30"/>
+				<Size x="54" y="27"/>
 				<!-- Anchored in code -->
 			</Frame>
 			<Button parentKey="CommunitiesCalendarButton" hidden="true" inherits="CommunitiesCalendarButtonTemplate">
 				<Anchors>
-					<Anchor point="RIGHT" relativeKey="$parent.VoiceChatHeadset" relativePoint="LEFT" x="-2" y="-1"/>
+					<Anchor point="TOPRIGHT" relativeKey="$parent" relativePoint="TOPRIGHT" x="-8" y="-26"/>
 				</Anchors>
 			</Button>
 			<Frame parentKey="MemberList" inherits="CommunitiesMemberListFrameTemplate">
@@ -457,8 +481,8 @@
 					<Anchor point="BOTTOMRIGHT" x="-9" y="29"/>
 				</Anchors>
 				<Scripts>
-					<OnLoad> 
-						ClubFinderGuildAndCommunityMixin.OnLoad(self); 
+					<OnLoad>
+						ClubFinderGuildAndCommunityMixin.OnLoad(self);
 					</OnLoad>
 				</Scripts>
 			</Frame>
@@ -520,7 +544,7 @@
 			<Frame parentKey="CommunityNameChangeFrame" inherits="CommunityNameChangeFrameTemplate" frameLevel="1"/>
 			<Frame parentKey="GuildPostingChangeFrame" inherits="GuildPostingChangeFrameTemplate" frameLevel="1"/>
 			<Frame parentKey="CommunityPostingChangeFrame" inherits="CommunityPostingChangeFrameTemplate" frameLevel="1"/>
-			
+
 			<Frame parentKey="EditStreamDialog" frameStrata="DIALOG" inherits="CommunitiesEditStreamDialogTemplate" hidden="true">
 				<Size x="320" y="260"/>
 				<Anchors>
@@ -541,7 +565,7 @@
 			<DropDownToggleButton parentKey="AddToChatButton" inherits="AddToChatButtonTemplate">
 				<Size x="22" y="22"/>
 				<Anchors>
-					<Anchor point="RIGHT" relativeKey="$parent.StreamDropDownMenu" relativePoint="RIGHT" x="220" y="3"/>
+					<Anchor point="RIGHT" relativeKey="$parent.StreamDropDownMenu" relativePoint="RIGHT" x="170" y="3"/>
 				</Anchors>
 				<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
 			</DropDownToggleButton>
@@ -573,7 +597,7 @@
 					<Anchor point="BOTTOMLEFT" x="190" y="5"/>
 				</Anchors>
 				<KeyValues>
-					<KeyValue key="frame" value="CommunitiesGuildLogFrame" type="Global"/>
+					<KeyValue key="frame" value="CommunitiesGuildLogFrame" type="global"/>
 				</KeyValues>
 			</Button>
 			<Frame parentKey="GuildMemberDetailFrame" frameLevel="1000" inherits="CommunitiesGuildMemberDetailFrameTemplate" hidden="true">

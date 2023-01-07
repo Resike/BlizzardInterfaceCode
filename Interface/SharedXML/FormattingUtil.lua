@@ -61,7 +61,7 @@ function GetMoneyString(money, separateThousands)
 	local silver = floor((money - (gold * COPPER_PER_SILVER * SILVER_PER_GOLD)) / COPPER_PER_SILVER);
 	local copper = mod(money, COPPER_PER_SILVER);
 
-	if ( ENABLE_COLORBLIND_MODE == "1" ) then
+	if ( CVarCallbackRegistry:GetCVarValueBool("colorblindMode") or ENABLE_COLORBLIND_MODE == "1" ) then
 		if (separateThousands) then
 			goldString = FormatLargeNumber(gold)..GOLD_AMOUNT_SYMBOL;
 		else
@@ -187,7 +187,7 @@ function GetCurrenciesString(currencies)
 
 		if type(currency) == "table" then
 			if currency.currencyID and currency.amount then
-				text = text..GetCurrencyString(currency.currencyID, currency.amount);
+				text = text..GetCurrencyString(currency.currencyID, currency.amount, currency.colorCode);
 			else
 				text = text..GetCurrencyString(unpack(currency));
 			end

@@ -11,7 +11,7 @@
 		<Size x="270" y="21"/>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString inherits="GameFontHighlight" parentKey="label" justifyH="LEFT" maxlines="2">
+				<FontString inherits="GameFontHighlight" parentKey="label" justifyH="LEFT" maxLines="2">
 					<Anchors>
 						<Anchor point="LEFT" relativeTo="$parent" x="18" y="0"/>
 						<Anchor point="RIGHT" relativeTo="$parent" x="-45" y="0"/>
@@ -167,7 +167,7 @@
 					<Anchor point="TOPLEFT" relativeTo="$parentHeader2" relativePoint="BOTTOMLEFT" x="14" y="-1"/>
 				</Anchors>
 				<ScrollChild>
-					<SimpleHTML parentKey="MOTD" disallowFormatting="true">
+					<SimpleHTML parentKey="MOTD">
 						<Size x="246" y="46"/>
 						<Scripts>
 							<OnHyperlinkClick>
@@ -215,7 +215,7 @@
 					<Anchor point="RIGHT" relativeTo="$parentHeader2" x="-8" y="0"/>
 				</Anchors>
 				<KeyValues>
-					<KeyValue key="editType" value="motd" type="String"/>
+					<KeyValue key="editType" value="motd" type="string"/>
 				</KeyValues>
 				<Scripts>
 					<OnClick function="TextEditButton_OnClick"/>
@@ -233,7 +233,7 @@
 					<Anchor point="RIGHT" relativeTo="$parentHeader3" x="-8" y="0"/>
 				</Anchors>
 				<KeyValues>
-					<KeyValue key="editType" value="info" type="String"/>
+					<KeyValue key="editType" value="info" type="string"/>
 				</KeyValues>
 				<Scripts>
 					<OnClick function="TextEditButton_OnClick"/>
@@ -307,17 +307,15 @@
 					<Anchor point="TOPRIGHT" x="-4" y="-4"/>
 				</Anchors>
 			</Button>
-			<Frame parentKey="Container" inherits="BackdropTemplate">
+			<Frame parentKey="Container" inherits="TooltipBackdropTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="22" y="-36"/>
 					<Anchor point="TOPRIGHT" x="-22" y="-36"/>
 					<Anchor point="BOTTOM" x="0" y="42"/>
 				</Anchors>
 				<KeyValues>
-					<KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_8_12_1111" type="global"/>
 					<KeyValue key="backdropColor" value="BLACK_FONT_COLOR" type="global"/>
 					<KeyValue key="backdropColorAlpha" value="0.9" type="number"/>
-					<KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
 				</KeyValues>
 				<Frames>
 					<ScrollFrame parentKey="ScrollFrame" inherits="MinimalScrollFrameTemplate">
@@ -399,17 +397,15 @@
 					<Anchor point="TOPRIGHT" x="-4" y="-4"/>
 				</Anchors>
 			</Button>
-			<Frame parentKey="Container" inherits="BackdropTemplate">
+			<Frame parentKey="Container" inherits="TooltipBackdropTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="22" y="-36"/>
 					<Anchor point="TOPRIGHT" x="-22" y="-36"/>
 					<Anchor point="BOTTOM" x="0" y="42"/>
 				</Anchors>
 				<KeyValues>
-					<KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_8_12_1111" type="global"/>
 					<KeyValue key="backdropColor" value="BLACK_FONT_COLOR" type="global"/>
 					<KeyValue key="backdropColorAlpha" value="0.9" type="number"/>
-					<KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
 				</KeyValues>
 				<Frames>
 					<ScrollFrame parentKey="ScrollFrame" inherits="MinimalScrollFrameTemplate">

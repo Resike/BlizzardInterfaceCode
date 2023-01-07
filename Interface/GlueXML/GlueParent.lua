@@ -13,7 +13,7 @@ GLUE_SECONDARY_SCREENS = {
 	-- Bug 477070 We have some rare race condition crash in the sound engine that happens when the MovieFrame's "showSound" sound plays at the same time the movie audio is starting.
 	-- Removing the showSound from the MovieFrame in attempt to avoid the crash, until we can actually find and fix the bug in the sound engine.
 	["movie"] = 		{ frame = "MovieFrame", 		playMusic = false,	playAmbience = false,	fullScreen = true },
-	["options"] = 		{ frame = "VideoOptionsFrame",	playMusic = true,	playAmbience = false,	fullScreen = false,	showSound = SOUNDKIT.GS_TITLE_OPTIONS },
+	["options"] = 		{ frame = "SettingsPanel",		playMusic = true,	playAmbience = false,	fullScreen = false,	showSound = SOUNDKIT.GS_TITLE_OPTIONS },
 };
 
 ACCOUNT_SUSPENDED_ERROR_CODE = 53;
@@ -55,7 +55,6 @@ function GlueParent_OnLoad(self)
 	self:RegisterEvent("FRAMES_LOADED");
 	self:RegisterEvent("LOGIN_STATE_CHANGED");
 	self:RegisterEvent("OPEN_STATUS_DIALOG");
-	self:RegisterEvent("REALM_LIST_UPDATED");
 	self:RegisterEvent("DISPLAY_SIZE_CHANGED");
 	self:RegisterEvent("LUA_WARNING");
 	self:RegisterEvent("SUBSCRIPTION_CHANGED_KICK_IMMINENT");
@@ -65,6 +64,7 @@ function GlueParent_OnLoad(self)
 	self:RegisterEvent("KIOSK_SESSION_SHUTDOWN");
 	self:RegisterEvent("KIOSK_SESSION_EXPIRED");
 	self:RegisterEvent("KIOSK_SESSION_EXPIRATION_CHANGED");
+	self:RegisterEvent("SCRIPTED_ANIMATIONS_UPDATE");
 
 	OnDisplaySizeChanged(self);
 end
@@ -89,8 +89,6 @@ function GlueParent_OnEvent(self, event, ...)
 	elseif ( event == "OPEN_STATUS_DIALOG" ) then
 		local dialog, text = ...;
 		GlueDialog_Show(dialog, text);
-	elseif ( event == "REALM_LIST_UPDATED" ) then
-		RealmList_Update();
 	elseif ( event == "DISPLAY_SIZE_CHANGED" ) then
 		OnDisplaySizeChanged(self);
 	elseif ( event == "LUA_WARNING" ) then
@@ -103,11 +101,14 @@ function GlueParent_OnEvent(self, event, ...)
 		local buttonID = ...;
 		if not IsGlobalMouseEventHandled(buttonID, event) then
 			UIDropDownMenu_HandleGlobalMouseEvent(buttonID, event);
+			SelectionPopouts:HandleGlobalMouseEvent(buttonID, event);
 		end
 	elseif (event == "KIOSK_SESSION_SHUTDOWN" or event == "KIOSK_SESSION_EXPIRED") then
 		GlueParent_SetScreen("kioskmodesplash");
 	elseif (event == "KIOSK_SESSION_EXPIRATION_CHANGED") then
 		GlueDialog_Show("OKAY", KIOSK_SESSION_TIMER_CHANGED);
+	elseif(event == "SCRIPTED_ANIMATIONS_UPDATE") then
+		ScriptedAnimationEffectsUtil.ReloadDB();
 	end
 end
 
@@ -199,6 +200,11 @@ function GlueParent_UpdateDialogs()
 			if ( not localizedString ) then
 				local tag = string.format("%s_ERROR_%d", errorCategory, errorID);
 				localizedString = _G[tag];
+
+				-- some translations may need the HTML formatting even if we are not using the %s_ERROR_%d_HTML basetag
+				if localizedString and strfind(strlower(localizedString), "<html><body><p>") then
+					isHTML = true;
+				end
 			end
 
 			--If we still don't have one, just display a generic error with the ID
@@ -249,6 +255,8 @@ function GlueParent_UpdateDialogs()
 				GlueDialog_Show("OKAY", localizedString);
 			end
 			currentlyShowingErrorID = errorID;
+
+			EventRegistry:TriggerEvent("GlueParent.OnLoginError");
 		end
 	elseif (  waitingForRealmList ) then
 		GlueDialog_Show("REALM_LIST_IN_PROGRESS");
@@ -257,23 +265,26 @@ function GlueParent_UpdateDialogs()
 	elseif ( wowConnectionState == LE_WOW_CONNECTION_STATE_IN_QUEUE ) then
 		local waitPosition, waitMinutes, hasFCM = C_Login.GetWaitQueueInfo();
 
-		if ( hasFCM ) then
-			GlueDialog_Show("QUEUED_WITH_FCM", _G["QUEUE_FCM"]);
-		elseif ( waitMinutes == 0 ) then
-			local queueString = string.format(_G["QUEUE_TIME_LEFT_UNKNOWN"], waitPosition);
-			GlueDialog_Show("QUEUED_NORMAL", queueString);
-		elseif (waitMinutes == 1) then
-			local queueString = string.format(_G["QUEUE_TIME_LEFT_SECONDS"], waitPosition);
-			GlueDialog_Show("QUEUED_NORMAL", queueString);
+		local queueString;
+		if ( waitMinutes == 0 ) then
+			queueString = string.format(_G["QUEUE_TIME_LEFT_UNKNOWN"], waitPosition);
+		elseif ( waitMinutes == 1 ) then
+			queueString = string.format(_G["QUEUE_TIME_LEFT_SECONDS"], waitPosition);
 		else
-			local queueString = string.format(_G["QUEUE_TIME_LEFT"], waitPosition, waitMinutes);
+			queueString = string.format(_G["QUEUE_TIME_LEFT"], waitPosition, waitMinutes);
+		end
+
+		if ( hasFCM ) then
+			queueString = queueString .. "\n\n" .. _G["QUEUE_FCM"];
+			GlueDialog_Show("QUEUED_WITH_FCM", queueString);
+		else
 			GlueDialog_Show("QUEUED_NORMAL", queueString);
 		end
 	else
 		-- JS_TODO: make it so this only cancels state dialogs, like "Connecting"
 		GlueDialog_Hide();
 	end
-	
+
 	if not errorID then
 		currentlyShowingErrorID = nil;
 	end
@@ -284,7 +295,7 @@ function GlueParent_EnsureValidScreen()
 	if ( not GlueParent_IsScreenValid(currentScreen) ) then
 		local bestScreen = GlueParent_GetBestScreen();
 
-		LogAuroraClient("ae", "Screen invalid. Changing",
+		LogAuroraClient("ae", "Screen invalid. Changing ",
 			"changingFrom", currentScreen,
 			"changingTo", bestScreen);
 
@@ -293,7 +304,7 @@ function GlueParent_EnsureValidScreen()
 end
 
 local function GlueParent_ChangeScreen(screenInfo, screenTable)
-	LogAuroraClient("ae", "Switching to screen",
+	LogAuroraClient("ae", "Switching to screen ",
 			"screen", screenInfo.frame);
 
 	--Hide all other screens
@@ -318,6 +329,14 @@ end
 
 function GlueParent_GetCurrentScreen()
 	return GlueParent.currentScreen;
+end
+
+function GlueParent_GetSecondaryScreen()
+	return GlueParent.currentSecondaryScreen;
+end
+
+function GlueParent_IsSecondaryScreenOpen(screen)
+	return GlueParent_GetSecondaryScreen() == screen;
 end
 
 function GlueParent_SetScreen(screen)
@@ -405,13 +424,23 @@ function GlueParent_CloseSecondaryScreen()
 	end
 end
 
+-- playIntroMovie CVar is set to the index of the last cinematic played.
+-- So we will play the cinematic at that index + 1 if there is one.
 function GlueParent_CheckCinematic()
-	local cinematicIndex = tonumber(GetCVar("playIntroMovie"));
-	local displayExpansionLevel = LE_EXPANSION_LEVEL_CURRENT;
-	if ( not cinematicIndex or cinematicIndex <= displayExpansionLevel ) then
-		SetCVar("playIntroMovie", displayExpansionLevel + 1);
-		MovieFrame.version = C_Login.IsNewPlayer() and 1 or tonumber(GetCVar("playIntroMovie"));
-		GlueParent_OpenSecondaryScreen("movie");
+	local firstCinematicIndex, lastCinematicIndex = CinematicsFrame_GetIndexRangeForExpansion(LE_EXPANSION_LEVEL_CURRENT);
+	if not firstCinematicIndex or not lastCinematicIndex then
+		return;
+	end
+	local nextCinematicIndex = (tonumber(GetCVar("playIntroMovie")) or 0) + 1;
+	nextCinematicIndex = math.max(nextCinematicIndex, firstCinematicIndex);
+	while nextCinematicIndex <= lastCinematicIndex do
+		SetCVar("playIntroMovie", nextCinematicIndex);
+		if not CinematicFrame_IsAutoPlayDisabled(nextCinematicIndex) then
+			MovieFrame.version = C_Login.IsNewPlayer() and 1 or tonumber(GetCVar("playIntroMovie"));
+			GlueParent_OpenSecondaryScreen("movie");
+			break;
+		end
+		nextCinematicIndex = nextCinematicIndex + 1;
 	end
 end
 
@@ -425,12 +454,16 @@ end
 
 function SetLoginScreenModel(model)
 	local expansionLevel = GetClientDisplayExpansionLevel();
-	local lowResBG = SafeGetExpansionData(EXPANSION_LOW_RES_BG, expansionLevel);
-	local highResBG = SafeGetExpansionData(EXPANSION_HIGH_RES_BG, expansionLevel);
+	local expansionInfo = GetExpansionDisplayInfo(expansionLevel);
 
-	if lowResBG and highResBG then
-		local background = GetLoginScreenBackground(highResBG, lowResBG);
-		model:SetModel(background, true);
+	if expansionInfo then
+		local lowResBG = expansionInfo.lowResBackgroundID;
+		local highResBG = expansionInfo.highResBackgroundID;
+
+		if lowResBG and highResBG then
+			local background = GetLoginScreenBackground(highResBG, lowResBG);
+			model:SetModel(background, true);
+		end
 	end
 
 	model:SetCamera(0);
@@ -507,6 +540,7 @@ local glueScreenTags =
 		["KULTIRAN"] = true,
 		["MECHAGNOME"] = true,
 		["VULPERA"] = true,
+		["DRACTHYR"] = true,
 	},
 };
 

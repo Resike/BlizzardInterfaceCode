@@ -93,12 +93,19 @@ function QUEST_TRACKER_MODULE:OnBlockHeaderEnter(block)
 		GameTooltip:SetPoint("TOPRIGHT", block, "TOPLEFT", 0, 0);
 		GameTooltip:SetOwner(block, "ANCHOR_PRESERVE");
 		GameTooltip:SetQuestPartyProgress(block.id);
+        EventRegistry:TriggerEvent("OnQuestBlockHeader.OnEnter", block, block.id, true);
+    else
+        EventRegistry:TriggerEvent("OnQuestBlockHeader.OnEnter", block, block.id, false);
 	end
 end
 
 function QUEST_TRACKER_MODULE:OnBlockHeaderLeave(block)
 	DEFAULT_OBJECTIVE_TRACKER_MODULE:OnBlockHeaderLeave(block)
 	GameTooltip:Hide();
+end
+
+function QUEST_TRACKER_MODULE:GetDebugReportInfo(block)
+	return { debugType = "TrackedQuest", questID = block.id, };
 end
 
 local LINE_TYPE_ANIM = { template = "QuestObjectiveAnimLineTemplate", freeLines = { } };
@@ -283,8 +290,10 @@ function QuestObjectiveTracker_DoQuestObjectives(self, block, questCompleted, qu
 	local objectiveCompleting = false;
 	local questLogIndex = C_QuestLog.GetLogIndexForQuestID(block.id);
 	local numObjectives = GetNumQuestLeaderBoards(questLogIndex);
+	local suppressProgressPercentageInObjectiveText = true;
 	for objectiveIndex = 1, numObjectives do
-		local text, objectiveType, finished = GetQuestLogLeaderBoard(objectiveIndex, questLogIndex);
+
+		local text, objectiveType, finished = GetQuestLogLeaderBoard(objectiveIndex, questLogIndex, suppressProgressPercentageInObjectiveText);
 		if ( text ) then
 			local line = block.lines[objectiveIndex];
 			if ( questCompleted ) then
@@ -482,5 +491,5 @@ function QUEST_TRACKER_MODULE:ShouldDisplayQuest(quest)
 		return false;
 	end
 
-	return not quest:IsCampaign();
+	return quest:GetSortType() ~= QuestSortType.Campaign;
 end

@@ -1,4 +1,5 @@
-<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/..\FrameXML\UI.xsd">
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\..\FrameXML\UI.xsd">
 	<Script file="Blizzard_Contribution.lua"/>
 
 	<Frame name="ContributionHeaderTemplate" virtual="true">
@@ -12,7 +13,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString parentKey="Text" font="QuestFontHighlight" justifyH="CENTER" justifyV="MIDDLE" maxLines="1">
+				<FontString parentKey="Text" font="SystemFont_Large" justifyH="CENTER" justifyV="MIDDLE" maxLines="1">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="24" y="-4" />
 					<Anchor point="BOTTOMRIGHT" x="-24" y="13" />
@@ -172,9 +173,7 @@
 				<Alpha childKey="SparkGlow" 		startDelay="0.5" 	duration="0.5" order="1" fromAlpha="1" toAlpha="0"/>
 				<Translation childKey="SparkGlow" 						duration="0.5" order="1" offsetX="2" offsetY="0"/>
 				<Scale childKey="SparkGlow" 							duration="0.25" order="1" fromScaleX="0.15" fromScaleY="1" toScaleX="0.2" toScaleY="1">
-					<Origin point="LEFT">
-						<Offset x="20" y="0"/>
-					</Origin>
+					<Origin point="LEFT"/>
 				</Scale>
 			</AnimationGroup>
 		</Animations>
@@ -280,7 +279,7 @@
 		</Scripts>
 	</Frame>
 
-	<Frame name="ContributionBuffTooltip" parent="UIParent" frameStrata="TOOLTIP" clampedToScreen="true" hidden="true" inherits="TooltipBorderedFrameTemplate">
+	<Frame name="ContributionBuffTooltip" parent="UIParent" frameStrata="TOOLTIP" clampedToScreen="true" hidden="true" inherits="TooltipBackdropTemplate">
 		<Size x="1" y="1"/>
 		<Layers>
 			<Layer level="ARTWORK">

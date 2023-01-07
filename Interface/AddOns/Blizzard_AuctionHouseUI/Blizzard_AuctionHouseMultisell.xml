@@ -2,11 +2,11 @@
 ..\..\FrameXML\UI.xsd">
 	<Script file="Blizzard_AuctionHouseMultisell.lua"/>
 
-	<Frame name="AuctionHouseMultisellProgressFrame" mixin="MultisellProgressFrameMixin" toplevel="true" parent="UIParent" enableMouse="true" hidden="true">
+	<Frame name="AuctionHouseMultisellProgressFrame" mixin="MultisellProgressFrameMixin" inherits="UIParentBottomManagedFrameTemplate" toplevel="true" parent="UIParent" enableMouse="true" hidden="true">
 		<Size x="300" y="64"/>
-		<Anchors>
-			<Anchor point="BOTTOM" x="0" y="73"/>
-		</Anchors>
+		<KeyValues>
+			<KeyValue key="layoutIndex" value="61" type="number"/>
+		</KeyValues>
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture parentKey="Fill" file="Interface\AuctionFrame\UI-AuctionPost-Background">							
@@ -45,10 +45,10 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<StatusBar parentKey="ProgressBar" inherits="CastingBarFrameTemplate">
-				<Size x="195" y="13"/>
+			<StatusBar parentKey="ProgressBar" inherits="CastingBarFrameBaseTemplate">
+				<Size x="195" y="11"/>
 				<Anchors>
-					<Anchor point="CENTER" relativeKey="$parent" x="3" y="-3"/>
+					<Anchor point="CENTER" relativeKey="$parent" x="3" y="5"/>
 				</Anchors>
 				<Scripts>
 					<OnLoad>
@@ -57,7 +57,7 @@
 						self.Icon:Show();
 						self.Icon:SetWidth(24);
 						self.Icon:SetHeight(24);
-						self.Icon:SetPoint("RIGHT", self, "LEFT", -10, 2);
+						self.Icon:SetPoint("RIGHT", self, "LEFT", -10, -6);
 					</OnLoad>
 
 					<!-- Override the scripts from the template, as this behavior is not desired. -->
@@ -70,7 +70,7 @@
 			<Button parentKey="CancelButton">
 				<Size x="32" y="32"/>
 				<Anchors>
-					<Anchor point="LEFT" relativeKey="$parent.ProgressBar" relativePoint="RIGHT" x="2" y="1"/>
+					<Anchor point="LEFT" relativeKey="$parent.ProgressBar" relativePoint="RIGHT" x="2" y="-7"/>
 				</Anchors>
 				<HitRectInsets left="9" right="7" top="-7" bottom="10"/>
 				<Scripts>
@@ -83,10 +83,5 @@
 				<HighlightTexture file="Interface\Buttons\CancelButton-Highlight" alphaMode="ADD"/>
 			</Button>
 		</Frames>
-		<Scripts>
-			<OnLoad>
-				UIParent_ManageFramePositions();
-			</OnLoad>
-		</Scripts>
 	</Frame>
 </Ui>

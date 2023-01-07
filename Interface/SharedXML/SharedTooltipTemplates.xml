@@ -1,5 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
-..\FrameXML\UI.xsd">
+..\FrameXML\UI_shared.xsd">
 	<Script file="SharedTooltipTemplates.lua"/>
 	
 	<FontString name="TooltipTextLeftTemplate" inherits="GameTooltipText" justifyH="LEFT" hidden="true" virtual="true"/>
@@ -9,13 +9,17 @@
 		<Size x="12" y="12"/>
 	</Texture>
 	
-	<GameTooltip name="SharedTooltipTemplate" clampedToScreen="true" frameStrata="TOOLTIP" inherits="BackdropTemplate" hidden="true" virtual="true">
+	<GameTooltip name="SharedTooltipTemplate" clampedToScreen="true" frameStrata="TOOLTIP" hidden="true" virtual="true">
 		<KeyValues>
 			<KeyValue key="textLeft1Font" value="GameTooltipHeaderText" type="string"/>
 			<KeyValue key="textRight1Font" value="GameTooltipHeaderText" type="string"/>
 			<KeyValue key="textLeft2Font" value="GameTooltipText" type="string"/>
 			<KeyValue key="textRight2Font" value="GameTooltipText" type="string"/>
+			<KeyValue key="layoutType" value="TooltipDefaultLayout" type="string"/>
 		</KeyValues>
+		<Frames>
+			<Frame parentKey="NineSlice" inherits="NineSlicePanelTemplate" useParentLevel="true"/>
+		</Frames>
 		<Layers>
 			<Layer level="OVERLAY">
 				<Texture parentKey="TopOverlay" hidden="true">
@@ -88,4 +92,35 @@
 			<KeyValue key="textRight1Font" value="GameTooltipText" type="string"/>
 		</KeyValues>
 	</GameTooltip>
+
+	<Frame name="TooltipBackdropTemplate" mixin="TooltipBackdropTemplateMixin" virtual="true">
+		<KeyValues>
+			<KeyValue key="layoutType" value="TooltipDefaultLayout" type="string"/>
+		</KeyValues>
+		<Frames>
+			<Frame parentKey="NineSlice" inherits="NineSlicePanelTemplate" useParentLevel="true"/>
+		</Frames>
+		<Scripts>
+			<OnLoad method="TooltipBackdropOnLoad"/>
+		</Scripts>
+	</Frame>
+
+	<Frame name="TooltipBorderBackdropTemplate" inherits="TooltipBackdropTemplate" virtual="true">
+		<KeyValues>
+			<KeyValue key="backdropColorAlpha" value="0" type="number"/>
+		</KeyValues>
+	</Frame>
+
+	<Frame name="TooltipBorderedFrameTemplate" inherits="TooltipBackdropTemplate" virtual="true">
+		<KeyValues>
+			<KeyValue key="backdropColorAlpha" value="0.8" type="number"/>
+		</KeyValues>
+	</Frame>
+	
+	<Button name="DisabledTooltipButtonTemplate" mixin="DisabledTooltipButtonMixin" motionScriptsWhileDisabled="true" virtual="true">
+		<Scripts>
+			<OnEnter method="OnEnter"/>
+			<OnLeave method="OnLeave"/>
+		</Scripts>
+	</Button>
 </Ui>

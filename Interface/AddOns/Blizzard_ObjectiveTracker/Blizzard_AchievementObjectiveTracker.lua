@@ -37,6 +37,10 @@ function ACHIEVEMENT_TRACKER_MODULE:OnBlockHeaderClick(block, mouseButton)
 	end
 end
 
+function ACHIEVEMENT_TRACKER_MODULE:GetDebugReportInfo(block)
+	return { debugType = "TrackedAchievement", achievementID = block.id, };
+end
+
 -- *****************************************************************************************************
 -- ***** BLOCK DROPDOWN FUNCTIONS
 -- *****************************************************************************************************
@@ -83,7 +87,7 @@ function ACHIEVEMENT_TRACKER_MODULE:Update()
 	self:BeginLayout();
 
 	local _, instanceType = IsInInstance();
-	local displayOnlyArena = ArenaEnemyFrames and ArenaEnemyFrames:IsShown() and (instanceType == "arena");
+	local displayOnlyArena = ArenaEnemyFramesContainer and ArenaEnemyFramesContainer:IsShown() and (instanceType == "arena");
 	local trackedAchievements = { GetTrackedAchievements() };
 
 	for i = 1, #trackedAchievements do

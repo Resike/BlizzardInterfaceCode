@@ -26,6 +26,7 @@ function CommentatorNamePlateMixin:OnLoad()
 	self:RegisterEvent("COMMENTATOR_TEAMS_SWAPPED");
 	self:RegisterEvent("LOSS_OF_CONTROL_COMMENTATOR_ADDED");
 	self:RegisterEvent("LOSS_OF_CONTROL_COMMENTATOR_UPDATE");
+	self:RegisterEvent("UPDATE_ACTIVE_BATTLEFIELD");
 
 	-- These functions are called from CUF functions so we can intercept the handling
 	-- if necessary; returning true will prevent CUF from continuing in the case there is
@@ -65,6 +66,8 @@ function CommentatorNamePlateMixin:OnEvent(event, ...)
 		if UnitGUID(self.unit) == guid then
 			self:ApplyLossOfControlAtIndex(LOSS_OF_CONTROL_ACTIVE_INDEX);
 		end
+	elseif event == "UPDATE_ACTIVE_BATTLEFIELD" then
+		self:SetBorderColors();
 	end
 end
 
@@ -155,8 +158,8 @@ function CommentatorNamePlateMixin:SetPointsByPixelUtil()
 end
 
 function CommentatorNamePlateMixin:OnSetupOverride()
-	self.healthBar:SetStatusBarAtlas("_Bar-mid");
-	self.castBar:SetStatusBarAtlas("_Bar-mid");
+	self.healthBar:SetStatusBarTexture("_Bar-mid");
+	self.castBar:SetStatusBarTexture("_Bar-mid");
 	self.myHealPrediction:SetAtlas("_Bar-mid");
 	self.otherHealPrediction:SetAtlas("_Bar-mid");
 	self.myHealAbsorb:SetAtlas("_Bar-mid");

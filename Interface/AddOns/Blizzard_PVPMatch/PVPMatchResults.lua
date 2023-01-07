@@ -43,7 +43,8 @@ function PVPMatchResultsMixin:OnLoad()
 	self:RegisterEvent("PVP_MATCH_ACTIVE");
 	
 	local tabContainer = self.content.tabContainer;
-	self.scrollFrame = self.content.scrollFrame;
+	self.scrollBox = self.content.scrollBox;
+	self.scrollBar = self.content.scrollBar;
 	self.scrollCategories = self.content.scrollCategories;
 	self.tabGroup = tabContainer.tabGroup;
 	self.tab1 = self.tabGroup.tab1;
@@ -71,7 +72,7 @@ function PVPMatchResultsMixin:OnLoad()
 	self.ratingButton = self.progressContainer.rating.button;
 	self.earningsArt = self.content.earningsArt;
 	self.earningsBackground = self.earningsArt.background;
-	self.tintFrames = {self.glowTop, self.earningsBackground, self.scrollFrame.background};
+	self.tintFrames = {self.glowTop, self.earningsBackground, self.scrollBox.background};
 	self.progressFrames = {self.honorFrame, self.conquestFrame, self.ratingFrame};
 
 	self.header:SetShadowOffset(1,-1);
@@ -94,15 +95,14 @@ function PVPMatchResultsMixin:OnLoad()
 	end
 	PanelTemplates_SetTab(self, 1);
 
-	HybridScrollFrame_OnLoad(self.scrollFrame);
-	HybridScrollFrame_CreateButtons(self.scrollFrame, "PVPTableRowTemplate");
-	HybridScrollFrame_SetDoNotHideScrollBar(self.scrollFrame, true);
-
 	UIPanelCloseButton_SetBorderAtlas(self.CloseButton, "UI-Frame-GenericMetal-ExitButtonBorder", -1, 1);
 
 	self.itemPool = CreateFramePool("BUTTON", self.itemContainer, "PVPMatchResultsLoot");
-	self.tableBuilder = CreateTableBuilder(HybridScrollFrame_GetButtons(self.scrollFrame));
+	
+	self.tableBuilder = CreateTableBuilder();
 	self.tableBuilder:SetHeaderContainer(self.scrollCategories);
+
+	PVPMatchUtil.InitScrollBox(self.scrollBox, self.scrollBar, self.tableBuilder);
 end
 
 function PVPMatchResultsMixin:Init()
@@ -111,19 +111,25 @@ function PVPMatchResultsMixin:Init()
 	end
 	self.isInitialized = true;
 
-	local winner = C_PvP.GetActiveMatchWinner();
+	-- Custom victory stat id being used for Solo Shuffle brawl.
 	local factionIndex = GetBattlefieldArenaFaction();
-	local enemyFactionIndex = (factionIndex+1)%2;
-	local GetOutcomeText = function()
-		if winner == factionIndex then
-			return PVP_MATCH_VICTORY;
-		elseif winner == enemyFactionIndex then
-			return PVP_MATCH_DEFEAT;
-		else
+	local victoryStatID = C_PvP.GetCustomVictoryStatID();
+	local hasCustomVictoryStatID = victoryStatID > 0;
+	if hasCustomVictoryStatID then
+		self.header:SetText(PVP_SCOREBOARD_MATCH_COMPLETE);
+	else
+		local function GetOutcomeText(winner, factionIndex)
+			local enemyFactionIndex = (factionIndex + 1) % 2;
+			if winner == factionIndex then
+				return PVP_MATCH_VICTORY;
+			elseif winner == enemyFactionIndex then
+				return PVP_MATCH_DEFEAT;		
+			end
 			return PVP_MATCH_DRAW;
 		end
+
+		self.header:SetText(GetOutcomeText(C_PvP.GetActiveMatchWinner(), factionIndex));
 	end
-	self.header:SetText(GetOutcomeText());
 
 	-- Using reference text size before adding a margin sufficiently sized
 	-- to allow space for the remaining time.
@@ -167,10 +173,17 @@ function PVPMatchResultsMixin:Init()
 
 	PVPMatchUtil.UpdateMatchmakingText(self.matchmakingText);
 
+	-- For Solo Shuffle brawl.
+	if hasCustomVictoryStatID then
+		SortBattlefieldScoreData("stat1");
+
+		factionIndex = 0;
+	end
 	self:SetupArtwork(factionIndex, isFactionalMatch);
 
 	ConstructPVPMatchTable(self.tableBuilder, not isFactionalMatch);
 end
+
 function PVPMatchResultsMixin:Shutdown()
 	FrameUtil.UnregisterFrameForEvents(self, ACTIVE_EVENTS);
 	self:UnregisterEvent("QUEST_LOG_UPDATE");
@@ -182,6 +195,7 @@ function PVPMatchResultsMixin:Shutdown()
 	self.earningsContainer:Hide();
 	HideUIPanel(self);
 end
+
 function PVPMatchResultsMixin:OnEvent(event, ...)
 	if event == "PVP_MATCH_ACTIVE" or (event == "PLAYER_ENTERING_WORLD" and C_PvP.GetActiveMatchState() ~= Enum.PvPMatchState.Inactive) then
 		FrameUtil.RegisterFrameForEvents(self, ACTIVE_EVENTS);
@@ -214,6 +228,7 @@ function PVPMatchResultsMixin:OnEvent(event, ...)
 		self.requeueButton:Disable();
 	end
 end
+
 function PVPMatchResultsMixin:BeginShow()
 	-- Get the conquest information if necessary. This will normally be cached
 	-- at the beginning of the match, but this is to deal with any rare cases
@@ -237,6 +252,7 @@ function PVPMatchResultsMixin:BeginShow()
 	self:Init();
 	ShowUIPanel(self);
 end
+
 function PVPMatchResultsMixin:DisplayRewards()
 	if self.hasDisplayedRewards or not self.hasRewardTimerElapsed then
 		return;
@@ -269,8 +285,8 @@ function PVPMatchResultsMixin:DisplayRewards()
 		end
 	end
 	
-	-- Skirmish is considered rated, ignore it.
-	if C_PvP.IsRatedMap() and not IsArenaSkirmish() then
+	-- Skirmish and Brawl Solo Shuffle are considered registered/rated, ignore them.
+	if C_PvP.IsRatedMap() and not IsArenaSkirmish() and not C_PvP.IsBrawlSoloShuffle() then
 		self:InitRatingFrame();
 	end
 
@@ -358,13 +374,16 @@ function PVPMatchResultsMixin:HaveConquestData()
 	local conquestQuestID = select(3, PVPGetConquestLevelInfo());
 	return HaveQuestRewardData(conquestQuestID);
 end
+
 function PVPMatchResultsMixin:OnUpdate()
 	if self.UpdateLeaveButton then
 		self:UpdateLeaveButton();
 	end
 
-	PVPMatchUtil.UpdateTable(self.tableBuilder, self.scrollFrame);
+	local forceNewDataProvider = false;
+	PVPMatchUtil.UpdateDataProvider(self.scrollBox, forceNewDataProvider);
 end
+
 local scoreWidgetSetID = 249;
 local function ScoreWidgetLayout(widgetContainer, sortedWidgets)
 	local widgetsHeight = 0;
@@ -389,14 +408,17 @@ local function ScoreWidgetLayout(widgetContainer, sortedWidgets)
 	widgetContainer:SetHeight(math.max(widgetsHeight, 1));
 	widgetContainer:SetWidth(maxWidgetWidth);
 end
+
 function PVPMatchResultsMixin:OnShow()
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB);
 	self.Score:RegisterForWidgetSet(scoreWidgetSetID, ScoreWidgetLayout);
 end
+
 function PVPMatchResultsMixin:OnHide()
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE);
 	self.Score:UnregisterForWidgetSet(scoreWidgetSetID);
 end
+
 function PVPMatchResultsMixin:AddItemReward(item)
 	local frame = self.itemPool:Acquire();
 
@@ -407,6 +429,7 @@ function PVPMatchResultsMixin:AddItemReward(item)
 	frame:Init(item.link, item.quantity, unusedSpecID, isCurrency, item.isUpgraded, isIconBorderShown, isIconBorderDropShadowShown);
 	frame:SetScale(.7931);
 end
+
 function PVPMatchResultsMixin:InitHonorFrame(currency)
 	local deltaString = FormatValueWithSign(math.floor(currency.quantityChanged));
 	self.honorText:SetText(PVP_HONOR_CHANGE:format(deltaString));
@@ -414,6 +437,7 @@ function PVPMatchResultsMixin:InitHonorFrame(currency)
 	self.legacyHonorButton:Hide();
 	self.honorFrame:Show();
 end
+
 function PVPMatchResultsMixin:InitConquestFrame(currency)
 	local deltaString = FormatValueWithSign(math.floor(currency.quantityChanged / 100));
 	self.conquestText:SetText(PVP_CONQUEST_CHANGE:format(deltaString));
@@ -421,41 +445,32 @@ function PVPMatchResultsMixin:InitConquestFrame(currency)
 	self.legacyConquestButton:Hide();
 	self.conquestFrame:Show();
 end
+
 function PVPMatchResultsMixin:InitRatingFrame()
 	local localPlayerScoreInfo = C_PvP.GetScoreInfoByPlayerGuid(GetPlayerGuid());
 	if localPlayerScoreInfo then
-	local ratingChange = localPlayerScoreInfo.ratingChange;
-	local rating = localPlayerScoreInfo.rating;
-	self.ratingButton:Init(rating, ratingChange);
+		local ratingChange = localPlayerScoreInfo.ratingChange;
+		local rating = localPlayerScoreInfo.rating;
+		self.ratingButton:Init(rating, ratingChange);
 
-	local personalRatedInfo = C_PvP.GetPVPActiveMatchPersonalRatedInfo();
-	if personalRatedInfo then
-		local tierInfo = C_PvP.GetPvpTierInfo(personalRatedInfo.tier);
-		self.ratingButton:Setup(tierInfo, ranking);
-	end
+		local personalRatedInfo = C_PvP.GetPVPActiveMatchPersonalRatedInfo();
+		if personalRatedInfo then
+			local tierInfo = C_PvP.GetPvpTierInfo(personalRatedInfo.tier);
+			self.ratingButton:Setup(tierInfo, ranking);
+		end
 
-	if ratingChange and ratingChange ~= 0 then
-		local deltaString = FormatValueWithSign(ratingChange);
-		self.ratingText:SetText(PVP_RATING_CHANGE:format(deltaString));
-	else
-		self.ratingText:SetText(PVP_RATING_UNCHANGED);
-	end
-	
-	self.ratingFrame:Show();
+		if ratingChange and ratingChange ~= 0 then
+			local deltaString = FormatValueWithSign(ratingChange);
+			self.ratingText:SetText(PVP_RATING_CHANGE:format(deltaString));
+		else
+			self.ratingText:SetText(PVP_RATING_UNCHANGED);
+		end
+		
+		self.ratingFrame:Show();
 	end
 end
+
 function PVPMatchResultsMixin:SetupArtwork(factionIndex, isFactionalMatch)
-	local useAlternateColor = not isFactionalMatch;
-	local buttons = HybridScrollFrame_GetButtons(self.scrollFrame);
-	for k, button in pairs(buttons) do
-		button:Init(useAlternateColor);
-	end
-
-	local r, g, b = PVPMatchStyle.GetTeamColor(factionIndex, useAlternateColor):GetRGB();
-	for k, frame in pairs(self.tintFrames) do
-		frame:SetVertexColor(r, g, b);
-	end
-
 	local themeDecoration = self.overlay.decorator;
 	local theme;
 	if isFactionalMatch then
@@ -467,9 +482,23 @@ function PVPMatchResultsMixin:SetupArtwork(factionIndex, isFactionalMatch)
 	end
 
 	themeDecoration:SetShown(isFactionalMatch);
+	
+	local color;
+	if C_PvP.GetCustomVictoryStatID() > 0 then
+		color = PVPMatchStyle.PurpleColor;
+	else
+		local useAlternateColor = not isFactionalMatch;
+		color = PVPMatchStyle.GetTeamColor(factionIndex, useAlternateColor);
+	end
+
+	local r, g, b = color:GetRGB();
+	for k, frame in pairs(self.tintFrames) do
+		frame:SetVertexColor(r, g, b);
+	end
 
 	NineSliceUtil.ApplyLayoutByName(self, theme.nineSliceLayout);
 end
+
 function PVPMatchResultsMixin:OnLeaveButtonClicked(button)
 	if IsInLFDBattlefield() then
 		ConfirmOrLeaveLFGParty();
@@ -479,16 +508,21 @@ function PVPMatchResultsMixin:OnLeaveButtonClicked(button)
 
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION);
 end
+
 function PVPMatchResultsMixin:OnRequeueButtonClicked(button)
 	button:Disable();
     RequeueSkirmish();
 
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB);
 end
+
 function PVPMatchResultsMixin:OnTabGroupClicked(tab)
 	PanelTemplates_SetTab(self, tab:GetID());
 	SetBattlefieldScoreFaction(tab.factionEnum);
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB);
+
+	local forceNewDataProvider = true;
+	PVPMatchUtil.UpdateDataProvider(self.scrollBox, forceNewDataProvider);
 end
 
 PVPMatchResultsRatingMixin = {};
@@ -501,11 +535,18 @@ function PVPMatchResultsRatingMixin:Init(rating, ratingChange)
 		C_PvP.GetTeamInfo(0),
 		C_PvP.GetTeamInfo(1), 
 	};
-	local factionIndex = GetBattlefieldArenaFaction();
-	self.friendlyMMR = BATTLEGROUND_YOUR_AVERAGE_RATING:format(teamInfos[factionIndex+1].ratingMMR);
-	local enemyFactionIndex = (factionIndex+1)%2;
-	self.enemyMMR = BATTLEGROUND_ENEMY_AVERAGE_RATING:format(teamInfos[enemyFactionIndex+1].ratingMMR);
+	if C_PvP.IsRatedSoloShuffle() then
+		-- For Rated Solo Shuffle your MMR is always first, followed by the match average
+		self.friendlyMMR = BATTLEGROUND_YOUR_PERSONAL_RATING:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(teamInfos[1].ratingMMR));
+		self.enemyMMR = BATTLEGROUND_MATCH_AVERAGE_RATING:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(teamInfos[2].ratingMMR));
+	else
+		local factionIndex = GetBattlefieldArenaFaction();
+		local enemyFactionIndex = (factionIndex+1)%2;
+		self.friendlyMMR = BATTLEGROUND_YOUR_AVERAGE_RATING:format(teamInfos[factionIndex+1].ratingMMR);
+		self.enemyMMR = BATTLEGROUND_ENEMY_AVERAGE_RATING:format(teamInfos[enemyFactionIndex+1].ratingMMR);
+	end
 end
+
 function PVPMatchResultsRatingMixin:OnEnter()
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 	GameTooltip_SetTitle(GameTooltip, PVP_RATING_HEADER);
@@ -519,11 +560,13 @@ function PVPMatchResultsRatingMixin:OnEnter()
 		GameTooltip_AddNormalLine(GameTooltip, PVP_RATING_CURRENT:format(HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(self.ratingNew)));
 	end
 	GameTooltip_AddBlankLineToTooltip(GameTooltip);
-	GameTooltip_AddNormalLine(GameTooltip, self.friendlyMMR);
-	GameTooltip_AddNormalLine(GameTooltip, self.enemyMMR);
+	local wrapText = false;
+	GameTooltip_AddNormalLine(GameTooltip, self.friendlyMMR, wrapText);
+	GameTooltip_AddNormalLine(GameTooltip, self.enemyMMR, wrapText);
 	
 	GameTooltip:Show();
 end
+
 function PVPMatchResultsRatingMixin:OnLeave()
 	GameTooltip:Hide();
 end

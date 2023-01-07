@@ -495,20 +495,14 @@ function MultiCastActionButtonDown(id)
 	if ( button:GetButtonState() == "NORMAL" ) then
 		button:SetButtonState("PUSHED");
 	end
-	if (GetCVarBool("ActionButtonUseKeyDown")) then
-		SecureActionButton_OnClick(button, "LeftButton");
-		button:UpdateState();
-	end
+	TryUseActionButton(button, true);
 end
 
 function MultiCastActionButtonUp(id)
 	local button = _G["MultiCastActionButton"..id];
 	if ( button:GetButtonState() == "PUSHED" ) then
 		button:SetButtonState("NORMAL");
-		if (not GetCVarBool("ActionButtonUseKeyDown")) then
-			SecureActionButton_OnClick(button, "LeftButton");
-			button:UpdateState();
-		end
+		TryUseActionButton(button, false);
 	end
 	MultiCastFlyoutFrame_Hide(MultiCastFlyoutFrame, true);
 end
@@ -860,7 +854,7 @@ function MultiCastSpellButton_OnLoad(self)
 end
 
 function MultiCastSpellButton_OnEvent(self, event, ...)
-	if ( event == "UPDATE_BINDINGS" ) then
+	if ( event == "UPDATE_BINDINGS" or event == "GAME_PAD_ACTIVE_CHANGED" ) then
 		self:UpdateHotkeys(self.buttonType);
 	elseif ( event == "ACTIONBAR_UPDATE_COOLDOWN" ) then
 		MultiCastSpellButton_UpdateCooldown(self);
@@ -964,6 +958,7 @@ function MultiCastSummonSpellButton_Update(self)
 
 		if ( not self.eventsRegistered ) then
 			self:RegisterEvent("UPDATE_BINDINGS");
+			self:RegisterEvent("GAME_PAD_ACTIVE_CHANGED");
 			self:RegisterEvent("ACTIONBAR_UPDATE_STATE");
 			self:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN");
 			self.eventsRegistered = true;
@@ -989,6 +984,7 @@ function MultiCastSummonSpellButton_Update(self)
 	else
 		if ( self.eventsRegistered ) then
 			self:UnregisterEvent("UPDATE_BINDINGS");
+			self:UnregisterEvent("GAME_PAD_ACTIVE_CHANGED");
 			self:UnregisterEvent("ACTIONBAR_UPDATE_STATE");
 			self:UnregisterEvent("ACTIONBAR_UPDATE_COOLDOWN");
 			self.eventsRegistered = false;
@@ -1041,6 +1037,7 @@ function MultiCastRecallSpellButton_Update(self)
 
 		if ( not self.eventsRegistered ) then
 			self:RegisterEvent("UPDATE_BINDINGS");
+			self:RegisterEvent("GAME_PAD_ACTIVE_CHANGED");
 			self:RegisterEvent("ACTIONBAR_UPDATE_STATE");
 			self:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN");
 			self.eventsRegistered = true;
@@ -1062,6 +1059,7 @@ function MultiCastRecallSpellButton_Update(self)
 	else
 		if ( self.eventsRegistered ) then
 			self:UnregisterEvent("UPDATE_BINDINGS");
+			self:UnregisterEvent("GAME_PAD_ACTIVE_CHANGED");
 			self:UnregisterEvent("ACTIONBAR_UPDATE_STATE");
 			self:UnregisterEvent("ACTIONBAR_UPDATE_COOLDOWN");
 			self.eventsRegistered = false;

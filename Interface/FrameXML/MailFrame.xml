@@ -64,12 +64,10 @@
 					</OnEnter>
 					<OnLeave>
 						GameTooltip:Hide();
-					</OnLeave>						
+					</OnLeave>
 				</Scripts>
 				<NormalFont style="GameFontHighlightSmallRight"/>
-				<PushedTextOffset>
-					<AbsDimension x="0" y="0"/> 
-				</PushedTextOffset>
+				<PushedTextOffset x="0" y="0"/>
 			</Button>
 			<CheckButton parentKey="Button" name="$parentButton" hidden="true">
 				<Size x="37" y="37"/>
@@ -249,11 +247,7 @@
 			<OnEvent>
 				--GameTooltip:Hide();
 				if ( GameTooltip:IsOwned(self) ) then
-					local hasCooldown, speciesID, level, breedQuality, maxHealth, power, speed, name = GameTooltip:SetInboxItem(InboxFrame.openMailID, self:GetID());
-					if(speciesID and speciesID > 0) then
-						BattlePetToolTip_Show(speciesID, level, breedQuality, maxHealth, power, speed, name);
-					end
-					GameTooltip:Show();
+					GameTooltip:SetInboxItem(InboxFrame.openMailID, self:GetID());
 				end
 			</OnEvent>
 			<OnClick>
@@ -280,14 +274,6 @@
 	</ItemButton>
 	<Frame name="MailFrame" toplevel="true" parent="UIParent" enableMouse="true" hidden="true" inherits="ButtonFrameTemplate">
 		<Layers>
-			<Layer level="OVERLAY" textureSubLevel="-1">
-				<Texture file="Interface\MailFrame\Mail-Icon">
-					<Size x="58" y="58"/>
-					<Anchors>
-						<Anchor point="TOPLEFT" x="-5" y="7"/>
-					</Anchors>
-				</Texture>
-			</Layer>
 			<Layer level="OVERLAY">
 				<FontString name="$parentTrialError" inherits="GameFontNormal" text="TRIAL_RESTRICTED" parentKey="trialError" hidden="true">
 					<Size x="250" y="0"/>
@@ -315,12 +301,6 @@
 						</Texture>
 					</Layer>
 					<Layer level="ARTWORK">
-						<FontString name="InboxTitleText" inherits="GameFontNormal" text="INBOX">
-							<Size x="224" y="14"/>
-							<Anchors>
-								<Anchor point="CENTER" x="0" y="245"/>
-							</Anchors>
-						</FontString>
 						<FontString name="InboxCurrentPage" inherits="GameFontNormal">
 							<Size x="192" y="0"/>
 							<Anchors>
@@ -334,7 +314,7 @@
 						<Size x="384" y="32"/>
 						<Anchors>
 							<Anchor point="TOP" x="0" y="-25"/>
-						</Anchors>					
+						</Anchors>
 						<Layers>
 							<Layer level="ARTWORK">
 								<FontString name="$parentText" inherits="GameFontNormal" text="INBOX_TOO_MUCH_MAIL">
@@ -342,13 +322,13 @@
 										<Anchor point="CENTER" x="16" y="0"/>
 									</Anchors>
 									<Color r="1.0" g="0.1" b="0.1" a="1.0"/>
-								</FontString>									
+								</FontString>
 								<Texture file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew">
 									<Size x="32" y="32"/>
 									<Anchors>
 										<Anchor point="RIGHT" relativeTo="$parentText" relativePoint="LEFT" x="0" y="-2"/>
 									</Anchors>
-								</Texture>						
+								</Texture>
 							</Layer>
 						</Layers>
 						<Scripts>
@@ -363,7 +343,7 @@
 								GameTooltip:Hide();
 							</OnLeave>
 						</Scripts>
-					</Frame>				
+					</Frame>
 					<Frame name="MailItem1" inherits="MailItemTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT" x="13" y="-70"/>
@@ -472,21 +452,14 @@
 				</Anchors>
 				<Layers>
 					<Layer level="BACKGROUND">
-						<FontString name="SendMailTitleText" inherits="GameFontNormal" text="SENDMAIL">
-							<Size x="224" y="14"/>
-							<Anchors>
-								<Anchor point="CENTER" x="0" y="245"/>
-							</Anchors>
-						</FontString>
 						<FontString name="SendMailErrorText" inherits="GameFontRedSmall" hidden="true">
 							<Size x="0" y="10"/>
 						</FontString>
-						<Texture name="SendMailErrorCoin" file="Interface\MoneyFrame\UI-MoneyIcons" hidden="true">
+						<Texture name="SendMailErrorCoin" atlas="coin-gold" hidden="true">
 							<Size x="10" y="10"/>
 							<Anchors>
 								<Anchor point="LEFT" relativeTo="SendMailErrorText" relativePoint="RIGHT" x="1" y="-1"/>
 							</Anchors>
-							<TexCoords left="0" right="0.25" top="0" bottom="1"/>
 						</Texture>
 						<Texture name="SendMailHorizontalBarLeft" file="Interface\ClassTrainerFrame\UI-ClassTrainer-HorizontalBar">
 							<Size x="256" y="16"/>
@@ -593,7 +566,7 @@
 										if ( CursorHasItem() ) then
 											SendMailAttachmentButton_OnDropAny();
 										end
-									</OnMouseUp> 
+									</OnMouseUp>
 								</Scripts>
 							</Frame>
 						</ScrollChild>
@@ -613,7 +586,7 @@
 								<Texture name="$parentLeft" file="Interface\Common\Common-Input-Border">
 									<Size x="8" y="20"/>
 									<Anchors>
-										<Anchor point="TOPLEFT" x="-8" y="0"/>
+										<Anchor point="TOPLEFT" x="-8" y="-2"/>
 									</Anchors>
 									<TexCoords left="0" right="0.0625" top="0" bottom="0.625"/>
 								</Texture>
@@ -682,7 +655,7 @@
 							<OnLoad>
 								SmallMoneyFrame_OnLoad(self);
 								MoneyFrame_SetType(self, "STATIC");
-								MoneyFrame_Update("SendMailCostMoneyFrame", GetSendMailPrice());	
+								MoneyFrame_Update("SendMailCostMoneyFrame", GetSendMailPrice());
 							</OnLoad>
 						</Scripts>
 					</Frame>
@@ -862,7 +835,7 @@
 						SendMailRadioButton_OnClick(self, 1);
 					</OnLoad>
 					<OnShow>
-						if ( ENABLE_COLORBLIND_MODE == "1" ) then
+						if ( CVarCallbackRegistry:GetCVarValueBool("colorblindMode") ) then
 							SendMailErrorText:SetFormattedText(MAIL_COD_ERROR_COLORBLIND, MAX_COD_AMOUNT, GOLD_AMOUNT_SYMBOL);
 						else
 							SendMailErrorText:SetFormattedText(MAIL_COD_ERROR, MAX_COD_AMOUNT);
@@ -873,7 +846,7 @@
 						if ( CursorHasItem() ) then
 							SendMailAttachmentButton_OnDropAny();
 						end
-					</OnMouseUp> 
+					</OnMouseUp>
 				</Scripts>
 			</Frame>
 			<Button name="MailFrameTab1" inherits="FriendsFrameTabTemplate" id="1" text="INBOX">
@@ -927,12 +900,6 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="OpenMailTitleText" inherits="GameFontNormal" text="OPENMAIL">
-					<Size x="224" y="24"/>
-					<Anchors>
-						<Anchor point="CENTER" x="6" y="202"/>
-					</Anchors>
-				</FontString>
 				<FontString name="OpenMailAttachmentText" inherits="GameFontHighlightSmall" text="TAKE_ATTACHMENTS">
 					<Size x="0" y="0"/>
 				</FontString>
@@ -1057,6 +1024,104 @@
 								</Anchors>
 								<FontString inherits="MailTextFontNormal" nonspacewrap="true" justifyH="LEFT"/>
 							</SimpleHTML>
+							<Frame name="ConsortiumMailFrame" setAllPoints="true">
+								<Layers>
+									<Layer level="OVERLAY">
+										<FontString parentKey="OpeningText" inherits="InvoiceTextFontNormal">
+											<Size x="250" y="0"/>
+											<Anchors>
+												<Anchor point="TOPLEFT" x="30" y="-20"/>
+											</Anchors>
+										</FontString>
+										<FontString parentKey="CrafterText" inherits="InvoiceTextFontNormal">
+											<Size x="250" y="0"/>
+											<Anchors>
+												<Anchor point="TOP" relativeKey="$parent.OpeningText" relativePoint="BOTTOM" x="0" y="-4"/>
+											</Anchors>
+										</FontString>
+										<FontString parentKey="CommissionReceived" inherits="InvoiceTextFontNormal" text="CRAFTING_ORDER_COMMISSION_ENCLOSED" justifyH="LEFT">
+											<Size x="0" y="0"/>
+											<Anchors>
+												<Anchor point="TOPLEFT" relativeKey="$parent.CrafterText" relativePoint="BOTTOMLEFT" x="0" y="-4"/>
+											</Anchors>
+										</FontString>
+										<FontString parentKey="CrafterNote" inherits="InvoiceTextFontNormal" wordwrap="true" nonspacewrap="true" justifyV="TOP" justifyH="LEFT">
+											<Size x="250" y="0"/>
+											<Anchors>
+												<Anchor point="TOP" relativeKey="$parent.CrafterText" relativePoint="BOTTOM" x="0" y="-16"/>
+											</Anchors>
+										</FontString>
+										<FontString parentKey="ConsortiumNote" inherits="InvoiceTextFontNormal" wordwrap="true" nonspacewrap="true" justifyV="TOP" justifyH="LEFT">
+											<Size x="250" y="0"/>
+											<Anchors>
+												<Anchor point="TOP" relativeKey="$parent.CrafterText" relativePoint="BOTTOM" x="0" y="-30"/>
+											</Anchors>
+										</FontString>
+									</Layer>
+								</Layers>
+								<Frames>
+									<Frame parentKey="CommissionReceivedDisplay" inherits="MoneyDisplayFrameTemplate">
+										<Size x="200" y="33"/>
+										<Anchors>
+											<Anchor point="LEFT" relativeKey="$parent.CommissionReceived" relativePoint="RIGHT" x="5" y="0"/>
+										</Anchors>
+										<KeyValues>
+											<KeyValue key="hideCopper" value="true" type="boolean"/>
+											<KeyValue key="leftAlign" value="false" type="boolean"/>
+											<KeyValue key="useAuctionHouseIcons" value="true" type="boolean"/>
+											<KeyValue key="resizeToFit" value="true" type="boolean"/>
+											<KeyValue key="alwaysShowGold" value="true" type="boolean"/>
+										</KeyValues>
+									</Frame>
+									<Frame parentKey="CommissionPaidDisplay">
+										<Size x="250" y="55"/>
+										<Anchors>
+											<Anchor point="BOTTOM"/>
+										</Anchors>
+										<Layers>
+											<Layer level="OVERLAY">
+												<Texture parentKey="Separator">
+													<Size x="230" y="1"/>
+													<Anchors>
+														<Anchor point="TOP"/>
+													</Anchors>
+													<Color color="DEFAULT_MATERIAL_TEXT_COLOR" a="0.5"/>
+												</Texture>
+												<FontString parentKey="CommissionPaidText" inherits="InvoiceTextFontNormal" text="CRAFTING_ORDER_MAIL_COMMISSION_PAID" justifyH="RIGHT">
+													<Size x="250" y="0"/>
+													<Anchors>
+														<Anchor point="TOPRIGHT" relativeKey="$parent.Separator" relativePoint="BOTTOMRIGHT" x="0" y="-8"/>
+													</Anchors>
+												</FontString>
+											</Layer>
+										</Layers>
+										<Frames>
+											<Frame parentKey="MoneyDisplayFrame" inherits="MoneyDisplayFrameTemplate">
+												<Size x="200" y="33"/>
+												<Anchors>
+													<Anchor point="TOPRIGHT" relativeKey="$parent.CommissionPaidText" relativePoint="BOTTOMRIGHT" x="0" y="6"/>
+												</Anchors>
+												<KeyValues>
+													<KeyValue key="hideCopper" value="true" type="boolean"/>
+													<KeyValue key="leftAlign" value="false" type="boolean"/>
+													<KeyValue key="useAuctionHouseIcons" value="true" type="boolean"/>
+													<KeyValue key="resizeToFit" value="true" type="boolean"/>
+													<KeyValue key="alwaysShowGold" value="true" type="boolean"/>
+												</KeyValues>
+												<Layers>
+													<Layer level="OVERLAY">
+														<FontString inherits="InvoiceTextFontNormal" text="-">
+															<Anchors>
+																<Anchor point="RIGHT" relativePoint="LEFT" x="-5" y="0"/>
+															</Anchors>
+														</FontString>
+													</Layer>
+												</Layers>
+											</Frame>
+										</Frames>
+									</Frame>
+								</Frames>
+							</Frame>
 							<Frame name="OpenMailInvoiceFrame" setAllPoints="true">
 								<Layers>
 									<Layer level="BACKGROUND">
@@ -1091,7 +1156,7 @@
 											<Anchors>
 												<Anchor point="TOP" relativeTo="OpenMailInvoiceHouseCut" relativePoint="BOTTOMRIGHT" x="0" y="-22"/>
 											</Anchors>
-										</Texture>										
+										</Texture>
 										<FontString name="OpenMailInvoiceAmountReceived" inherits="InvoiceTextFontNormal" text="AMOUNT_RECEIVED_COLON">
 											<Anchors>
 												<Anchor point="TOPRIGHT" relativeTo="OpenMailArithmeticLine" relativePoint="BOTTOMRIGHT" x="-14" y="10"/>
@@ -1284,9 +1349,9 @@
 			<OnShow>
 				HideUIPanel(GetUIPanel("center"));
 				HideUIPanel(GetUIPanel("right"));
+				self:SetTitle(OPENMAIL);
 			</OnShow>
 			<OnHide function="OpenMailFrame_OnHide"/>
 		</Scripts>
 	</Frame>
 </Ui>
-

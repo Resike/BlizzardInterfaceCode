@@ -17,7 +17,7 @@ AuctionHouseItemDisplayMixin = {};
 
 function AuctionHouseItemDisplayMixin:OnLoad()
 	AuctionHouseBackgroundMixin.OnLoad(self);
-	
+
 	self.ItemButton:SetPoint("LEFT", self.itemButtonXOffset or 0, self.itemButtonYOffset or 0);
 end
 
@@ -83,10 +83,7 @@ function AuctionHouseItemDisplayMixin:OnEnter()
 				local bagID, slotIndex = itemLocation:GetBagAndSlot();
 				if bagID and slotIndex then
 					GameTooltip:SetOwner(self.ItemButton, "ANCHOR_RIGHT");
-					local hasCooldown, repairCost, speciesID, level, breedQuality, maxHealth, power, speed, name = GameTooltip:SetBagItem(bagID, slotIndex);
-					if speciesID and speciesID > 0 then
-						BattlePetToolTip_Show(speciesID, level, breedQuality, maxHealth, power, speed, name);
-					end
+					GameTooltip:SetBagItem(bagID, slotIndex);
 				end
 			end
 		end
@@ -208,6 +205,8 @@ function AuctionHouseItemDisplayMixin:SetItemKey(itemKey)
 		self.Name:SetText(AuctionHouseUtil.GetItemDisplayTextFromItemKey(itemKey, itemKeyInfo));
 		SetItemButtonTexture(self.ItemButton, itemKeyInfo.iconFileID);
 		SetItemButtonQuality(self.ItemButton, itemKeyInfo.quality);
+		
+		self.FavoriteButton:SetItemKey(itemKey);
 	end
 
 	return successful;
@@ -264,10 +263,7 @@ function AuctionHouseItemDisplayMixin:SetItemInternal(item)
 	local itemLinkForQuality = not isPet and itemLink or nil;
 	SetItemButtonQuality(self.ItemButton, itemQuality, itemLinkForQuality);
 
-	local displayText = itemName;
-	if self.itemLevelShown and not isPet then
-		displayText = AUCTION_HOUSE_EQUIPMENT_RESULT_FORMAT:format(itemName, itemLevel);
-	end
+	local displayText = self:GetItemDisplayText(itemName, itemLevel, isPet);
 
 	self.Name:SetText(ITEM_QUALITY_COLORS[itemQuality].color:WrapTextInColorCode(displayText));
 
@@ -288,6 +284,15 @@ function AuctionHouseItemDisplayMixin:IsPet()
 	end
 
 	return LinkUtil.IsLinkType(itemLink, "battlepet");
+end
+
+function AuctionHouseItemDisplayMixin:GetItemDisplayText(itemName, itemLevel, isPet)
+	if isPet then
+		return itemName;
+	end
+
+	local craftingQuality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(self.item);
+	return AuctionHouseUtil.GetItemDisplayText(itemName, self.itemLevelShown and itemLevel or nil, craftingQuality);
 end
 
 function AuctionHouseItemDisplayMixin:GetItemInfo()
@@ -359,7 +364,7 @@ end
 AuctionHouseItemDisplayItemButtonMixin = {};
 
 function AuctionHouseItemDisplayItemButtonMixin:OnLoad()
-	self:SetHighlightTexture(nil);
+	self:ClearHighlightTexture();
 end
 
 function AuctionHouseItemDisplayItemButtonMixin:OnClick(...)
@@ -491,7 +496,7 @@ function AuctionHouseInteractableItemDisplayMixin:SetItemLocation(itemLocation, 
 	if currentItemLocation and C_Item.DoesItemExist(currentItemLocation) then
 		C_Item.UnlockItem(currentItemLocation);
 	end
-	
+
 	if itemLocation then
 		if C_Item.DoesItemExist(itemLocation) then
 			C_Item.LockItem(itemLocation);
@@ -517,6 +522,16 @@ function AuctionHouseInteractableItemDisplayMixin:SwitchItemWithCursor(skipCallb
 			ItemUtil.PickupBagItem(currentItemLocation);
 		end
 	end
+end
+
+function AuctionHouseInteractableItemDisplayMixin:GetItemDisplayText(itemName, itemLevel, isPet)
+	if isPet then
+		return AuctionHouseItemDisplayMixin.GetItemDisplayText(self, itemName, itemLevel, isPet);
+	end
+
+	-- Never display crafting quality in the item text since it will display as an overlay on top of the icon.
+	local craftingQuality = nil;
+	return AuctionHouseUtil.GetItemDisplayText(itemName, self.itemLevelShown and itemLevel or nil, craftingQuality);
 end
 
 
@@ -602,7 +617,7 @@ local function AuctionHouseFavoriteDropDown_Initialize(self)
 	local info = UIDropDownMenu_CreateInfo();
 	info.notCheckable = 1;
 	info.text = isFavorite and AUCTION_HOUSE_DROPDOWN_REMOVE_FAVORITE or AUCTION_HOUSE_DROPDOWN_SET_FAVORITE;
-	
+
 	local function CanChangeFavoriteState()
 		return C_AuctionHouse.FavoritesAreAvailable() and (isFavorite or not C_AuctionHouse.HasMaxFavorites());
 	end
@@ -674,7 +689,7 @@ function AuctionHouseBidFrameMixin:SetPrice(minBid, isOwnerItem, isPlayerHighBid
 	else
 		MoneyInputFrame_SetEnabled(self.BidAmount, true);
 		self.BidButton:SetDisableTooltip(nil);
-	end	
+	end
 end
 
 function AuctionHouseBidFrameMixin:GetPrice()
@@ -730,4 +745,54 @@ AuctionHouseBuyoutButtonMixin = {};
 
 function AuctionHouseBuyoutButtonMixin:OnClick()
 	self:GetParent():BuyoutItem();
+end
+
+AuctionHouseFavoriteButtonBaseMixin = {};
+
+function AuctionHouseFavoriteButtonBaseMixin:OnEnter()
+	if not self:IsInteractionAvailable() then
+		self:ShowMaxedFavoritesTooltip();
+	end
+end
+
+function AuctionHouseFavoriteButtonBaseMixin:ShowMaxedFavoritesTooltip()
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip_AddErrorLine(GameTooltip, AUCTION_HOUSE_FAVORITES_MAXED_TOOLTIP);
+	GameTooltip:Show();
+end
+
+function AuctionHouseFavoriteButtonBaseMixin:OnLeave()
+	GameTooltip_Hide();
+end
+
+function AuctionHouseFavoriteButtonBaseMixin:OnClick()
+	if not self:IsInteractionAvailable() then
+		return;
+	end
+	
+	local setToFavorite = not self:IsFavorite();
+	C_AuctionHouse.SetFavoriteItem(self.itemKey, setToFavorite);
+	self:UpdateFavoriteState();
+end
+
+function AuctionHouseFavoriteButtonBaseMixin:IsInteractionAvailable()
+	return C_AuctionHouse.FavoritesAreAvailable() and (self:IsFavorite() or not C_AuctionHouse.HasMaxFavorites());
+end
+
+function AuctionHouseFavoriteButtonBaseMixin:SetItemKey(itemKey)
+	self.itemKey = itemKey;
+	self:UpdateFavoriteState();
+end
+
+function AuctionHouseFavoriteButtonBaseMixin:UpdateFavoriteState()
+	local isFavorite = self:IsFavorite();
+	local currAtlas = isFavorite and "auctionhouse-icon-favorite" or "auctionhouse-icon-favorite-off";
+	self.NormalTexture:SetAtlas(currAtlas);
+
+	self.HighlightTexture:SetAtlas(currAtlas);
+	self.HighlightTexture:SetAlpha(isFavorite and 0.2 or 0.4);
+end
+
+function AuctionHouseFavoriteButtonBaseMixin:IsFavorite()
+	return self.itemKey and C_AuctionHouse.IsFavoriteItem(self.itemKey);
 end

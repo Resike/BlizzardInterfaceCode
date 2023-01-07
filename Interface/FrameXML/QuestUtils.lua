@@ -63,7 +63,7 @@ end
 
 QuestUtil = {};
 
-function QuestUtil.GetWorldQuestAtlasInfo(worldQuestType, inProgress, tradeskillLineID)
+function QuestUtil.GetWorldQuestAtlasInfo(worldQuestType, inProgress, tradeskillLineID, questID)
 	local iconAtlas;
 	if ( inProgress ) then
 		return "worldquest-questmarker-questionmark", 10, 15;
@@ -89,8 +89,17 @@ function QuestUtil.GetWorldQuestAtlasInfo(worldQuestType, inProgress, tradeskill
 			iconAtlas = "worldquest-icon-horde";
 		end
 	elseif ( worldQuestType == Enum.QuestTagType.Threat ) then
-		iconAtlas = "worldquest-icon-nzoth";
+		iconAtlas = QuestUtil.GetThreatPOIIcon(questID);
 	else
+		if(questID) then
+			local theme = C_QuestLog.GetQuestDetailsTheme(questID);
+			if theme then
+				iconAtlas = theme.poiIcon;
+			end
+		end
+	end
+
+	if(not iconAtlas) then
 		return "worldquest-questmarker-questbang", 6, 15;
 	end
 
@@ -277,6 +286,23 @@ function QuestUtil.SetupWorldQuestButton(button, info, inProgress, selected, isC
 	end
 end
 
+function QuestUtil.QuestTextContrastEnabled()
+	return GetCVarBool("QuestTextContrast");
+end
+
+function QuestUtil.GetDefaultQuestBackgroundTexture()
+	return QuestUtil.QuestTextContrastEnabled() and "QuestBG-Parchment-Accessibility" or "QuestBG-Parchment";
+end
+
+function QuestUtil.GetDefaultQuestMapBackgroundTexture()
+	return QuestUtil.QuestTextContrastEnabled() and "QuestDetailsBackgrounds-Accessibility" or "QuestDetailsBackgrounds";
+end
+
+function QuestUtil.GetThreatPOIIcon(questID)
+	local theme = C_QuestLog.GetQuestDetailsTheme(questID);
+	return theme and theme.poiIcon or "worldquest-icon-nzoth";
+end
+
 function QuestUtils_GetQuestTagTextureCoords(tagID, worldQuestType)
 	if IsQuestWorldQuest_Internal(worldQuestType) then
 		return WORLD_QUEST_TYPE_TCOORDS[worldQuestType];
@@ -428,12 +454,12 @@ function QuestUtils_AddQuestRewardsToTooltip(tooltip, questID, style)
 		if style.fullItemDescription then
 			-- we want to do a full item description
 			local itemIndex, rewardType = QuestUtils_GetBestQualityItemRewardIndex(questID);  -- Only support one item reward currently
-			if not EmbeddedItemTooltip_SetItemByQuestReward(tooltip.ItemTooltip, itemIndex, questID, rewardType) then
+			if not EmbeddedItemTooltip_SetItemByQuestReward(tooltip.ItemTooltip, itemIndex, questID, rewardType, style.showCollectionText) then
 				showRetrievingData = true;
 			end
 			-- check for item compare input of flag
 			if not showRetrievingData then
-				if IsModifiedClick("COMPAREITEMS") or GetCVarBool("alwaysCompareItems") then
+				if TooltipUtil.ShouldDoItemComparison() then
 					GameTooltip_ShowCompareItem(tooltip.ItemTooltip.Tooltip, tooltip.BackdropFrame);
 				else
 					for i, tooltip in ipairs(tooltip.ItemTooltip.Tooltip.shoppingTooltips) do
@@ -444,6 +470,7 @@ function QuestUtils_AddQuestRewardsToTooltip(tooltip, questID, style)
 		else
 			-- we want to do an abbreviated item description
 			local name, texture, numItems, quality, isUsable = GetQuestLogRewardInfo(1, questID);
+			local text;
 			if numItems > 1 then
 				text = string.format(BONUS_OBJECTIVE_REWARD_WITH_COUNT_FORMAT, texture, HIGHLIGHT_FONT_COLOR:WrapTextInColorCode(numItems), name);
 			elseif texture and name then
@@ -631,4 +658,18 @@ end
 
 function QuestUtils_IsQuestWatched(questID)
 	return questID and C_QuestLog.GetQuestWatchType(questID) ~= nil;
+end
+
+QuestSortType = EnumUtil.MakeEnum( "Normal", "Campaign", "Calling");
+
+function QuestUtils_GetQuestSortType(questInfo)
+	if questInfo.isCalling then
+		return QuestSortType.Calling;
+	elseif questInfo.campaignID and questInfo.campaignID > 0 then
+		if not C_CampaignInfo.SortAsNormalQuest(questInfo.campaignID) then
+			return QuestSortType.Campaign;
+		end
+	end
+
+	return QuestSortType.Normal;
 end

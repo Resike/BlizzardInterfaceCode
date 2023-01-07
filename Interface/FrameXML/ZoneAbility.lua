@@ -1,5 +1,5 @@
 
-local ZONE_SPELL_ABILITY_TEXTURES_BASE_FALLBACK = "Interface\\ExtraButton\\GarrZoneAbility-Armory";
+local ZoneAbilityFrameAtlasFallback = "revendreth-zone-ability";
 
 -- Include sound information based on texture kit for now.
 local TextureKitToSoundEffects = {
@@ -56,28 +56,34 @@ local function HasZoneAbilitySpellOnBar(spellID)
 	return false;
 end
 
-local function CheckShowZoneAbilityTutorial(zoneAbilityButton)
-	local zoneAbilityInfo = zoneAbilityButton.zoneAbilityInfo;
-	if HelpTip:IsShowingAny(ZoneAbilityFrame) or GetCVarBitfield("closedExtraAbiltyTutorials", zoneAbilityInfo.zoneAbilityID) or not zoneAbilityInfo.tutorialText then
-		return;
-	end
-
-	local helpTipInfo = {
-		text = zoneAbilityInfo.tutorialText,
-		buttonStyle = HelpTip.ButtonStyle.Close,
-		cvarBitfield = "closedExtraAbiltyTutorials",
-		onAcknowledgeCallback = function() ZoneAbilityFrame:CheckForTutorial() end,
-		bitfieldFlag = zoneAbilityInfo.zoneAbilityID,
-		targetPoint = HelpTip.Point.TopEdgeCenter,
-		offsetY = 20,
-	};
-	HelpTip:Show(ZoneAbilityFrame, helpTipInfo, zoneAbilityButton);
-end
-
 local function HideZoneAbilityTutorial()
 	HelpTip:HideAll(ZoneAbilityFrame);
 end
 
+
+ZoneAbilityFrameUpdater = {};
+
+function ZoneAbilityFrameUpdater:AddDirtyFrame(dirtyFrame)
+	if not self.dirtyFrames then
+		self.dirtyFrames = {};
+	end
+
+	self.dirtyFrames[dirtyFrame] = true;
+
+	if not self.isDirty then
+		self.isDirty = true;
+		C_Timer.After(0, function() self:Clean() end);
+	end
+end
+
+function ZoneAbilityFrameUpdater:Clean()
+	for frame in pairs(self.dirtyFrames) do
+		frame:UpdateDisplayedZoneAbilities();
+	end
+
+	self.dirtyFrames = {};
+	self.isDirty = false;
+end
 
 ZoneAbilityFrameMixin = {};
 
@@ -87,13 +93,31 @@ function ZoneAbilityFrameMixin:OnLoad()
 	self:RegisterEvent("SPELLS_CHANGED");
 	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED");
 
+	self.variablesLoaded = false;
+	-- Will be unregistered once received.
+	self:RegisterEvent("VARIABLES_LOADED");
+
 	self.SpellButtonContainer:SetTemplate("Button", "ZoneAbilityFrameSpellButtonTemplate");
 
 	self:UpdateDisplayedZoneAbilities();
 end
 
 function ZoneAbilityFrameMixin:OnEvent(event, ...)
-	self:UpdateDisplayedZoneAbilities();
+	if event == "VARIABLES_LOADED" then
+		self:SetVariablesLoaded();
+	end
+
+	self:MarkDirty();
+end
+
+function ZoneAbilityFrameMixin:SetVariablesLoaded()
+	self:UnregisterEvent("VARIABLES_LOADED");
+	self.variablesLoaded = true;
+	self:CheckForTutorial();
+end
+
+function ZoneAbilityFrameMixin:MarkDirty()
+	ZoneAbilityFrameUpdater:AddDirtyFrame(self);
 end
 
 local function SortByUIPriority(lhs, rhs)
@@ -101,11 +125,9 @@ local function SortByUIPriority(lhs, rhs)
 end
 
 function ZoneAbilityFrameMixin:UpdateDisplayedZoneAbilities()
-	HideZoneAbilityTutorial();
-
 	local zoneAbilities = GetActiveZoneAbilities();
 	table.sort(zoneAbilities, SortByUIPriority);
-	
+
 	local displayedZoneAbilities = {};
 	local activeAbilityIsDisplayedOnBar = {};
 	local displayedTextureKit = nil;
@@ -149,6 +171,14 @@ function ZoneAbilityFrameMixin:UpdateDisplayedZoneAbilities()
 		end
 	end
 
+	-- don't update if nothing's changed, could screw up OnClick
+	local depth = 3;
+	if self.previousZoneAbilities and tCompare(self.previousZoneAbilities, displayedZoneAbilities, depth) then
+		return;
+	end
+
+	HideZoneAbilityTutorial();
+
 	self.previousZoneAbilities = displayedZoneAbilities;
 
 	local numDisplayedAbilites = #displayedZoneAbilities;
@@ -188,6 +218,30 @@ function ZoneAbilityFrameMixin:CheckForTutorial()
 	end
 end
 
+function ZoneAbilityFrameMixin:CanShowTutorial(zoneAbilityInfo)
+	return self.variablesLoaded
+		and not HelpTip:IsShowingAny(self)
+		and not GetCVarBitfield("closedExtraAbiltyTutorials", zoneAbilityInfo.zoneAbilityID)
+		and zoneAbilityInfo.tutorialText;
+end
+
+function ZoneAbilityFrameMixin:CheckShowZoneAbilityTutorial(zoneAbilityButton)
+	local zoneAbilityInfo = zoneAbilityButton.zoneAbilityInfo;
+	if not self:CanShowTutorial(zoneAbilityInfo) then
+		return;
+	end
+
+	local helpTipInfo = {
+		text = zoneAbilityInfo.tutorialText,
+		buttonStyle = HelpTip.ButtonStyle.Close,
+		cvarBitfield = "closedExtraAbiltyTutorials",
+		onAcknowledgeCallback = function() self:CheckForTutorial() end,
+		bitfieldFlag = zoneAbilityInfo.zoneAbilityID,
+		targetPoint = HelpTip.Point.TopEdgeCenter,
+		offsetY = 20,
+	};
+	HelpTip:Show(self, helpTipInfo, zoneAbilityButton);
+end
 
 ZoneAbilityFrameSpellButtonMixin = CreateFromMixins(ContentFrameMixin);
 
@@ -215,7 +269,7 @@ end
 
 function ZoneAbilityFrameSpellButtonMixin:OnEnter()
 	GameTooltip:SetOwner(self);
-	GameTooltip:SetSpellByID(self:GetSpellID());
+	GameTooltip:SetSpellByID(self:GetOverrideSpellID());
 end
 
 function ZoneAbilityFrameSpellButtonMixin:OnLeave()
@@ -233,12 +287,14 @@ function ZoneAbilityFrameSpellButtonMixin:OnDragStart()
 end
 
 function ZoneAbilityFrameSpellButtonMixin:Refresh()
-	local spellID = self:GetSpellID();
-	spellID = FindSpellOverrideByID(spellID) or spellID;
+	local spellID = self:GetOverrideSpellID();
 
 	local charges, maxCharges, chargeStart, chargeDuration = GetSpellCharges(spellID);
 	local start, duration, enable = GetSpellCooldown(spellID);
 	local usesCount = GetSpellCount(spellID);
+
+	local texture = select(3, GetSpellInfo(spellID));
+	self.Icon:SetTexture(texture);
 
 	local spellCount = nil;
 	if maxCharges and maxCharges > 1 then
@@ -259,20 +315,22 @@ function ZoneAbilityFrameSpellButtonMixin:Refresh()
 end
 
 function ZoneAbilityFrameSpellButtonMixin:CheckForTutorial()
-	CheckShowZoneAbilityTutorial(self);
+	self:GetParent():GetParent():CheckShowZoneAbilityTutorial(self);
 end
 
 function ZoneAbilityFrameSpellButtonMixin:SetSpellID(spellID)
 	self.spellID = spellID;
-
-	local texture = select(3, GetSpellInfo(spellID));
-	self.Icon:SetTexture(texture);
 
 	self:Refresh();
 end
 
 function ZoneAbilityFrameSpellButtonMixin:GetSpellID()
 	return self.spellID;
+end
+
+function ZoneAbilityFrameSpellButtonMixin:GetOverrideSpellID()
+	local spellID = self:GetSpellID();
+	return FindSpellOverrideByID(spellID) or spellID;
 end
 
 function ZoneAbilityFrameSpellButtonMixin:SetContent(zoneAbilityInfo)

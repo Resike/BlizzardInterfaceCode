@@ -1,28 +1,226 @@
+local LFG_EYE_NONE_ANIM			= "NONE";
+local LFG_EYE_INIT_ANIM			= "INITIAL";
+local LFG_EYE_SEARCHING_ANIM	= "SEARCHING_LOOP";
+local LFG_EYE_HOVER_ANIM		= "HOVER_ANIM";
+local LFG_EYE_FOUND_INIT_ANIM	= "FOUND_INIT";
+local LFG_EYE_FOUND_LOOP_ANIM	= "FOUND_LOOP";
+local LFG_EYE_POKE_INIT_ANIM	= "POKE_INIT";
+local LFG_EYE_POKE_LOOP_ANIM	= "POKE_LOOP";
+local LFG_EYE_POKE_END_ANIM		= "POKE_END";
+
+EyeTemplateMixin = {};
+
+function EyeTemplateMixin:OnLoad()
+	self.currActiveAnims = {};
+	self.activeAnim = LFG_EYE_NONE_ANIM;
+	self.isStatic = false;
+end
+
+function EyeTemplateMixin:StartInitialAnimation()
+	self:StopAnimating();
+
+	self:PlayAnim(self.EyeInitial, self.EyeInitial.EyeInitialAnim);
+
+	self.currAnim = LFG_EYE_INIT_ANIM;
+end
+
+function EyeTemplateMixin:StartSearchingAnimation()
+	self:StopAnimating();
+
+	self:PlayAnim(self.EyeSearchingLoop, self.EyeSearchingLoop.EyeSearchingLoopAnim);
+
+	self.currAnim = LFG_EYE_SEARCHING_ANIM;
+end
+
+function EyeTemplateMixin:StartHoverAnimation()
+	self:StopAnimating();
+
+	self:PlayAnim(self.EyeMouseOver, self.EyeMouseOver.EyeMouseOverAnim);
+
+	self.currAnim = LFG_EYE_HOVER_ANIM;
+end
+
+function EyeTemplateMixin:StartFoundAnimationInit()
+	self:StopAnimating();
+	
+	self:PlayAnim(self.EyeFoundInitial, self.EyeFoundInitial.EyeFoundInitialAnim);
+
+	self.currAnim = LFG_EYE_FOUND_INIT_ANIM;
+end
+
+function EyeTemplateMixin:StartFoundAnimationLoop()
+	self:StopAnimating();
+	
+	self:PlayAnim(self.EyeFoundLoop, self.EyeFoundLoop.EyeFoundLoopAnim);
+	self:PlayAnim(self.EyeFoundLoop, self.GlowBackLoop.GlowBackLoopAnim);
+
+	self.currAnim = LFG_EYE_FOUND_LOOP_ANIM;
+end
+
+function EyeTemplateMixin:StartPokeAnimationInitial()
+	self:StopAnimating();
+
+	self:PlayAnim(self.EyePokeInitial, self.EyePokeInitial.EyePokeInitialAnim);
+
+	self.currAnim = LFG_EYE_POKE_INIT_ANIM;
+end
+
+function EyeTemplateMixin:StartPokeAnimationLoop()
+	self:StopAnimating();
+
+	self:PlayAnim(self.EyePokeLoop, self.EyePokeLoop.EyePokeLoopAnim);
+
+	self.currAnim = LFG_EYE_POKE_LOOP_ANIM;
+end
+
+function EyeTemplateMixin:StartPokeAnimationEnd()
+	self:StopAnimating();
+
+	self:PlayAnim(self.EyePokeEnd, self.EyePokeEnd.EyePokeEndAnim);
+
+	self.currAnim = LFG_EYE_POKE_END_ANIM;
+end
+
+function EyeTemplateMixin:SetStaticMode(set)
+	self.isStatic = set;
+
+	for _, currAnim in ipairs(self.currActiveAnims) do
+		if (self.isStatic) then
+			currAnim[1]:Hide();
+			currAnim[2]:Pause();
+		else
+			currAnim[1]:Show();
+			currAnim[2]:Play();
+		end
+	end
+end
+
+function EyeTemplateMixin:IsStaticMode()
+	return self.isStatic;
+end
+
+function EyeTemplateMixin:PlayAnim(parentFrame, anim)
+	parentFrame:Show();
+	anim:Play();
+
+	tinsert(self.currActiveAnims, #(self.currActiveAnims) + 1, { parentFrame, anim });
+end
+
+function EyeTemplateMixin:StopAnimating()
+	if self.currAnim == LFG_EYE_NONE_ANIM then
+		return;
+	end
+	self.currAnim = LFG_EYE_NONE_ANIM;
+
+	for _, currAnim in ipairs(self.currActiveAnims) do
+		currAnim[1]:Hide();
+		currAnim[2]:Stop();
+	end
+
+	self.currActiveAnims = {};
+end
 
 ----------------------------------------------
----------QueueStatusMinimapButton-------------
+-------------QueueStatusButton----------------
 ----------------------------------------------
 
-function QueueStatusMinimapButton_OnLoad(self)
+QueueStatusButtonMixin = {};
+
+local LFG_ANGER_INC_VAL = 30;
+local LFG_ANGER_DEC_VAL = 1;
+local LFG_ANGER_INIT_VAL = 60;
+local LFG_ANGER_END_VAL = 75;
+local LFG_ANGER_CAP_VAL = 90;
+function QueueStatusButtonMixin:OnLoad()
 	self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
-	self:SetFrameLevel(self:GetFrameLevel() + 1);
 	self.glowLocks = {};
+	self.angerVal = 0;
 end
 
-function QueueStatusMinimapButton_OnEnter(self)
+function QueueStatusButtonMixin:IsInitialEyeAnimFinished()
+	return self.Eye.currAnim == LFG_EYE_INIT_ANIM and not self.Eye.EyeInitial.EyeInitialAnim:IsPlaying();
+end
+function QueueStatusButtonMixin:IsFoundInitialAnimFinished()
+	return self.Eye.currAnim == LFG_EYE_FOUND_INIT_ANIM and not self.Eye.EyeFoundInitial.EyeFoundInitialAnim:IsPlaying();
+end
+function QueueStatusButtonMixin:ShouldStartHoverAnim()
+	return self.cursorOnButton and self.Eye.currAnim == LFG_EYE_SEARCHING_ANIM;
+end
+function QueueStatusButtonMixin:ShouldStartPokeInitAnim()
+	return self.angerVal >= LFG_ANGER_INIT_VAL and (self.Eye.currAnim == LFG_EYE_HOVER_ANIM or self.Eye.currAnim == LFG_EYE_SEARCHING_ANIM);
+end
+function QueueStatusButtonMixin:IsPokeInitAnimFinished()
+	return self.Eye.currAnim == LFG_EYE_POKE_INIT_ANIM and not self.Eye.EyePokeInitial.EyePokeInitialAnim:IsPlaying();
+end
+function QueueStatusButtonMixin:ShouldStartPokeEndAnim()
+	return self.angerVal < LFG_ANGER_END_VAL and (self.Eye.currAnim == LFG_EYE_POKE_LOOP_ANIM or self:IsPokeInitAnimFinished());
+end
+function QueueStatusButtonMixin:IsPokeEndAnimFinished()
+	return self.Eye.currAnim == LFG_EYE_POKE_END_ANIM and not self.Eye.EyePokeEnd.EyePokeEndAnim:IsPlaying();
+end
+
+function QueueStatusButtonMixin:OnUpdate()
+	if ( self.Eye:IsStaticMode() ) then
+		self.Eye.texture:Show();
+		return;
+	end
+
+	self.Eye.texture:Hide();
+
+	--Animation state machine
+	if ( self:IsInitialEyeAnimFinished() or self:IsPokeEndAnimFinished()) then
+		self.Eye:StartSearchingAnimation();
+	elseif ( self:IsFoundInitialAnimFinished() ) then
+		self.Eye:StartFoundAnimationLoop();
+	elseif ( self:ShouldStartPokeInitAnim() ) then
+		self.Eye:StartPokeAnimationInitial();
+	elseif ( self:IsPokeInitAnimFinished() ) then
+		self.Eye:StartPokeAnimationLoop();
+	elseif ( self:ShouldStartPokeEndAnim() ) then
+		self.Eye:StartPokeAnimationEnd();
+	elseif ( self:ShouldStartHoverAnim() ) then
+		self.Eye:StartHoverAnimation();
+	end
+
+	self.angerVal = self.angerVal - LFG_ANGER_DEC_VAL;
+	self.angerVal = Clamp(self.angerVal, 0, LFG_ANGER_CAP_VAL);
+end
+
+function QueueStatusButtonMixin:OnEnter()
 	QueueStatusFrame:Show();
+	self.cursorOnButton = true;
+
+	if ( self.Eye:IsStaticMode() ) then
+		return;
+	end
+
+	if ( self.Eye.currAnim == LFG_EYE_SEARCHING_ANIM or self.Eye.currAnim == LFG_EYE_NONE_ANIM ) then
+		self.Eye:StartHoverAnimation();
+	end
 end
 
-function QueueStatusMinimapButton_OnLeave(self)
+function QueueStatusButtonMixin:OnLeave()
 	QueueStatusFrame:Hide();
+	self.cursorOnButton = false;
+	
+	if ( self.Eye:IsStaticMode() ) then
+		return;
+	end
+
+	if ( self.Eye.currAnim == LFG_EYE_HOVER_ANIM ) then
+		self.Eye:StartSearchingAnimation();
+	end
 end
 
-function QueueStatusMinimapButton_OnClick(self, button)
+function QueueStatusButtonMixin:OnClick(button)
 	if ( button == "RightButton" ) then
 		QueueStatusDropDown_Show(self.DropDown, self:GetName());
 	else
+		--Angry Eye
+		self.angerVal = self.angerVal + LFG_ANGER_INC_VAL;
+
 		local inBattlefield, showScoreboard = QueueStatus_InActiveBattlefield();
-		if IsInLFDBattlefield() then
+		if ( IsInLFDBattlefield() ) then
 			inBattlefield = true;
 			showScoreboard = true;
 		end
@@ -44,28 +242,50 @@ function QueueStatusMinimapButton_OnClick(self, button)
 					return;
 				end
 			end
-
-			--Just show the dropdown
-			QueueStatusDropDown_Show(self.DropDown, self:GetName());
 		end
 	end
 end
 
-function QueueStatusMinimapButton_OnShow(self)
-	self.Eye:SetFrameLevel(self:GetFrameLevel() - 1);
+function QueueStatusButtonMixin:CheckTutorials()
+	if not self:IsShown() then
+		return;
+	end
+	if not GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_HUD_REVAMP_LFG_QUEUE_CHANGES) then
+		local helpTipInfo = {
+			text = TUTORIAL_HUD_REVAMP_LFG_QUEUE_CHANGES,
+			buttonStyle = HelpTip.ButtonStyle.Close,
+			cvarBitfield = "closedInfoFrames",
+			bitfieldFlag = LE_FRAME_TUTORIAL_HUD_REVAMP_LFG_QUEUE_CHANGES,
+			targetPoint = HelpTip.Point.TopEdgeCenter,
+			offsetX = 0,
+			alignment = HelpTip.Alignment.Center,
+			acknowledgeOnHide = true,
+		};
+		HelpTip:Show(UIParent, helpTipInfo, self);
+	end
 end
 
-function QueueStatusMinimapButton_OnHide(self)
+function QueueStatusButtonMixin:OnShow()
+	self:CheckTutorials();
+	
+	self.Eye:SetFrameLevel(self:GetFrameLevel() - 1);
+
+	self.Eye:StartInitialAnimation();
+	EventRegistry:TriggerEvent("QueueStatusButton.OnShow");
+end
+
+function QueueStatusButtonMixin:OnHide()
 	QueueStatusFrame:Hide();
+	EventRegistry:TriggerEvent("QueueStatusButton.OnHide");
 end
 
 --Will play the sound numPingSounds times (or forever if nil)
-function QueueStatusMinimapButton_SetGlowLock(self, lock, enabled, numPingSounds)
+function QueueStatusButtonMixin:SetGlowLock(lock, enabled, numPingSounds)
 	self.glowLocks[lock] = enabled and (numPingSounds or -1);
-	QueueStatusMinimapButton_UpdateGlow(self);
+	self:UpdateGlow();
 end
 
-function QueueStatusMinimapButton_UpdateGlow(self)
+function QueueStatusButtonMixin:UpdateGlow()
 	local enabled = false;
 	for k, v in pairs(self.glowLocks) do
 		if ( v ) then
@@ -82,7 +302,7 @@ function QueueStatusMinimapButton_UpdateGlow(self)
 	end
 end
 
-function QueueStatusMinimapButton_OnGlowPulse(self)
+function QueueStatusButtonMixin:OnGlowPulse()
 	local playSounds = false;
 	for k, v in pairs(self.glowLocks) do
 		if ( type(v) == "number" ) then
@@ -104,7 +324,9 @@ end
 ----------------------------------------------
 ------------QueueStatusFrame------------------
 ----------------------------------------------
-function QueueStatusFrame_OnLoad(self)
+
+QueueStatusFrameMixin = {}
+function QueueStatusFrameMixin:OnLoad()
 	--For everything
 	self:RegisterEvent("PLAYER_ENTERING_WORLD");
 	self:RegisterEvent("GROUP_ROSTER_UPDATE");
@@ -139,11 +361,18 @@ function QueueStatusFrame_OnLoad(self)
 	QueueStatusFrame_CreateEntriesPool(self);
 end
 
-function QueueStatusFrame_OnEvent(self)
-	QueueStatusFrame_Update(self);
+function QueueStatusFrameMixin:OnEvent(event, ...)
+	self:Update();
+
+	if event == "LFG_PROPOSAL_SHOW" then
+		QueueStatusButton.Eye:StartFoundAnimationInit();
+	elseif event == "LFG_PROPOSAL_FAILED" then
+		QueueStatusButton.Eye:StartSearchingAnimation();
+	end
+
 end
 
-function QueueStatusFrame_GetEntry(self, entryIndex)
+function QueueStatusFrameMixin:GetEntry(entryIndex)
 	local entry = self.statusEntriesPool:Acquire();
 	entry.orderIndex = entryIndex;
 	return entry;
@@ -182,7 +411,7 @@ do
     local function QueueStatusEntryResetter(pool, frame)
 	    frame:Hide();
 	    frame:ClearAllPoints();
-    
+
 	    frame.EntrySeparator:Show();
 	    frame.active = nil;
 	    frame.orderIndex = nil;
@@ -193,8 +422,8 @@ do
 	end
 end
 
-function QueueStatusFrame_Update(self)
-	local animateEye;
+function QueueStatusFrameMixin:Update()
+	local makeEyeStatic = true;
 
 	local nextEntry = 1;
 
@@ -205,15 +434,25 @@ function QueueStatusFrame_Update(self)
 	--Try each LFG type
 	for i=1, NUM_LE_LFG_CATEGORYS do
 		local mode, submode = GetLFGMode(i);
+
 		if ( mode and submode ~= "noteleport" ) then
-			local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+			local entry = self:GetEntry(nextEntry);
 			QueueStatusEntry_SetUpLFG(entry, i);
 			entry:Show();
 			totalHeight = totalHeight + entry:GetHeight();
 			nextEntry = nextEntry + 1;
 
-			if ( mode == "queued" ) then
-				animateEye = true;
+			if ( mode == "queued" or mode == "abandonedInDungeon" or mode == "rolecheck" or mode == "proposal") then
+				makeEyeStatic = false;
+
+				--Gates the animation from playing from anything that isn't a static eye -> queued eye
+				if ( QueueStatusButton.Eye.currAnim
+				and	QueueStatusButton.Eye.currAnim ~= LFG_EYE_SEARCHING_ANIM
+				and QueueStatusButton.Eye.currAnim ~= LFG_EYE_INIT_ANIM
+				and QueueStatusButton.Eye.currAnim ~= LFG_EYE_HOVER_ANIM
+				and QueueStatusButton.Eye.currAnim ~= LFG_EYE_NONE_ANIM ) then
+					QueueStatusButton.Eye:StartSearchingAnimation();
+				end
 			end
 		end
 	end
@@ -221,12 +460,12 @@ function QueueStatusFrame_Update(self)
 	--Try LFGList entries
 	local isActive = C_LFGList.HasActiveEntryInfo();
 	if ( isActive ) then
-		local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+		local entry = self:GetEntry(nextEntry);
 		QueueStatusEntry_SetUpLFGListActiveEntry(entry);
 		entry:Show();
 		totalHeight = totalHeight + entry:GetHeight();
 		nextEntry = nextEntry + 1;
-		animateEye = true;
+		makeEyeStatic = false;
 	end
 
 	--Try LFGList applications
@@ -234,14 +473,14 @@ function QueueStatusFrame_Update(self)
 	for i=1, #apps do
 		local _, appStatus = C_LFGList.GetApplicationInfo(apps[i]);
 		if ( appStatus == "applied" or appStatus == "invited" ) then
-			local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+			local entry = self:GetEntry(nextEntry);
 			QueueStatusEntry_SetUpLFGListApplication(entry, apps[i]);
 			entry:Show();
 			totalHeight = totalHeight + entry:GetHeight();
 			nextEntry = nextEntry + 1;
 
 			if ( appStatus == "applied" ) then
-				animateEye = true;
+				makeEyeStatic = false;
 			end
 		end
 	end
@@ -250,7 +489,7 @@ function QueueStatusFrame_Update(self)
 
 	--Try PvP Role Check
 	if ( inProgress and isBattleground ) then
-		local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+		local entry = self:GetEntry(nextEntry);
 		QueueStatusEntry_SetUpPVPRoleCheck(entry);
 		entry:Show();
 		totalHeight = totalHeight + entry:GetHeight();
@@ -261,7 +500,7 @@ function QueueStatusFrame_Update(self)
 
 	-- Try PvP Ready Check
 	if ( readyCheckInProgress and readyCheckIsBattleground ) then
-		local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+		local entry = self:GetEntry(nextEntry);
 		QueueStatusEntry_SetUpPvPReadyCheck(entry);
 		entry:Show();
 		totalHeight = totalHeight + entry:GetHeight();
@@ -272,14 +511,14 @@ function QueueStatusFrame_Update(self)
 	for i=1, GetMaxBattlefieldID() do
 		local status, mapName, teamSize, registeredMatch, suspend = GetBattlefieldStatus(i);
 		if ( status and status ~= "none" ) then
-			local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+			local entry = self:GetEntry(nextEntry);
 			QueueStatusEntry_SetUpBattlefield(entry, i);
 			entry:Show();
 			totalHeight = totalHeight + entry:GetHeight();
 			nextEntry = nextEntry + 1;
 
 			if ( status == "queued" and not suspend ) then
-				animateEye = true;
+				makeEyeStatic = false;
 			end
 		end
 	end
@@ -288,21 +527,21 @@ function QueueStatusFrame_Update(self)
 	for i=1, MAX_WORLD_PVP_QUEUES do
 		local status, mapName, queueID = GetWorldPVPQueueStatus(i);
 		if ( status and status ~= "none" ) then
-			local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+			local entry = self:GetEntry(nextEntry);
 			QueueStatusEntry_SetUpWorldPvP(entry, i);
 			entry:Show();
 			totalHeight = totalHeight + entry:GetHeight();
 			nextEntry = nextEntry + 1;
 
 			if ( status == "queued" ) then
-				animateEye = true;
+				makeEyeStatic = false;
 			end
 		end
 	end
 
 	--World PvP areas we're currently in
 	if ( CanHearthAndResurrectFromArea() ) then
-		local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+		local entry = self:GetEntry(nextEntry);
 		QueueStatusEntry_SetUpActiveWorldPVP(entry);
 		entry:Show();
 		totalHeight = totalHeight + entry:GetHeight();
@@ -312,14 +551,14 @@ function QueueStatusFrame_Update(self)
 	--Pet Battle PvP Queue
 	local pbStatus = C_PetBattles.GetPVPMatchmakingInfo();
 	if ( pbStatus ) then
-		local entry = QueueStatusFrame_GetEntry(self, nextEntry);
+		local entry = self:GetEntry(nextEntry);
 		QueueStatusEntry_SetUpPetBattlePvP(entry);
 		entry:Show();
 		totalHeight = totalHeight + entry:GetHeight();
 		nextEntry = nextEntry + 1;
 
 		if ( pbStatus == "queued" ) then
-			animateEye = true;
+			makeEyeStatic = false;
 		end
 	end
 
@@ -328,17 +567,21 @@ function QueueStatusFrame_Update(self)
 	--Update the size of this frame to fit everything
 	self:SetHeight(totalHeight);
 
-	--Update the minimap icon
+	--Update the queue icon
 	if ( nextEntry > 1 ) then
-		QueueStatusMinimapButton:Show();
+		--Handle case where the button is already showing, but we need to reset the animation on it.
+		if ( QueueStatusButton:IsShown() ) then
+			if ( QueueStatusButton.Eye:IsStaticMode() and not makeEyeStatic and #QueueStatusButton.Eye.currActiveAnims == 0 ) then
+				QueueStatusButton.Eye:StartInitialAnimation();
+			end
+		else
+			QueueStatusButton:Show();
+		end
 	else
-		QueueStatusMinimapButton:Hide();
+		QueueStatusButton:Hide();
 	end
-	if ( animateEye ) then
-		EyeTemplate_StartAnimating(QueueStatusMinimapButton.Eye);
-	else
-		EyeTemplate_StopAnimating(QueueStatusMinimapButton.Eye);
-	end
+
+	QueueStatusButton.Eye:SetStaticMode(makeEyeStatic);
 end
 
 ----------------------------------------------
@@ -405,7 +648,7 @@ function QueueStatusEntry_SetUpLFG(entry, category)
 
 	QueueStatus_GetAllRelevantLFG(category, queuedList);
 
-	
+
 	local activeID = select(18, GetLFGQueueStats(category));
 	for queueID in pairs(queuedList) do
 		local mode, submode = GetLFGMode(category, queueID);
@@ -425,7 +668,7 @@ function QueueStatusEntry_SetUpLFG(entry, category)
 	if ( not activeID ) then
 		GMError(format("Thought we had an active queue, but we don't.: activeIdx - %d", activeID));
 	end
-	
+
 	local mode, submode = GetLFGMode(category, activeID);
 
 	local subTitle;
@@ -435,7 +678,7 @@ function QueueStatusEntry_SetUpLFG(entry, category)
 		--We're queued for more than one thing
 		subTitle = table.remove(allNames, activeIndex);
 		extraText = string.format(ALSO_QUEUED_FOR, table.concat(allNames, PLAYER_LIST_DELIMITER));
-	elseif ( mode == "suspended" ) then 
+	elseif ( mode == "suspended" ) then
 		local suspendedPlayers = GetLFGSuspendedPlayers(category);
 		if ( #suspendedPlayers > 0 ) then
 			extraText = "";
@@ -458,7 +701,7 @@ function QueueStatusEntry_SetUpLFG(entry, category)
 			tank, healer, dps = nil, nil, nil;
 			totalTanks, totalHealers, totalDPS, tankNeeds, healerNeeds, dpsNeeds = nil, nil, nil, nil, nil, nil;
 		end
-		
+
 		if ( category == LE_LFG_CATEGORY_WORLDPVP ) then
 			QueueStatusEntry_SetMinimalDisplay(entry, GetDisplayNameFromCategory(category), QUEUED_STATUS_IN_PROGRESS, subTitle, extraText);
 		else
@@ -478,10 +721,10 @@ function QueueStatusEntry_SetUpLFG(entry, category)
 			local brawlInfo = C_PvP.GetActiveBrawlInfo();
 			if (brawlInfo and brawlInfo.canQueue and brawlInfo.longDescription) then
 				title = brawlInfo.name;
-				if (subtitle) then
-					subtitle = QUEUED_STATUS_BRAWL_RULES_SUBTITLE:format(brawlInfo.longDescription, subtitle);
+				if (subTitle) then
+					subTitle = QUEUED_STATUS_BRAWL_RULES_SUBTITLE:format(brawlInfo.longDescription, subTitle);
 				else
-					subtitle = brawlInfo.longDescription;
+					subTitle = brawlInfo.longDescription;
 				end
 			end
 		else
@@ -501,7 +744,7 @@ end
 
 function QueueStatusEntry_SetUpLFGListApplication(entry, resultID)
 	local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID);
-	local activityName = C_LFGList.GetActivityInfo(searchResultInfo.activityID);
+	local activityName = C_LFGList.GetActivityFullName(searchResultInfo.activityID, nil, searchResultInfo.isWarMode);
 	QueueStatusEntry_SetMinimalDisplay(entry, searchResultInfo.name, QUEUED_STATUS_SIGNED_UP, activityName);
 end
 
@@ -625,7 +868,7 @@ end
 
 function QueueStatusEntry_SetFullDisplay(entry, title, queuedTime, myWait, isTank, isHealer, isDPS, totalTanks, totalHealers, totalDPS, tankNeeds, healerNeeds, dpsNeeds, subTitle, extraText)
 	local height = 14;
-	
+
 	entry.Title:SetText(title);
 	height = height + entry.Title:GetHeight();
 
@@ -740,7 +983,10 @@ end
 ----------------------------------------------
 function QueueStatusDropDown_Show(self, relativeTo)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN);
-	ToggleDropDownMenu(1, nil, self, relativeTo, 0, 0);
+	self.point = "BOTTOMRIGHT";
+	self.relativePoint = "LEFT";
+
+	ToggleDropDownMenu(1, nil, self, relativeTo, 0, 28);
 end
 
 local wrappedFuncs = {};
@@ -854,7 +1100,7 @@ end
 function QueueStatusDropDown_AddPVPRoleCheckButtons()
 	local info = UIDropDownMenu_CreateInfo();
 	local inProgress, _, _, _, _, isBattleground = GetLFGRoleUpdate();
-	
+
 	if ( inProgress and isBattleground ) then
 		local name = GetLFGRoleUpdateBattlegroundInfo();
 		info.text = name;
@@ -886,7 +1132,7 @@ function QueueStatusDropDown_AddBattlefieldButtons(idx)
 	local status, mapName, teamSize, registeredMatch,_,_,_,_, asGroup = GetBattlefieldStatus(idx);
 
 	local name = mapName;
-	if ( status == "active" ) then
+	if ( name and status == "active" ) then
 		name = "|cff19ff19"..name.."|r";
 	end
 	info.text = name;
@@ -933,7 +1179,7 @@ function QueueStatusDropDown_AddBattlefieldButtons(idx)
 			info.arg2 = nil;
 			UIDropDownMenu_AddButton(info);
 		end
-		
+
 		if ( not inArena ) then
 			info.text = TOGGLE_BATTLEFIELD_MAP;
 			info.func = wrapFunc(ToggleBattlefieldMap);
@@ -947,16 +1193,23 @@ function QueueStatusDropDown_AddBattlefieldButtons(idx)
 			info.func = wrapFunc(ConfirmSurrenderArena);
 			info.arg1 = nil;
 			info.arg2 = nil;
-			if (not CanSurrenderArena()) then
+			if (not CanSurrenderArena() or C_PvP.IsSoloShuffle() ) then
 				info.disabled = true;
 			end
 			UIDropDownMenu_AddButton(info, UIDROPDOWNMENU_MENU_LEVEL);
 			info.disabled = false;
 			info.text = LEAVE_ARENA;
 		else
-			info.text = LEAVE_BATTLEGROUND;
+			if ( C_PvP.IsSoloShuffle() ) then
+				info.disabled = true;
+			end
+			if ( C_PvP.IsInBrawl() ) then
+				info.text = LEAVE_LFD_BATTLEFIELD;
+			else
+				info.text = LEAVE_BATTLEGROUND;
+			end
 		end
-		
+
 		info.func = wrapFunc(ConfirmOrLeaveBattlefield);
 		info.arg1 = nil;
 		info.arg2 = nil;
@@ -1173,8 +1426,7 @@ function QueueStatus_InActiveBattlefield()
 		local status, mapName, teamSize, registeredMatch = GetBattlefieldStatus(i);
 		if ( status == "active" ) then
 			local canShowScoreboard = false;
-			local inArena = IsActiveBattlefieldArena();
-			if not inArena or GetBattlefieldWinner() or C_PvP.IsInBrawl() then
+			if not IsActiveBattlefieldArena() or GetBattlefieldWinner() or C_PvP.IsInBrawl() or C_PvP.IsSoloShuffle() then
 				canShowScoreboard = true;
 			end
 			return true, canShowScoreboard;
@@ -1197,7 +1449,7 @@ function TogglePVPScoreboardOrResults()
 				HideUIPanel(PVPMatchScoreboard);
 			else
 				local isActive = matchState == Enum.PvPMatchState.Active;
-				if isActive and not C_PvP.IsMatchConsideredArena() then
+				if isActive and (not C_PvP.IsMatchConsideredArena() or C_PvP.IsSoloShuffle()) then
 					PVPMatchScoreboard:BeginShow();
 				end
 			end

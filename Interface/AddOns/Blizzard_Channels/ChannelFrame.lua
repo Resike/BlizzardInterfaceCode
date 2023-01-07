@@ -23,6 +23,7 @@ do
 		self.DirtyFlags:AddNamedMask("UpdateAll", Flags_CreateMaskFromTable(dirtyFlags));
 		self.DirtyFlags:AddNamedMask("CheckShowTutorial", 4);
 
+		self:SetTitle(CHAT_CHANNELS);
 		self:MarkDirty("UpdateAll");
 
 		self:RegisterEvent("MUTELIST_UPDATE");
@@ -247,19 +248,19 @@ function ChannelFrameMixin:ShouldShowTutorial()
 end
 
 function ChannelFrameMixin:TryCreateVoiceChannel(channelName)
-	self:TryExecuteCommand(function()
+	return self:TryExecuteCommand(function()
 		self:CreateVoiceChannel(channelName);
 	end);
 end
 
 function ChannelFrameMixin:TryJoinVoiceChannelByType(channelType, autoActivate)
-	self:TryExecuteCommand(function()
+	return self:TryExecuteCommand(function()
 		C_VoiceChat.RequestJoinChannelByChannelType(channelType, autoActivate);
 	end);
 end
 
 function ChannelFrameMixin:TryJoinCommunityStreamChannel(clubId, streamId)
-	self:TryExecuteCommand(function()
+	return self:TryExecuteCommand(function()
 		C_VoiceChat.RequestJoinAndActivateCommunityStreamChannel(clubId, streamId);
 	end);
 end
@@ -301,9 +302,11 @@ end
 function ChannelFrameMixin:TryExecuteCommand(cmd)
 	if C_VoiceChat.IsLoggedIn() then
 		cmd();
-	else
-		self:QueueVoiceChannelCommand(cmd);
+		return true;
 	end
+
+	self:QueueVoiceChannelCommand(cmd);
+	return false;
 end
 
 function ChannelFrameMixin:Toggle()
@@ -398,7 +401,7 @@ function ChannelFrameMixin:ToggleCreateChannel()
 end
 
 function ChannelFrameMixin:ToggleVoiceSettings()
-	ShowOptionsPanel(VideoOptionsFrame, self, VOICE_CHAT);
+	Settings.OpenToCategory(Settings.AUDIO_CATEGORY_ID);
 end
 
 -- Channel remains, but appears disabled
@@ -408,7 +411,8 @@ function ChannelFrameMixin:OnVoiceChannelRemoved(channelID)
 		if button:ChannelIsCommunity() then
 			-- This is a community stream, so just remove the attached voice channel...we will try to re-join when they activate next
 			button:ClearVoiceChannel();
-		else
+		elseif not button:ChannelSupportsText() then
+			-- For other chat channels channels, they only need to update if they're voice-only.
 			button:SetActive(false);
 			button:SetRemoved(true);
 			button:Update();
@@ -434,7 +438,7 @@ function ChannelFrameMixin:OnVoiceChatError(platformCode, statusCode)
 
 	local errorCode = Voice_GetGameErrorFromStatusCode(statusCode);
 	if errorCode then
-		UIErrorsFrame:TryDisplayMessage(errorCode, errorString, RED_FONT_COLOR:GetRGB());
+		UIErrorsFrame:TryDisplayMessage(errorCode, tostring(errorString), RED_FONT_COLOR:GetRGB());
 	end
 end
 
@@ -481,13 +485,7 @@ local function CountActiveChannelMembers(channel)
 		end
 	end
 
-	-- TODO FIX: bug work-around, member active status not updated for local player when channel is initially activated.
-	-- If the channel is marked active, then the local player must be active in it:
-	if channel.isActive then
-		return count + 1;
-	else
-		return count;
-	end
+	return count;
 end
 
 function ChannelFrameMixin:ShowChannelAnnounce(channelID)
@@ -620,10 +618,6 @@ function ChannelFrameMixin:OnChatChannelTransmitChanged(channelID, isTransmittin
 	else
 		PlaySound(SOUNDKIT.UI_VOICECHAT_STOPTALK);
 	end
-end
-
-function ChannelFrameMixin:UpdateScrolling()
-	self:GetRoster():UpdateRosterWidth();
 end
 
 function ChannelFrameMixin:OnUserSelectedChannel()

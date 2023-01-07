@@ -43,14 +43,14 @@ COMBATLOG_DEFAULT_COLORS = {
 	};
 	-- School coloring
 	schoolColoring = {
-		[SCHOOL_MASK_NONE]	= {a=1.0,r=1.00,g=1.00,b=1.00};
-		[SCHOOL_MASK_PHYSICAL]	= {a=1.0,r=1.00,g=1.00,b=0.00};
-		[SCHOOL_MASK_HOLY] 	= {a=1.0,r=1.00,g=0.90,b=0.50};
-		[SCHOOL_MASK_FIRE] 	= {a=1.0,r=1.00,g=0.50,b=0.00};
-		[SCHOOL_MASK_NATURE] 	= {a=1.0,r=0.30,g=1.00,b=0.30};
-		[SCHOOL_MASK_FROST] 	= {a=1.0,r=0.50,g=1.00,b=1.00};
-		[SCHOOL_MASK_SHADOW] 	= {a=1.0,r=0.50,g=0.50,b=1.00};
-		[SCHOOL_MASK_ARCANE] 	= {a=1.0,r=1.00,g=0.50,b=1.00};
+		[Enum.Damageclass.MaskNone]	= {a=1.0,r=1.00,g=1.00,b=1.00};
+		[Enum.Damageclass.MaskPhysical]	= {a=1.0,r=1.00,g=1.00,b=0.00};
+		[Enum.Damageclass.MaskHoly] 	= {a=1.0,r=1.00,g=0.90,b=0.50};
+		[Enum.Damageclass.MaskFire] 	= {a=1.0,r=1.00,g=0.50,b=0.00};
+		[Enum.Damageclass.MaskNature] 	= {a=1.0,r=0.30,g=1.00,b=0.30};
+		[Enum.Damageclass.MaskFrost] 	= {a=1.0,r=0.50,g=1.00,b=1.00};
+		[Enum.Damageclass.MaskShadow] 	= {a=1.0,r=0.50,g=0.50,b=1.00};
+		[Enum.Damageclass.MaskArcane] 	= {a=1.0,r=1.00,g=0.50,b=1.00};
 	};
 	-- Defaults
 	defaults = {
@@ -172,6 +172,9 @@ COMBATLOG_EVENT_LIST = {
 	["SPELL_BUILDING_DAMAGE"] = true,
 	["SPELL_BUILDING_HEAL"] = true,
 	["UNIT_DISSIPATES"] = true,
+	["SPELL_EMPOWER_START"] = true,
+	["SPELL_EMPOWER_END"] = true,
+	["SPELL_EMPOWER_INTERRUPT"] = true,
 };
 
 COMBATLOG_FLAG_LIST = {
@@ -187,7 +190,9 @@ COMBATLOG_FLAG_LIST = {
 EVENT_TEMPLATE_FORMATS = {
 	["SPELL_AURA_BROKEN_SPELL"] = TEXT_MODE_A_STRING_3,
 	["SPELL_CAST_START"] = TEXT_MODE_A_STRING_2,
-	["SPELL_CAST_SUCCESS"] = TEXT_MODE_A_STRING_2
+	["SPELL_CAST_SUCCESS"] = TEXT_MODE_A_STRING_2,
+	["SPELL_EMPOWER_START"] = TEXT_MODE_A_STRING_2,
+	["SPELL_EMPOWER_END"] = TEXT_MODE_A_STRING_2
 };
 
 --
@@ -323,14 +328,6 @@ local COMBATLOG_FILTER_EVERYTHING = COMBATLOG_FILTER_EVERYTHING;
 local COMBATLOG = COMBATLOG;
 local AURA_TYPE_BUFF = AURA_TYPE_BUFF;
 local AURA_TYPE_DEBUFF = AURA_TYPE_DEBUFF;
-local SCHOOL_MASK_NONE = SCHOOL_MASK_NONE;
-local SCHOOL_MASK_PHYSICAL = SCHOOL_MASK_PHYSICAL;
-local SCHOOL_MASK_HOLY = SCHOOL_MASK_HOLY;
-local SCHOOL_MASK_FIRE = SCHOOL_MASK_FIRE;
-local SCHOOL_MASK_NATURE = SCHOOL_MASK_NATURE;
-local SCHOOL_MASK_FROST = SCHOOL_MASK_FROST;
-local SCHOOL_MASK_SHADOW = SCHOOL_MASK_SHADOW;
-local SCHOOL_MASK_ARCANE = SCHOOL_MASK_ARCANE;
 local COMBATLOG_LIMIT_PER_FRAME = COMBATLOG_LIMIT_PER_FRAME;
 local COMBATLOG_HIGHLIGHT_MULTIPLIER = COMBATLOG_HIGHLIGHT_MULTIPLIER;
 local COMBATLOG_DEFAULT_COLORS = COMBATLOG_DEFAULT_COLORS;
@@ -433,7 +430,10 @@ Blizzard_CombatLog_Filter_Defaults = {
 					      ["PARTY_KILL"] = true,
 					      ["UNIT_DIED"] = false,
 					      ["UNIT_DESTROYED"] = true,
-					      ["UNIT_DISSIPATES"] = true
+					      ["UNIT_DISSIPATES"] = true,
+					      ["SPELL_EMPOWER_START"] = false,
+					      ["SPELL_EMPOWER_END"] = false,
+					      ["SPELL_EMPOWER_INTERRUPT"] = false,
 					};
 					sourceFlags = {
 						[COMBATLOG_FILTER_MINE] = true
@@ -666,11 +666,14 @@ function Blizzard_CombatLog_RefilterUpdate()
 	-- Clear the combat log
 	local total = 0;
 	while (valid and total < COMBATLOG_LIMIT_PER_FRAME) do
-		-- Log to the window
-		local text, r, g, b, a = CombatLog_OnEvent(Blizzard_CombatLog_CurrentSettings, CombatLogGetCurrentEntry());
-		-- NOTE: be sure to pass in nil for the color id or the color id may override the r, g, b values for this message
-		if ( text ) then
-			COMBATLOG:BackFillMessage(text, r, g, b);
+		local show = CombatLogShowCurrentEntry();
+		if (show) then
+			-- Log to the window
+			local text, r, g, b, a = CombatLog_OnEvent(Blizzard_CombatLog_CurrentSettings, CombatLogGetCurrentEntry());
+			-- NOTE: be sure to pass in nil for the color id or the color id may override the r, g, b values for this message
+			if ( text ) then
+				COMBATLOG:BackFillMessage(text, r, g, b);
+			end
 		end
 
 		-- count can be
@@ -1812,6 +1815,7 @@ local powerTypeToStringLookup =
 	[Enum.PowerType.ArcaneCharges] = ARCANE_CHARGES_POWER,
 	[Enum.PowerType.Fury] = FURY,
 	[Enum.PowerType.Pain] = PAIN,
+	[Enum.PowerType.Essence] = POWER_TYPE_ESSENCE,
 };
 
 local alternatePowerEnumValue = Enum.PowerType.Alternate; -- Upvalue for marginally faster access.
@@ -1833,7 +1837,7 @@ end
 _G.CombatLog_String_PowerType = CombatLog_String_PowerType
 
 local function CombatLog_String_SchoolString(school)
-	if ( not school or school == SCHOOL_MASK_NONE ) then
+	if ( not school or school == Enum.Damageclass.MaskNone ) then
 		return STRING_SCHOOL_UNKNOWN;
 	end
 
@@ -2574,7 +2578,17 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 			resultEnabled = false;
 			valueEnabled = true;
 			valueTypeEnabled = false;
-
+		elseif ( event == "SPELL_EMPOWER_START" ) then
+			-- Disable appropriate sections
+			resultEnabled = false;
+			valueEnabled = false;
+			valueTypeEnabled = false;
+		elseif ( event == "SPELL_EMPOWER_END" or event == "SPELL_EMPOWER_INTERRUPT" ) then
+			amount = select(4, ...);
+			-- Disable appropriate sections
+			resultEnabled = false;
+			valueEnabled = true;
+			valueTypeEnabled = false;
 		end
 	elseif ( subVal == "RANGE" ) then
 		--spellName = ACTION_RANGED;
@@ -2934,7 +2948,7 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 		-- Color amount numbers
 		if ( settings.amountColoring ) then
 			-- To make white swings white
-			if ( settings.noMeleeSwingColoring and school == SCHOOL_MASK_PHYSICAL and not spellId )  then
+			if ( settings.noMeleeSwingColoring and school == Enum.Damageclass.MaskPhysical and not spellId )  then
 				-- Do nothing
 			elseif ( settings.amountActorColoring ) then
 				if ( sourceName ) then
@@ -2970,7 +2984,7 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 		local schoolNameColor = nil;
 		-- Color school names
 		if ( settings.schoolNameColoring ) then
-			if ( settings.noMeleeSwingColoring and school == SCHOOL_MASK_PHYSICAL and not spellId )  then
+			if ( settings.noMeleeSwingColoring and school == Enum.Damageclass.MaskPhysical and not spellId )  then
 			elseif ( settings.schoolNameActorColoring ) then
 					if ( sourceName ) then
 						schoolNameColor = CombatLog_Color_ColorArrayByUnitType( sourceFlags, filterSettings );
@@ -3109,7 +3123,7 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 				abilityColor = CombatLog_Color_ColorArrayBySchool( extraSpellSchool, filterSettings );
 			else
 				if ( extraSpellSchool ) then
-					abilityColor = CombatLog_Color_ColorArrayBySchool( SCHOOL_MASK_HOLY, filterSettings );
+					abilityColor = CombatLog_Color_ColorArrayBySchool( Enum.Damageclass.MaskHoly, filterSettings );
 				else
 					abilityColor = CombatLog_Color_ColorArrayBySchool( nil, filterSettings );
 				end
@@ -3290,19 +3304,18 @@ function CombatLog_AddEvent(...)
 end
 
 --
--- Overrides for the combat log
+-- Event handler for the combat log
 --
--- Save the original event handler
-local original_OnEvent = COMBATLOG:GetScript("OnEvent");
-
-COMBATLOG:SetScript("OnEvent", function(self, event, ...)
+COMBATLOG.customEventHandler = 
+	function(self, event, ...)
 		if ( event == "COMBAT_LOG_EVENT" ) then
 			CombatLog_AddEvent(CombatLogGetCurrentEventInfo());
+			return true;
 		else
-			original_OnEvent(self, event, ...);
+			return false;
 		end
 	end
-);
+;
 
 --
 -- XML Function Overrides Part 2
@@ -3365,14 +3378,14 @@ function Blizzard_CombatLog_QuickButtonFrame_OnLoad(self)
 	CombatLogQuickButtonFrameTexture = _G.CombatLogQuickButtonFrame_CustomTexture
 
 	-- Parent it to the tab so that we just inherit the tab's alpha. No need to do special fading for it.
-	CombatLogQuickButtonFrame:SetParent(COMBATLOG:GetName() .. "Tab");
+	CombatLogQuickButtonFrame:SetParent(_G[COMBATLOG:GetName() .. "Tab"]);
 	CombatLogQuickButtonFrame:ClearAllPoints();
-	CombatLogQuickButtonFrame:SetPoint("BOTTOMLEFT", COMBATLOG, "TOPLEFT");
+	CombatLogQuickButtonFrame:SetPoint("BOTTOMLEFT", COMBATLOG, "TOPLEFT", 0, 3);
 
 	if COMBATLOG.ScrollBar then
-		CombatLogQuickButtonFrame:SetPoint("BOTTOMRIGHT", COMBATLOG, "TOPRIGHT", COMBATLOG.ScrollBar:GetWidth(), 0);
+		CombatLogQuickButtonFrame:SetPoint("BOTTOMRIGHT", COMBATLOG, "TOPRIGHT", COMBATLOG.ScrollBar:GetWidth(), 3);
 	else
-		CombatLogQuickButtonFrame:SetPoint("BOTTOMRIGHT", COMBATLOG, "TOPRIGHT");
+		CombatLogQuickButtonFrame:SetPoint("BOTTOMRIGHT", COMBATLOG, "TOPRIGHT", 0, 3);
 	end
 
 	CombatLogQuickButtonFrameProgressBar:Hide();
@@ -3398,6 +3411,7 @@ function Blizzard_CombatLog_QuickButtonFrame_OnLoad(self)
 	end
 
 	FCF_SetButtonSide(COMBATLOG, COMBATLOG.buttonSide, true);
+	FCF_DockUpdate();
 end
 
 local oldFCF_DockUpdate = FCF_DockUpdate;
@@ -3462,7 +3476,7 @@ function SetItemRef(link, text, button, chatFrame)
 
 	if ( strsub(link, 1, 4) == "unit") then
 		local _, guid, name = strsplit(":", link);
-
+        
 		if ( IsModifiedClick("CHATLINK") ) then
 			ChatEdit_InsertLink (name);
 			return;

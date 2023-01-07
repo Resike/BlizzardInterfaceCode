@@ -118,7 +118,8 @@ function TorghastLevelPickerFrameMixin:ClearLevelSelection()
 		self.currentSelectedButton:ClearSelection(); 
 		self.currentSelectedButton = nil;
 		self.currentSelectedButtonIndex = nil;
-	end 
+	end
+	self.highestAvailableLayerIndex = nil;
 	self:UpdatePortalButtonState(); 
 end 
 
@@ -236,7 +237,6 @@ function TorghastLevelPickerOptionButtonMixin:SetState(status)
 	local parent = self:GetParent():GetParent(); 
 	local isHighestAvailableLayer = self.index == parent.highestAvailableLayerIndex;
 	local isChecked = (self == parent.currentSelectedButton) and (self.index == parent.currentSelectedButtonIndex);
-
 	self.RewardBanner.Banner:SetShown(not lockedState);
 	self.RewardBanner.BannerSelected:SetShown(not lockedState and isChecked);
 	self.RewardBanner.Reward.PulseAnim:Stop();
@@ -467,7 +467,8 @@ function TorghastLevelPickerRewardCircleMixin:RefreshTooltip()
 
 	if(self.completeState) then 
 		EmbeddedItemTooltip:SetOwner(self, "ANCHOR_RIGHT");
-		GameTooltip_AddNormalLine(EmbeddedItemTooltip, JAILERS_TOWER_REWARD_RECIEVED, true)
+		local completeString = C_GossipInfo.GetCompletedOptionDescriptionString() or ""; 
+		GameTooltip_AddNormalLine(EmbeddedItemTooltip, completeString, true)
 		EmbeddedItemTooltip:Show(); 
 		return; 
 	end 
@@ -536,6 +537,6 @@ function TorghastLevelPickerOpenPortalButtonMixin:OnClick()
 	if(not selectedPortal) then 
 		return; 
 	end
-	C_GossipInfo.SelectOption(selectedPortal.index); 
+	C_GossipInfo.SelectOption(selectedPortal.optionInfo.gossipOptionID); 
 	PlaySound(SOUNDKIT.UI_TORGHAST_WAYFINDER_OPEN_PORTAL); 
 end 

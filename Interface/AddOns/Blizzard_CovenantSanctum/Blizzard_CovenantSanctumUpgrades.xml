@@ -1,5 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
-..\FrameXML\UI.xsd">
+..\..\FrameXML\UI.xsd">
 	<Script file="Blizzard_CovenantSanctumUpgrades.lua"/>
 
 	<Frame name="CovenantSanctumUpgradeTreeTemplate" mixin="CovenantSanctumUpgradeTreeMixin" virtual="true">
@@ -377,7 +377,10 @@
 				<Texture parentKey="Border"/>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString parentKey="Name" inherits="SystemFont_Shadow_Med2" mixin="ShrinkUntilTruncateFontStringMixin" maxLines="2" justifyH="LEFT">
+				<FontString parentKey="Name" inherits="SystemFont_Shadow_Med2" mixin="AutoScalingFontStringMixin" maxLines="2" justifyH="LEFT">
+					<KeyValues>
+						<KeyValue key="minLineHeight" value="12" type="number"/>
+					</KeyValues>
 					<Size x="190" y="0"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="58" y="-6"/>
@@ -436,7 +439,6 @@
 			</Cooldown>
 		</Frames>
 		<Scripts>
-			<OnLoad method="OnLoad"/>
 			<OnEnter method="OnEnter"/>
 			<OnLeave function="GameTooltip_Hide"/>
 		</Scripts>
@@ -602,7 +604,7 @@
 			</Button>
 			<Frame parentKey="CurrencyDisplayGroup" inherits="CurrencyDisplayGroupTemplate">
 				<Anchors>
-					<Anchor point="BOTTOMRIGHT" x="-338" y="56"/>
+					<Anchor point="BOTTOMRIGHT" x="-338" y="58"/>
 				</Anchors>
 			</Frame>
 		</Frames>

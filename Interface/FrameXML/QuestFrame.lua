@@ -6,11 +6,6 @@ QUESTINFO_FADE_IN = 0.5;
 
 local QUEST_FRAME_MODEL_SCENE_ID = 309;
 
--- A temporary solution for solving troublesome models.
-local QUEST_FRAME_CREATURE_DISPLAY_ID_TO_CUSTOM_MODEL_SCENES = {
-	[92797] = 366,
-};
-
 function QuestFrame_OnLoad(self)
 	self:RegisterEvent("QUEST_GREETING");
 	self:RegisterEvent("QUEST_DETAIL");
@@ -114,7 +109,7 @@ function QuestFrame_OnEvent(self, event, ...)
 end
 
 function QuestFrame_SetPortrait()
-	QuestFrameNpcNameText:SetText(UnitName("questnpc"));
+	QuestFrame:SetTitle(UnitName("questnpc"));
 	if ( UnitExists("questnpc") ) then
 		SetPortraitTexture(QuestFramePortrait, "questnpc");
 	else
@@ -133,7 +128,9 @@ function QuestFrameRewardPanel_OnShow()
 	QuestRewardScrollFrameScrollBar:SetValue(0);
 	local questPortrait, questPortraitText, questPortraitName = GetQuestPortraitTurnIn();
 	if (questPortrait ~= 0) then
-		QuestFrame_ShowQuestPortrait(QuestFrame, questPortrait, 0, questPortraitText, questPortraitName, -3, -42);
+		local questPortraitMount = 0;
+		local questPortraitModelSceneID = nil;
+		QuestFrame_ShowQuestPortrait(QuestFrame, questPortrait, questPortraitMount, questPortraitModelSceneID, questPortraitText, questPortraitName, -3, -42);
 	else
 		QuestFrame_HideQuestPortrait();
 	end
@@ -191,7 +188,6 @@ local function QuestFrameProgressPanel_SetupBG(self)
 		end
 	end
 
-	self.Bg:SetAtlas("QuestBG-Parchment", true);
 	QuestFrame_SetMaterial(QuestFrameProgressPanel, material);
 	return material;
 end
@@ -245,22 +241,25 @@ function QuestFrameProgressItems_Update()
 			_G[questItemName..1]:SetPoint("TOPLEFT", "QuestProgressRequiredItemsText", "BOTTOMLEFT", -3, -5);
 		end
 
-		-- Keep track of how many actual required items there are, in case we hide all of them.
+		-- Check if this quest should hide required items on turn in.
 		local actualNumRequiredItems = 0;
-		for i=1, numRequiredItems do
-			local hidden = IsQuestItemHidden(i);
-			if (hidden == 0) then
-				local requiredItem = _G[questItemName..buttonIndex];
-				requiredItem.type = "required";
-				requiredItem.objectType = "item";
-				requiredItem:SetID(i);
-				local name, texture, numItems = GetQuestItemInfo(requiredItem.type, i);
-				SetItemButtonCount(requiredItem, numItems);
-				SetItemButtonTexture(requiredItem, texture);
-				requiredItem:Show();
-				_G[questItemName..buttonIndex.."Name"]:SetText(name);
-				buttonIndex = buttonIndex+1;
-				actualNumRequiredItems = actualNumRequiredItems+1;
+		if ( not IsQuestCompletable() or not C_QuestOffer.GetHideRequiredItemsOnTurnIn() ) then
+			-- Keep track of how many actual required items there are, in case we hide any of them.
+			for i=1, numRequiredItems do
+				local hidden = IsQuestItemHidden(i);
+				if (hidden == 0) then
+					local requiredItem = _G[questItemName..buttonIndex];
+					requiredItem.type = "required";
+					requiredItem.objectType = "item";
+					requiredItem:SetID(i);
+					local name, texture, numItems = GetQuestItemInfo(requiredItem.type, i);
+					SetItemButtonCount(requiredItem, numItems);
+					SetItemButtonTexture(requiredItem, texture);
+					requiredItem:Show();
+					_G[questItemName..buttonIndex.."Name"]:SetText(name);
+					buttonIndex = buttonIndex+1;
+					actualNumRequiredItems = actualNumRequiredItems+1;
+				end
 			end
 		end
 
@@ -392,7 +391,7 @@ function QuestFrame_OnShow()
 	if (TutorialFrame.id == 1 or TutorialFrame.id == 55 or TutorialFrame.id == 57) then
 		TutorialFrame_Hide();
 	end
-	NPCFriendshipStatusBar_Update(QuestFrame);
+	QuestFrame.FriendshipStatusBar:Update();
 end
 
 function QuestFrame_OnHide()
@@ -453,13 +452,13 @@ function QuestFrame_UpdatePortraitText(text)
 	end
 end
 
-function QuestFrame_ShowQuestPortrait(parentFrame, portraitDisplayID, mountPortraitDisplayID, text, name, x, y)
+function QuestFrame_ShowQuestPortrait(parentFrame, portraitDisplayID, mountPortraitDisplayID, modelSceneID, text, name, x, y)
 	QuestModelScene:SetParent(parentFrame);
 	QuestModelScene:SetFrameLevel(600);
 	QuestModelScene:ClearAllPoints();
 	QuestModelScene:SetPoint("TOPLEFT", parentFrame, "TOPRIGHT", x, y);
 	QuestModelScene:ClearScene();
-	QuestModelScene:TransitionToModelSceneID(QUEST_FRAME_CREATURE_DISPLAY_ID_TO_CUSTOM_MODEL_SCENES[portraitDisplayID] or QUEST_FRAME_MODEL_SCENE_ID, CAMERA_TRANSITION_TYPE_IMMEDIATE, CAMERA_MODIFICATION_TYPE_DISCARD, true);
+	QuestModelScene:TransitionToModelSceneID(modelSceneID or QUEST_FRAME_MODEL_SCENE_ID, CAMERA_TRANSITION_TYPE_IMMEDIATE, CAMERA_MODIFICATION_TYPE_DISCARD, true);
 	QuestModelScene:Show();
 	QuestFrame_UpdatePortraitText(text);
 
@@ -526,9 +525,9 @@ function QuestFrameDetailPanel_OnShow()
 	QuestFrame_SetMaterial(QuestFrameDetailPanel, material);
 	QuestInfo_Display(QUEST_TEMPLATE_DETAIL, QuestDetailScrollChildFrame, QuestFrameAcceptButton, material);
 	QuestDetailScrollFrameScrollBar:SetValue(0);
-	local questPortrait, questPortraitText, questPortraitName, questPortraitMount = GetQuestPortraitGiver();
+	local questPortrait, questPortraitText, questPortraitName, questPortraitMount, questPortraitModelSceneID = GetQuestPortraitGiver();
 	if (questPortrait ~= 0) then
-		QuestFrame_ShowQuestPortrait(QuestFrame, questPortrait, questPortraitMount, questPortraitText, questPortraitName, -3, -42);
+		QuestFrame_ShowQuestPortrait(QuestFrame, questPortrait, questPortraitMount, questPortraitModelSceneID, questPortraitText, questPortraitName, -3, -42);
 	else
 		QuestFrame_HideQuestPortrait();
 	end
@@ -553,22 +552,24 @@ end
 
 function QuestFrame_SetMaterial(frame, material)
 	local hasMaterial = material ~= "Parchment";
-	_G[frame:GetName().."MaterialTopLeft"]:SetShown(hasMaterial);
-	_G[frame:GetName().."MaterialTopRight"]:SetShown(hasMaterial);
-	_G[frame:GetName().."MaterialBotLeft"]:SetShown(hasMaterial);
-	_G[frame:GetName().."MaterialBotRight"]:SetShown(hasMaterial);
+	frame.MaterialTopLeft:SetShown(hasMaterial);
+	frame.MaterialTopRight:SetShown(hasMaterial);
+	frame.MaterialBotLeft:SetShown(hasMaterial);
+	frame.MaterialBotRight:SetShown(hasMaterial);
 
 	if hasMaterial then
-		_G[frame:GetName().."MaterialTopLeft"]:SetTexture("Interface\\ItemTextFrame\\ItemText-"..material.."-TopLeft");
-		_G[frame:GetName().."MaterialTopRight"]:SetTexture("Interface\\ItemTextFrame\\ItemText-"..material.."-TopRight");
-		_G[frame:GetName().."MaterialBotLeft"]:SetTexture("Interface\\ItemTextFrame\\ItemText-"..material.."-BotLeft");
-		_G[frame:GetName().."MaterialBotRight"]:SetTexture("Interface\\ItemTextFrame\\ItemText-"..material.."-BotRight");
+		frame.MaterialTopLeft:SetTexture("Interface\\ItemTextFrame\\ItemText-"..material.."-TopLeft");
+		frame.MaterialTopRight:SetTexture("Interface\\ItemTextFrame\\ItemText-"..material.."-TopRight");
+		frame.MaterialBotLeft:SetTexture("Interface\\ItemTextFrame\\ItemText-"..material.."-BotLeft");
+		frame.MaterialBotRight:SetTexture("Interface\\ItemTextFrame\\ItemText-"..material.."-BotRight");
 	end
+	frame.Bg:SetAtlas(QuestUtil.GetDefaultQuestBackgroundTexture());
 end
 
 function QuestFrame_GetMaterial()
+	local questTextContrastEnabled = QuestUtil.QuestTextContrastEnabled();
 	local material = GetQuestBackgroundMaterial();
-	if not material then
+	if questTextContrastEnabled or not material then
 		return "Parchment", true;
 	end
 

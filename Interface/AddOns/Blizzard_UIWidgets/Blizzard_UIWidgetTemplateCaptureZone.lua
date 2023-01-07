@@ -20,7 +20,13 @@ function UIWidgetTemplateCaptureZoneMixin:Setup(widgetInfo, widgetContainer)
 	local zoneInfo = widgetInfo.zoneInfo;
 	local lastVals = (self.lastVals.state == zoneInfo.state) and self.lastVals or nil;
 	self.Zone:Setup(widgetContainer, 1, widgetInfo.mode, widgetInfo.leadingEdgeType, widgetInfo.dangerFlashType, zoneInfo, lastVals, widgetInfo.textureKit);
+	self.Zone:SetTooltipLocation(widgetInfo.tooltipLoc);
 	self.lastVals = zoneInfo;
 
-	self:Layout();
+	if not self.Zone:IsShown() then
+		self:Hide();
+		return;
+	else
+		self:Layout();
+	end
 end

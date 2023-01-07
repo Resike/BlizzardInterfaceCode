@@ -1,5 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
-..\FrameXML\UI.xsd">
+..\FrameXML\UI_shared.xsd">
 
   <!-- this code is shared between the Frame and Glue -->
   <Frame name="IMECandidate" hidden="false" virtual="true">
@@ -22,7 +22,7 @@
     </Layers>
   </Frame>
 
-  <Frame name="IMECandidatesFrame" frameStrata="TOOLTIP" hidden="true" parent="UIParent" virtual="false" inherits="TooltipBorderBackdropTemplate">
+  <Frame name="IMECandidatesFrame" frameStrata="TOOLTIP" hidden="true" parent="UIParent" inherits="TooltipBorderBackdropTemplate">
     <Anchors>
       <Anchor point="TOPLEFT"/>
     </Anchors>

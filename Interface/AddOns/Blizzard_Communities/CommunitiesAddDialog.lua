@@ -75,7 +75,6 @@ function CommunitiesAddDialogMixin:OnShow()
 	self:SetAttribute("shown", true);
 	local factionTag, localizedFactionName = UnitFactionGroup("player");
 	self.CreateWoWCommunityLabel:SetText(COMMUNITIES_ADD_DIALOG_CREATE_WOW_LABEL:format(localizedFactionName));
-	self.CreateWoWCommunityDescription:SetText(COMMUNITIES_ADD_DIALOG_CREATE_WOW_DESCRIPTION:format(localizedFactionName));
 	
 	self.CreateWoWCommunityButton:SetEnabled(C_Club.ShouldAllowClubType(Enum.ClubType.Character) and not IsVeteranTrialAccount() and not C_ClassTrial.IsClassTrialCharacter());
 	self.CreateWoWCommunityButton.FactionIcon:Show();
@@ -119,8 +118,7 @@ function CommunitiesCreateDialogMixin:OnShow()
 	if self:GetClubType() == Enum.ClubType.BattleNet then
 		self.DialogLabel:SetText(COMMUNITIES_CREATE_DIALOG_BATTLE_NET_LABEL);
 	else
-		local factionTag, localizedFactionName = UnitFactionGroup("player");
-		self.DialogLabel:SetText(COMMUNITIES_CREATE_DIALOG_WOW_LABEL:format(localizedFactionName));
+		self.DialogLabel:SetText(COMMUNITIES_CREATE_DIALOG_WOW_LABEL);
 	end
 end
 
@@ -181,9 +179,9 @@ end
 
 function CommunitiesCreateDialogMixin:UpdateCreateButton()
 	local name = self.NameBox:GetText();
-	local nameIsValid = C_Club.ValidateText(self:GetClubType(), name, Enum.ClubFieldType.ClubName) == Enum.ValidateNameResult.NameSuccess;
+	local nameIsValid = C_Club.ValidateText(self:GetClubType(), name, Enum.ClubFieldType.ClubName) == Enum.ValidateNameResult.Success;
 	local shortName = self.ShortNameBox:GetText();
-	local shortNameIsValid = C_Club.ValidateText(self:GetClubType(), shortName, Enum.ClubFieldType.ClubShortName) == Enum.ValidateNameResult.NameSuccess;
+	local shortNameIsValid = C_Club.ValidateText(self:GetClubType(), shortName, Enum.ClubFieldType.ClubShortName) == Enum.ValidateNameResult.Success;
 	self.CreateButton:SetEnabled(nameIsValid and shortNameIsValid);
 	if self.CreateButton:IsMouseOver() then
 		CommunitiesCreateDialogCreateButton_OnEnter(self.CreateButton);

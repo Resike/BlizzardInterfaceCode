@@ -16,7 +16,6 @@ local EJ_HTYPE_OVERVIEW = 3;
 
 local EJ_NUM_INSTANCE_PER_ROW = 4;
 
-local EJ_LORE_MAX_HEIGHT = 97;
 local EJ_MAX_SECTION_MOVE = 320;
 
 local EJ_NUM_SEARCH_PREVIEWS = 5;
@@ -45,7 +44,7 @@ local flagsByRole = {
 local EJ_Tabs = {};
 
 EJ_Tabs[1] = {frame="overviewScroll", button="overviewTab"};
-EJ_Tabs[2] = {frame="lootScroll", button="lootTab"};
+EJ_Tabs[2] = {frame="LootContainer", button="lootTab"};
 EJ_Tabs[3] = {frame="detailsScroll", button="bossTab"};
 EJ_Tabs[4] = {frame="model", button="modelTab"};
 
@@ -61,6 +60,7 @@ local EJ_DIFFICULTIES = {
 	DifficultyUtil.ID.DungeonNormal,
 	DifficultyUtil.ID.DungeonHeroic,
 	DifficultyUtil.ID.DungeonMythic,
+	DifficultyUtil.ID.DungeonChallenge,
 	DifficultyUtil.ID.DungeonTimewalker,
 	DifficultyUtil.ID.RaidLFR,
 	DifficultyUtil.ID.Raid10Normal,
@@ -106,6 +106,8 @@ local EJ_TIER_DATA =
 	[7] = { backgroundAtlas = "UI-EJ-Legion", r = 0.0, g = 0.6, b = 0.2 },
 	[8] = { backgroundAtlas = "UI-EJ-BattleforAzeroth", r = 0.8, g = 0.4, b = 0.0 },
 	[9] = { backgroundAtlas = "UI-EJ-Shadowlands", r = 0.278, g = 0.471, b = .937 },
+	[10] = { backgroundAtlas = "UI-EJ-Dragonflight", r = 0.2, g = 0.8, b = 1.0 },
+	[11] = { backgroundAtlas = "UI-EJ-Dragonflight", r = 0.2, g = 0.8, b = 1.0 },
 }
 
 EJButtonMixin = {}
@@ -157,6 +159,7 @@ ExpansionEnumToEJTierDataTableId = {
 	[LE_EXPANSION_LEGION] = 7,
 	[LE_EXPANSION_BATTLE_FOR_AZEROTH] = 8,
 	[LE_EXPANSION_SHADOWLANDS] = 9,
+	[LE_EXPANSION_DRAGONFLIGHT] = 10,
 }
 
 function GetEJTierDataTableID(expansion)
@@ -189,10 +192,114 @@ local SlotFilterToSlotName = {
 local BOSS_LOOT_BUTTON_HEIGHT = 45;
 local INSTANCE_LOOT_BUTTON_HEIGHT = 64;
 
+EncounterJournalScrollBarMixin = {};
+
+function EncounterJournalScrollBarMixin:OnLoad()
+	WowTrimScrollBarMixin.OnLoad(self);
+end
+
+EncounterJournalItemMixin = {};
+
+function EncounterJournalItemMixin:Init(elementData)
+	local index = elementData.index;
+	if (EncounterJournal.encounterID) then
+		self:SetHeight(BOSS_LOOT_BUTTON_HEIGHT);
+		self.boss:Hide();
+		self.bossTexture:Hide();
+		self.bosslessTexture:Show();
+	else
+		self:SetHeight(INSTANCE_LOOT_BUTTON_HEIGHT);
+		self.boss:Show();
+		self.bossTexture:Show();
+		self.bosslessTexture:Hide();
+	end
+	self.index = index;
+
+	local itemInfo = C_EncounterJournal.GetLootInfoByIndex(self.index);
+	if ( itemInfo and itemInfo.name ) then
+		self.name:SetText(WrapTextInColorCode(itemInfo.name, itemInfo.itemQuality));
+		self.icon:SetTexture(itemInfo.icon);
+		if itemInfo.handError then
+			self.slot:SetText(INVALID_EQUIPMENT_COLOR:WrapTextInColorCode(itemInfo.slot));
+		else
+			self.slot:SetText(itemInfo.slot);
+		end
+		if itemInfo.weaponTypeError then
+			self.armorType:SetText(INVALID_EQUIPMENT_COLOR:WrapTextInColorCode(itemInfo.armorType));
+		else
+			self.armorType:SetText(itemInfo.armorType);
+		end
+
+		local numEncounters = EJ_GetNumEncountersForLootByIndex(self.index);
+		if ( numEncounters == 1 ) then
+			self.boss:SetFormattedText(BOSS_INFO_STRING, EJ_GetEncounterInfo(itemInfo.encounterID));
+		elseif ( numEncounters == 2) then
+			local itemInfoSecond = C_EncounterJournal.GetLootInfoByIndex(self.index, 2);
+			local secondEncounterID = itemInfoSecond and itemInfoSecond.encounterID;
+			if ( itemInfo.encounterID and secondEncounterID ) then
+				self.boss:SetFormattedText(BOSS_INFO_STRING_TWO, EJ_GetEncounterInfo(itemInfo.encounterID), EJ_GetEncounterInfo(secondEncounterID));
+			end
+		elseif ( numEncounters > 2 ) then
+			self.boss:SetFormattedText(BOSS_INFO_STRING_MANY, EJ_GetEncounterInfo(itemInfo.encounterID));
+		end
+
+		local itemName, _, quality = GetItemInfo(itemInfo.link);
+		SetItemButtonQuality(self, quality, itemInfo.link);
+	else
+		self.name:SetText(RETRIEVING_ITEM_INFO);
+		self.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark");
+		self.slot:SetText("");
+		self.armorType:SetText("");
+		self.boss:SetText("");
+	end
+	self.encounterID = itemInfo and itemInfo.encounterID;
+	self.itemID = itemInfo and itemInfo.itemID;
+	self.link = itemInfo and itemInfo.link;
+	if self.showingTooltip then
+		GameTooltip:SetAnchorType("ANCHOR_RIGHT");
+		local useSpec = true;
+		EncounterJournal_SetTooltipWithCompare(GameTooltip, self.link, useSpec);
+	end
+end
+
+EncounterJournalItemHeaderMixin = {};
+
+function EncounterJournalItemHeaderMixin:Init(elementData)
+	self.name:SetText(elementData.text);
+	if elementData.helpText then
+		self.TipButton.elementData = elementData;
+		self.TipButton:Show();
+	else
+		self.TipButton:Hide();
+	end
+end
+
+EncounterBossButtonMixin = {};
+
+function EncounterBossButtonMixin:Init(elementData)
+	local index = elementData.index;
+	local name, description, bossID, rootSectionID, link = EJ_GetEncounterInfoByIndex(index);
+
+	self.link = link;
+	self:SetText(name);
+	self.encounterID = bossID;
+
+	--Use the boss' first creature as the button icon
+	local bossImage = select(5, EJ_GetCreatureInfo(1, bossID)) or "Interface\\EncounterJournal\\UI-EJ-BOSS-Default";
+	self.creature:SetTexture(bossImage);
+
+	if (EncounterJournal.encounterID == bossID) then
+		self:LockHighlight();
+	else
+		self:UnlockHighlight();
+	end
+
+	EncounterJournalBossButton_UpdateDifficultyOverlay(self);
+end
 
 function EncounterJournal_OnLoad(self)
-	EncounterJournalTitleText:SetText(ADVENTURE_JOURNAL);
-	EncounterJournal:SetPortraitToAsset("Interface\\EncounterJournal\\UI-EJ-PortraitIcon");
+	self:SetTitle(ADVENTURE_JOURNAL);
+	self:SetPortraitToAsset([[Interface\EncounterJournal\UI-EJ-PortraitIcon]]);
 	self:RegisterEvent("EJ_LOOT_DATA_RECIEVED");
 	self:RegisterEvent("EJ_DIFFICULTY_UPDATE");
 	self:RegisterEvent("UNIT_PORTRAIT_UPDATE");
@@ -211,21 +318,114 @@ function EncounterJournal_OnLoad(self)
 	self.encounter.infoFrame = self.encounter.info.detailsScroll.child;
 	self.encounter.info.detailsScroll.ScrollBar.scrollStep = 30;
 
-	self.encounter.bossesFrame = self.encounter.info.bossesScroll.child;
-	self.encounter.info.bossesScroll.ScrollBar.scrollStep = 30;
-
 	self.encounter.info.overviewTab:Click();
 
-	self.encounter.info.lootScroll.update = EncounterJournal_LootUpdate;
-	self.encounter.info.lootScroll.scrollBar.doNotHide = true;
-	self.encounter.info.lootScroll.dynamic = EncounterJournal_LootCalcScroll;
-	HybridScrollFrame_CreateButtons(self.encounter.info.lootScroll, "EncounterItemTemplate", 0, 0);
+	-- Bosses
+	do
+		local info = self.encounter.info;
+		local scrollBox = info.BossesScrollBox;
+		local scrollBar = info.BossesScrollBar;
 
+		local view = CreateScrollBoxListLinearView();
+		view:SetElementInitializer("EncounterBossButtonTemplate", function(button, elementData)
+			button:Init(elementData);
+		end);
+		view:SetPadding(10,0,0,20,15);
 
-	self.searchResults.scrollFrame.update = EncounterJournal_SearchUpdate;
-	self.searchResults.scrollFrame.scrollBar.doNotHide = true;
-	HybridScrollFrame_CreateButtons(self.searchResults.scrollFrame, "EncounterSearchLGTemplate", 0, 0);
+		ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view);
+	end
 
+	-- Items
+	do
+		local view = CreateScrollBoxListLinearView();
+		view:SetElementExtentCalculator(function(dataIndex, elementData)
+			if elementData.header then
+				return BOSS_LOOT_BUTTON_HEIGHT;
+			elseif EncounterJournal.encounterID then
+				return BOSS_LOOT_BUTTON_HEIGHT;
+			else
+				return INSTANCE_LOOT_BUTTON_HEIGHT;
+			end
+		end);
+		view:SetElementFactory(function(factory, elementData)
+			if elementData.header then
+				factory("EncounterItemDividerTemplate", function(button, elementData)
+					button:Init(elementData);
+				end);
+			else
+				factory("EncounterItemTemplate", function(button, elementData)
+					button:Init(elementData);
+				end);
+			end
+		end);
+
+		local lootContainer = self.encounter.info.LootContainer;
+		local scrollBox = lootContainer.ScrollBox;
+		local scrollBar = lootContainer.ScrollBar;
+		ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view);
+
+		UIDropDownMenu_Initialize(lootContainer.lootFilter, EncounterJournal_InitLootFilter, "MENU");
+		UIDropDownMenu_Initialize(lootContainer.lootSlotFilter, EncounterJournal_InitLootSlotFilter, "MENU");
+	end
+
+	-- Search
+	do
+		local view = CreateScrollBoxListLinearView();
+		view:SetElementInitializer("EncounterSearchLGTemplate", function(button, elementData)
+			button:Init(elementData);
+		end);
+
+		local scrollBox = EncounterJournal.searchResults.ScrollBox;
+		local scrollBar = EncounterJournal.searchResults.ScrollBar;
+		local panExtent = buttonHeight;
+		ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view);
+	end
+
+	-- Dungeons/Raids
+	do
+		local Pad = 0;
+		local Spacing = 15;
+		local view = CreateScrollBoxListGridView(4, Pad, Pad, Pad, Pad, Spacing, Spacing);
+
+		local function Initializer(button, elementData)
+			button.name:SetText(elementData.name);
+			button.bgImage:SetTexture(elementData.buttonImage);
+			button.instanceID = elementData.instanceID;
+			button.tooltipTitle = elementData.name;
+			button.tooltipText = elementData.description;
+			button.link = elementData.link;
+			button:Show();
+			if ( EncounterJournal.localizeInstanceButton ) then
+				EncounterJournal.localizeInstanceButton(button);
+			end
+
+			local modifiedInstanceInfo = C_ModifiedInstance.GetModifiedInstanceInfoFromMapID(elementData.mapID)
+			if (modifiedInstanceInfo) then
+				button.ModifiedInstanceIcon.info = modifiedInstanceInfo;
+				button.ModifiedInstanceIcon.name = name;
+				local atlas = button.ModifiedInstanceIcon:GetIconTextureAtlas();
+				button.ModifiedInstanceIcon.Icon:SetAtlas(atlas, true)
+				button.ModifiedInstanceIcon:SetSize(button.ModifiedInstanceIcon.Icon:GetSize());
+				button.ModifiedInstanceIcon:Show();
+			end
+
+		end
+
+		view:SetElementInitializer("EncounterInstanceButtonTemplate", Initializer);
+
+		ScrollUtil.InitScrollBoxWithScrollBar(self.instanceSelect.ScrollBox, self.instanceSelect.ScrollBar, view);
+	end
+
+	-- Dungeons/Raids description
+	do
+		local instance = self.encounter.instance;
+		local loreScrollingFont = instance.LoreScrollingFont;
+		loreScrollingFont:SetTextColor(CreateColor(.13, .07, .01));
+
+		local scrollBox = loreScrollingFont:GetScrollBox();
+		local scrollBar = instance.LoreScrollBar;
+		ScrollUtil.RegisterScrollBoxWithScrollBar(scrollBox, scrollBar);
+	end
 
 	local homeData = {
 		name = HOME,
@@ -238,25 +438,66 @@ function EncounterJournal_OnLoad(self)
 		end,
 	}
 	NavBar_Initialize(self.navBar, "NavButtonTemplate", homeData, self.navBar.home, self.navBar.overflow);
-	UIDropDownMenu_Initialize(self.encounter.info.lootScroll.lootFilter, EncounterJournal_InitLootFilter, "MENU");
-	UIDropDownMenu_Initialize(self.encounter.info.lootScroll.lootSlotFilter, EncounterJournal_InitLootSlotFilter, "MENU");
 
 	-- initialize tabs
-	local instanceSelect = EncounterJournal.instanceSelect;
+	local instanceSelect = self.instanceSelect;
+	PanelTemplates_SetNumTabs(self, 4);
+	EJ_ContentTab_OnClick(self.suggestTab);
+	self.maxTabWidth = self:GetWidth() / #self.Tabs;
+
 	local tierName = EJ_GetTierInfo(EJ_GetCurrentTier());
 	UIDropDownMenu_SetText(instanceSelect.tierDropDown, tierName);
 
 	-- check if tabs are active
 	local dungeonInstanceID = EJ_GetInstanceByIndex(1, false);
 	if( not dungeonInstanceID ) then
-		instanceSelect.dungeonsTab.grayBox:Show();
+		EJ_ContentTab_SetEnabled(self.dungeonsTab, false);
 	end
 	local raidInstanceID = EJ_GetInstanceByIndex(1, true);
 	if( not raidInstanceID ) then
-		instanceSelect.raidsTab.grayBox:Show();
+		EJ_ContentTab_SetEnabled(self.raidsTab, false);
 	end
 	-- set the suggestion panel frame to open by default
 	EJSuggestFrame_OpenFrame();
+end
+
+function EncounterItemTemplate_DividerFrameTipOnEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip:SetText(self.elementData.text, 1, 1, 1);
+	GameTooltip:AddLine(self.elementData.helpText, nil, nil, nil, true);
+	GameTooltip:Show();
+end
+
+function EncounterJournal_GetLootJournalView()
+	return EncounterJournal.lootJournalView;
+end
+
+function EncounterJournal_SetLootJournalView(view)
+	local self = EncounterJournal;
+	local activeViewPanel, inactiveViewPanel = EncounterJournal_GetLootJournalPanels(view);
+	self.LootJournalViewDropDown:SetParent(activeViewPanel);
+	self.LootJournalViewDropDown:SetPoint("TOPLEFT", 15, -9);
+	UIDropDownMenu_SetText(self.LootJournalViewDropDown, view);
+
+	-- if no previous view then it's the init, no need to change which frame is shown
+	if self.lootJournalView then
+		activeViewPanel:Show();
+		inactiveViewPanel:Hide();
+	end
+
+	self.lootJournalView = view;
+end
+
+function EncounterJournal_GetLootJournalPanels(view)
+	local self = EncounterJournal;
+	if not view then
+		view = self.lootJournalView;
+	end
+	if view == LOOT_JOURNAL_POWERS then
+		return self.LootJournal, self.LootJournalItems;
+	else
+		return self.LootJournalItems, self.LootJournal;
+	end
 end
 
 function EncounterJournal_EnableTierDropDown()
@@ -292,7 +533,7 @@ function EncounterJournal_ResetDisplay(instanceID, instanceType, difficultyID)
 		EncounterJournal.lastDifficulty = nil;
 		EJSuggestFrame_OpenFrame();
 	else
-		EJ_ContentTab_Select(EncounterJournal.instanceSelect.dungeonsTab.id);
+		EJ_ContentTab_Select(EncounterJournal.dungeonsTab:GetID());
 
 		EncounterJournal_DisplayInstance(instanceID);
 		EncounterJournal.lastInstance = instanceID;
@@ -315,6 +556,10 @@ function EncounterJournal_OnShow(self)
 	UpdateMicroButtons();
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN);
 	EncounterJournal_LootUpdate();
+
+	if not self.lootJournalView then
+		EncounterJournal_SetLootJournalView(LOOT_JOURNAL_POWERS);
+	end
 
 	local instanceSelect = EncounterJournal.instanceSelect;
 
@@ -347,17 +592,15 @@ function EncounterJournal_OnShow(self)
 	end
 
 	local tierData = GetEJTierData(EJ_GetCurrentTier());
-	if ( not instanceSelect.suggestTab:IsEnabled() or EncounterJournal.suggestFrame:IsShown() ) then
+	if ( not EncounterJournal.suggestTab:IsEnabled() or EncounterJournal.suggestFrame:IsShown() ) then
 		tierData = GetEJTierData(EJSuggestTab_GetPlayerTierIndex());
 	end
 	instanceSelect.bg:SetAtlas(tierData.backgroundAtlas, true);
-	instanceSelect.raidsTab.selectedGlow:SetVertexColor(tierData.r, tierData.g, tierData.b);
-	instanceSelect.dungeonsTab.selectedGlow:SetVertexColor(tierData.r, tierData.g, tierData.b);
 
 	local shouldShowPowerTab, powerID = EJMicroButton:ShouldShowPowerTab();
 	if shouldShowPowerTab then
 		self.LootJournal:SetPendingPowerID(powerID);
-		EJ_ContentTab_Select(instanceSelect.LootJournalTab.id);
+		EJ_ContentTab_Select(EncounterJournal.LootJournalTab:GetID());
 		SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_FIRST_RUNEFORGE_LEGENDARY_POWER, true);
 	elseif EncounterJournal.instanceSelect:IsShown() then
 		EJ_ContentTab_Select(self.selectedTab);
@@ -372,9 +615,9 @@ end
 function EncounterJournal_CheckAndDisplayLootTab()
 	local instanceSelect = EncounterJournal.instanceSelect;
 	if EJ_GetCurrentTier() == EJ_TIER_INDEX_SHADOWLANDS then
-		PanelTemplates_ShowTab(instanceSelect, instanceSelect.LootJournalTab.id);
+		PanelTemplates_ShowTab(EncounterJournal, EncounterJournal.LootJournalTab:GetID());
 	else
-		PanelTemplates_HideTab(instanceSelect, instanceSelect.LootJournalTab.id);
+		PanelTemplates_HideTab(EncounterJournal, EncounterJournal.LootJournalTab:GetID());
 	end
 end
 
@@ -387,6 +630,22 @@ function EncounterJournal_OnHide(self)
 	end
 	EJ_EndSearch();
 	self.shouldDisplayDifficulty = nil;
+end
+
+function EncounterJournal_IsSuggestTabSelected(self)
+	return self.selectedTab == self.suggestTab:GetID();
+end
+
+function EncounterJournal_IsDungeonTabSelected(self)
+	return self.selectedTab == self.dungeonsTab:GetID();
+end
+
+function EncounterJournal_IsRaidTabSelected(self)
+	return self.selectedTab == self.raidsTab:GetID();
+end
+
+function EncounterJournal_IsLootTabSelected(self)
+	return self.selectedTab == self.LootJournalTab:GetID();
 end
 
 local function EncounterJournal_IsHeaderTypeOverview(headerType)
@@ -563,65 +822,52 @@ function EncounterJournal_ListInstances()
 	NavBar_Reset(EncounterJournal.navBar);
 	EncounterJournal.encounter:Hide();
 	instanceSelect:Show();
-	local showRaid = not instanceSelect.raidsTab:IsEnabled();
 
-	local scrollFrame = instanceSelect.scroll.child;
-	local index = 1;
-	local instanceID, name, description, _, buttonImage, _, _, _, link = EJ_GetInstanceByIndex(index, showRaid);
+	local dataIndex = 1;
+	local showRaid = EncounterJournal_IsRaidTabSelected(EncounterJournal);
+	local instanceID, name, description, _, buttonImage, _, _, _, link, _, mapID = EJ_GetInstanceByIndex(dataIndex, showRaid);
 
 	--No instances in this tab
 	if not instanceID and not infiniteLoopPolice then
 		--disable this tab and select the other one.
 		infiniteLoopPolice = true;
 		if ( showRaid ) then
-			instanceSelect.raidsTab.grayBox:Show();
-			EJ_ContentTab_Select(instanceSelect.dungeonsTab.id);
+			EJ_ContentTab_SetEnabled(EncounterJournal.raidsTab, false);
+			EJ_ContentTab_Select(EncounterJournal.dungeonsTab:GetID());
 		else
-			instanceSelect.dungeonsTab.grayBox:Show();
-			EJ_ContentTab_Select(instanceSelect.raidsTab.id);
+			EJ_ContentTab_SetEnabled(EncounterJournal.dungeonsTab, false);
+			EJ_ContentTab_Select(EncounterJournal.raidsTab:GetID());
 		end
 		return;
 	end
 	infiniteLoopPolice = false;
 
-	while instanceID do
-		local instanceButton = scrollFrame["instance"..index];
-		if not instanceButton then -- create button
-			instanceButton = CreateFrame("BUTTON", scrollFrame:GetParent():GetName().."instance"..index, scrollFrame, "EncounterInstanceButtonTemplate");
-			if ( EncounterJournal.localizeInstanceButton ) then
-				EncounterJournal.localizeInstanceButton(instanceButton);
-			end
-			scrollFrame["instance"..index] = instanceButton;
-			if mod(index-1, EJ_NUM_INSTANCE_PER_ROW) == 0 then
-				instanceButton:SetPoint("TOP", scrollFrame["instance"..(index-EJ_NUM_INSTANCE_PER_ROW)], "BOTTOM", 0, -15);
-			else
-				instanceButton:SetPoint("LEFT", scrollFrame["instance"..(index-1)], "RIGHT", 15, 0);
-			end
-		end
+	local dataProvider = CreateDataProvider();
+	while instanceID ~= nil do
+		dataProvider:Insert({
+			instanceID = instanceID,
+			name = name,
+			description = description,
+			buttonImage = buttonImage,
+			link = link,
+			mapID = mapID,
+		});
 
-		instanceButton.name:SetText(name);
-		instanceButton.bgImage:SetTexture(buttonImage);
-		instanceButton.instanceID = instanceID;
-		instanceButton.tooltipTitle = name;
-		instanceButton.tooltipText = description;
-		instanceButton.link = link;
-		instanceButton:Show();
-
-		index = index + 1;
-		instanceID, name, description, _, buttonImage, _, _, _, link = EJ_GetInstanceByIndex(index, showRaid);
+		dataIndex = dataIndex + 1;
+		instanceID, name, description, _, buttonImage, _, _, _, link = EJ_GetInstanceByIndex(dataIndex, showRaid);
 	end
 
-	EJ_HideInstances(index);
+	EncounterJournal.instanceSelect.ScrollBox:SetDataProvider(dataProvider);
 
 	--check if the other tab is empty
-	local instanceText = EJ_GetInstanceByIndex(1, not showRaid);
+	local otherInstanceID = EJ_GetInstanceByIndex(1, not showRaid);
 	--No instances in the other tab
-	if not instanceText then
+	if not otherInstanceID then
 		--disable the other tab.
 		if ( showRaid ) then
-			instanceSelect.dungeonsTab.grayBox:Show();
+			EJ_ContentTab_SetEnabled(EncounterJournal.dungeonsTab, false);
 		else
-			instanceSelect.raidsTab.grayBox:Show();
+			EJ_ContentTab_SetEnabled(EncounterJournal.raidsTab, false);
 		end
 	end
 end
@@ -723,16 +969,11 @@ function EncounterJournal_DisplayInstance(instanceID, noButton)
 	self.info.instanceTitle:SetText(instanceName);
 	self.instance.mapButton:SetShown(dungeonAreaMapID and dungeonAreaMapID > 0);
 
-	self.instance.loreScroll.ScrollBar:Hide();
-	self.instance.loreScroll.child.lore:SetWidth(335);
-	self.instance.loreScroll.child.lore:SetText(description);
+	local loreScrollingFont = self.instance.LoreScrollingFont;
+	loreScrollingFont:SetText(description);
 
-	local loreHeight = self.instance.loreScroll.child.lore:GetHeight();
-	self.instance.loreScroll.ScrollBar:SetValue(0);
-	if loreHeight > EJ_LORE_MAX_HEIGHT then
-		self.instance.loreScroll.ScrollBar:Show();
-		self.instance.loreScroll.child.lore:SetWidth(313);
-	end
+	self.instance.LoreScrollBar:SetShown(loreScrollingFont:HasScrollableExtent());
+
 
 	self.info.instanceButton.instanceID = instanceID;
 	self.info.instanceButton.icon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask");
@@ -747,35 +988,24 @@ function EncounterJournal_DisplayInstance(instanceID, noButton)
 	local bossButton;
 
 	local hasBossAbilities = false;
-	while bossID do
-		bossButton = _G["EncounterJournalBossButton"..bossIndex];
-		if not bossButton then -- create a new header;
-			bossButton = CreateFrame("BUTTON", "EncounterJournalBossButton"..bossIndex, EncounterJournal.encounter.bossesFrame, "EncounterBossButtonTemplate");
-			if bossIndex > 1 then
-				bossButton:SetPoint("TOPLEFT", _G["EncounterJournalBossButton"..(bossIndex-1)], "BOTTOMLEFT", 0, -15);
+	do
+		local index = 1;
+		local dataProvider = CreateDataProvider();
+		while index do
+			local name, description, bossID, rootSectionID, link = EJ_GetEncounterInfoByIndex(index);
+			if bossID then
+				if not hasBossAbilities then
+					hasBossAbilities = rootSectionID > 0;
+				end
+
+				dataProvider:Insert({index=index});
+				index = index + 1;
 			else
-				bossButton:SetPoint("TOPLEFT", EncounterJournal.encounter.bossesFrame, "TOPLEFT", 0, -10);
+				index = nil;
 			end
 		end
 
-		bossButton.link = link;
-		bossButton:SetText(name);
-		bossButton:Show();
-		bossButton.encounterID = bossID;
-		--Use the boss' first creature as the button icon
-		local _, _, _, _, bossImage = EJ_GetCreatureInfo(1, bossID);
-		bossImage = bossImage or "Interface\\EncounterJournal\\UI-EJ-BOSS-Default";
-		bossButton.creature:SetTexture(bossImage);
-		bossButton:UnlockHighlight();
-
-		EncounterJournalBossButton_UpdateDifficultyOverlay(bossButton);
-
-		if ( not hasBossAbilities ) then
-			hasBossAbilities = rootSectionID > 0;
-		end
-
-		bossIndex = bossIndex + 1;
-		name, description, bossID, rootSectionID, link = EJ_GetEncounterInfoByIndex(bossIndex);
+		self.info.BossesScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition);
 	end
 
 	EncounterJournal_SetTabEnabled(EncounterJournal.encounter.info.overviewTab, true);
@@ -807,7 +1037,7 @@ function EncounterJournal_DisplayInstance(instanceID, noButton)
 	self.instance:Show();
 	self.info.overviewScroll:Hide();
 	self.info.detailsScroll:Hide();
-	self.info.lootScroll:Hide();
+	self.info.LootContainer:Hide();
 	self.info.rightShadow:Hide();
 
 	if (self.info.tab < 3) then
@@ -841,10 +1071,7 @@ function EncounterJournal_DisplayEncounter(encounterID, noButton)
 	EncounterJournal.encounterID = encounterID;
 	EJ_SelectEncounter(encounterID);
 	EncounterJournal_LootUpdate();
-	--need to clear details, but don't want to scroll to top of bosses list
-	local bossListScrollValue = self.info.bossesScroll.ScrollBar:GetValue()
 	EncounterJournal_ClearDetails();
-	EncounterJournal.encounter.info.bossesScroll.ScrollBar:SetValue(bossListScrollValue);
 
 	self.info.encounterTitle:SetText(ename);
 
@@ -885,37 +1112,20 @@ function EncounterJournal_DisplayEncounter(encounterID, noButton)
 	self.infoFrame.rootSectionID = rootSectionID;
 	self.infoFrame.expanded = false;
 
-	local bossIndex = 1;
-	local name, description, bossID, _, link = EJ_GetEncounterInfoByIndex(bossIndex);
-	local bossButton;
-	while bossID do
-		bossButton = _G["EncounterJournalBossButton"..bossIndex];
-		if not bossButton then -- create a new header;
-			bossButton = CreateFrame("BUTTON", "EncounterJournalBossButton"..bossIndex, EncounterJournal.encounter.bossesFrame, "EncounterBossButtonTemplate");
-			if bossIndex > 1 then
-				bossButton:SetPoint("TOPLEFT", _G["EncounterJournalBossButton"..(bossIndex-1)], "BOTTOMLEFT", 0, -15);
+	do
+		local index = 1;
+		local dataProvider = CreateDataProvider()
+		while index do
+			local bossID = select(3, EJ_GetEncounterInfoByIndex(index));
+			if bossID then
+				dataProvider:Insert({index=index});
+				index = index + 1;
 			else
-				bossButton:SetPoint("TOPLEFT", EncounterJournal.encounter.bossesFrame, "TOPLEFT", 0, -10);
+				index = nil;
 			end
 		end
 
-		bossButton.link = link;
-		bossButton:SetText(name);
-		bossButton:Show();
-		bossButton.encounterID = bossID;
-		--Use the boss' first creature as the button icon
-		local _, _, _, _, bossImage = EJ_GetCreatureInfo(1, bossID);
-		bossImage = bossImage or "Interface\\EncounterJournal\\UI-EJ-BOSS-Default";
-		bossButton.creature:SetTexture(bossImage);
-
-		if (encounterID == bossID) then
-			bossButton:LockHighlight();
-		else
-			bossButton:UnlockHighlight();
-		end
-
-		bossIndex = bossIndex + 1;
-		name, description, bossID, _, link = EJ_GetEncounterInfoByIndex(bossIndex);
+		self.info.BossesScrollBox:SetDataProvider(dataProvider, ScrollBoxConstants.RetainScrollPosition);
 	end
 
 	-- Setup Creatures
@@ -1565,7 +1775,7 @@ function EncounterJournal_ToggleHeaders(self, doNotShift)
 					end
 				end
 				self.linkSection = nil;
-			else
+			elseif self.overviews and self.overviews[1] then
 				self.overviews[1].expanded = false;
 				EncounterJournal.overviewDefaultRole = role;
 				if ( hasRoleSection ) then
@@ -1588,7 +1798,7 @@ function EncounterJournal_ToggleHeaders(self, doNotShift)
 				local scrollValue = EncounterJournal.encounter.info.detailsScroll.ScrollBar:GetValue();
 				local cutoff = EncounterJournal.encounter.info.detailsScroll:GetHeight() + scrollValue;
 
-				local _, _, _, _, anchorY = self:GetPoint();
+				local _, _, _, _, anchorY = self:GetPoint(1);
 				anchorY = anchorY - self:GetHeight();
 				if self.description:IsShown() then
 					anchorY = anchorY - self.description:GetHeight() - SECTION_DESCRIPTION_OFFSET;
@@ -1612,7 +1822,7 @@ function EncounterJournal_ShiftHeaders(index)
 		return;
 	end
 
-	local _, _, _, _, anchorY = usedHeaders[index]:GetPoint();
+	local _, _, _, _, anchorY = usedHeaders[index]:GetPoint(1);
 	for i=index,#usedHeaders-1 do
 		anchorY = anchorY - usedHeaders[i]:GetHeight();
 		if usedHeaders[i].description:IsShown() then
@@ -1652,7 +1862,7 @@ end
 
 function EncounterJournal_FocusSectionCallback(self)
 	if self.cbCount > 0 then
-		local _, _, _, _, anchorY = self:GetPoint();
+		local _, _, _, _, anchorY = self:GetPoint(1);
 		local scrollFrame = self:GetParent():GetParent();
 		if ( self.isOverview ) then
 			-- +4 puts the scrollbar all the way at the bottom when going to the last section
@@ -1670,7 +1880,7 @@ end
 function EncounterJournal_MoveSectionUpdate(self)
 
 	if self.frameCount > 0 then
-		local _, _, _, _, anchorY = self:GetPoint();
+		local _, _, _, _, anchorY = self:GetPoint(1);
 		local height = min(EJ_MAX_SECTION_MOVE, self:GetHeight() + self.description:GetHeight() + SECTION_DESCRIPTION_OFFSET);
 		local scrollValue = abs(anchorY) - (EncounterJournal.encounter.info.detailsScroll:GetHeight()-height);
 		EncounterJournal.encounter.info.detailsScroll.ScrollBar:SetValue(scrollValue);
@@ -1715,9 +1925,7 @@ function EncounterJournal_ClearDetails()
 	EncounterJournal.encounter.info.encounterTitle:SetText("");
 
 	EncounterJournal.encounter.info.overviewScroll.ScrollBar:SetValue(0);
-	EncounterJournal.encounter.info.lootScroll.scrollBar:SetValue(0);
 	EncounterJournal.encounter.info.detailsScroll.ScrollBar:SetValue(0);
-	EncounterJournal.encounter.info.bossesScroll.ScrollBar:SetValue(0);
 
 	local freeHeaders = EncounterJournal.encounter.freeHeaders;
 	local usedHeaders = EncounterJournal.encounter.usedHeaders;
@@ -1730,14 +1938,6 @@ function EncounterJournal_ClearDetails()
 
 	local clearDisplayInfo = true;
 	EncounterJournal_HideCreatures(clearDisplayInfo);
-
-	local bossIndex = 1
-	local bossButton = _G["EncounterJournalBossButton"..bossIndex];
-	while bossButton do
-		bossButton:Hide();
-		bossIndex = bossIndex + 1;
-		bossButton = _G["EncounterJournalBossButton"..bossIndex];
-	end
 
 	EncounterJournal.searchResults:Hide();
 	EncounterJournal_HideSearchPreview();
@@ -1794,109 +1994,63 @@ function EncounterJournal_ValidateSelectedTab()
 end
 
 function EncounterJournal_SetLootButton(item)
-	local itemInfo = C_EncounterJournal.GetLootInfoByIndex(item.index);
-	if ( itemInfo and itemInfo.name ) then
-		item.name:SetText(WrapTextInColorCode(itemInfo.name, itemInfo.itemQuality));
-		item.icon:SetTexture(itemInfo.icon);
-		if itemInfo.handError then
-			item.slot:SetText(INVALID_EQUIPMENT_COLOR:WrapTextInColorCode(itemInfo.slot));
-		else
-			item.slot:SetText(itemInfo.slot);
-		end
-		if itemInfo.weaponTypeError then
-			item.armorType:SetText(INVALID_EQUIPMENT_COLOR:WrapTextInColorCode(itemInfo.armorType));
-		else
-			item.armorType:SetText(itemInfo.armorType);
-		end
 
-		local numEncounters = EJ_GetNumEncountersForLootByIndex(item.index);
-		if ( numEncounters == 1 ) then
-			item.boss:SetFormattedText(BOSS_INFO_STRING, EJ_GetEncounterInfo(itemInfo.encounterID));
-		elseif ( numEncounters == 2) then
-			local itemInfoSecond = C_EncounterJournal.GetLootInfoByIndex(item.index, 2);
-			local secondEncounterID = itemInfoSecond and itemInfoSecond.encounterID;
-			if ( itemInfo.encounterID and secondEncounterID ) then
-				item.boss:SetFormattedText(BOSS_INFO_STRING_TWO, EJ_GetEncounterInfo(itemInfo.encounterID), EJ_GetEncounterInfo(secondEncounterID));
-			end
-		elseif ( numEncounters > 2 ) then
-			item.boss:SetFormattedText(BOSS_INFO_STRING_MANY, EJ_GetEncounterInfo(itemInfo.encounterID));
-		end
-
-		local itemName, _, quality = GetItemInfo(itemInfo.link);
-		SetItemButtonQuality(item, quality, itemInfo.link);
-	else
-		item.name:SetText(RETRIEVING_ITEM_INFO);
-		item.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark");
-		item.slot:SetText("");
-		item.armorType:SetText("");
-		item.boss:SetText("");
-	end
-	item.encounterID = itemInfo and itemInfo.encounterID;
-	item.itemID = itemInfo and itemInfo.itemID;
-	item.link = itemInfo and itemInfo.link;
-	item:Show();
-	if item.showingTooltip then
-		EncounterJournal_SetTooltip(item.link);
-	end
 end
 
 function EncounterJournal_LootCallback(itemID)
-	local scrollFrame = EncounterJournal.encounter.info.lootScroll;
-
-	for i, item in ipairs(scrollFrame.buttons) do
-		if item.itemID == itemID and item:IsShown() then
-			EncounterJournal_SetLootButton(item, item.index);
-		end
+	local scrollBox = EncounterJournal.encounter.info.LootContainer.ScrollBox;
+	local button = scrollBox:FindFrameByPredicate(function(button, elementData)
+		return button.itemID == itemID;
+	end);
+	if button then
+		button:Init(button:GetElementData());
 	end
 end
 
 function EncounterJournal_LootUpdate()
 	EncounterJournal_UpdateFilterString();
-	local scrollFrame = EncounterJournal.encounter.info.lootScroll;
-	local offset = HybridScrollFrame_GetOffset(scrollFrame);
-	local items = scrollFrame.buttons;
-	local item, index;
 
-	local numLoot = EJ_GetNumLoot();
-	local buttonSize = BOSS_LOOT_BUTTON_HEIGHT;
+	local scrollBox = EncounterJournal.encounter.info.LootContainer.ScrollBox;
 
-	for i = 1,#items do
-		item = items[i];
-		index = offset + i;
-		if index <= numLoot then
-			if (EncounterJournal.encounterID) then
-				item:SetHeight(BOSS_LOOT_BUTTON_HEIGHT);
-				item.boss:Hide();
-				item.bossTexture:Hide();
-				item.bosslessTexture:Show();
-			else
-				buttonSize = INSTANCE_LOOT_BUTTON_HEIGHT;
-				item:SetHeight(INSTANCE_LOOT_BUTTON_HEIGHT);
-				item.boss:Show();
-				item.bossTexture:Show();
-				item.bosslessTexture:Hide();
-			end
-			item.index = index;
-			EncounterJournal_SetLootButton(item);
+	local dataProvider = CreateDataProvider();
+	local loot = {};
+	local perPlayerLoot = {};
+	local veryRareLoot = {};
+	local extremelyRareLoot = {};
+
+	for i = 1, EJ_GetNumLoot() do
+		local itemInfo = C_EncounterJournal.GetLootInfoByIndex(i);
+		if itemInfo.displayAsPerPlayerLoot then
+			tinsert(perPlayerLoot, i);
+		elseif itemInfo.displayAsExtremelyRare then
+			tinsert(extremelyRareLoot, i);
+		elseif itemInfo.displayAsVeryRare then
+			tinsert(veryRareLoot, i);
 		else
-			item:Hide();
+			tinsert(loot, i);
 		end
 	end
 
-	local totalHeight = numLoot * buttonSize;
-	HybridScrollFrame_Update(scrollFrame, totalHeight, scrollFrame:GetHeight());
-end
-
-function EncounterJournal_LootCalcScroll(offset)
-	local buttonHeight = BOSS_LOOT_BUTTON_HEIGHT;
-	local numLoot = EJ_GetNumLoot();
-
-	if (not EncounterJournal.encounterID) then
-		buttonHeight = INSTANCE_LOOT_BUTTON_HEIGHT;
+	for _,val in ipairs(loot) do
+		dataProvider:Insert({index=val});
 	end
 
-	local index = floor(offset/buttonHeight)
-	return index, offset - (index*buttonHeight);
+	local lootCategories = { 
+		{ loot=veryRareLoot,		headerTitle=EJ_ITEM_CATEGORY_VERY_RARE },
+		{ loot=extremelyRareLoot,	headerTitle=EJ_ITEM_CATEGORY_EXTREMELY_RARE },
+		{ loot=perPlayerLoot,		headerTitle=BONUS_LOOT_TOOLTIP_TITLE,			helpText=BONUS_LOOT_TOOLTIP_BODY },
+	};
+
+	for _,category in ipairs(lootCategories) do
+		if #category.loot > 0 then
+			dataProvider:Insert({header=true, text=category.headerTitle, helpText=category.helpText});
+			for _,val in ipairs(category.loot) do
+				dataProvider:Insert({index=val});
+			end
+		end
+	end
+
+	scrollBox:SetDataProvider(dataProvider);
 end
 
 function EncounterJournal_Loot_OnUpdate(self)
@@ -1916,25 +2070,26 @@ function EncounterJournal_Loot_OnClick(self)
 	end
 end
 
-function EncounterJournal_SetTooltip(link)
-	if (not link) then
+function EncounterJournal_SetTooltipWithCompare(tooltip, link, useSpec)
+	if not link then
 		return;
 	end
-
-	local classID, specID = EJ_GetLootFilter();
-
-	if (specID == 0) then
-		local spec = GetSpecialization();
-		if (spec and classID == select(3, UnitClass("player"))) then
-			specID = GetSpecializationInfo(spec, nil, nil, nil, UnitSex("player"));
-		else
-			specID = -1;
+	
+	local classID, specID;
+	if useSpec then
+		local classID, specID = EJ_GetLootFilter();
+		if specID == 0 then
+			local spec = GetSpecialization();
+			if spec and classID == select(3, UnitClass("player")) then
+				specID = GetSpecializationInfo(spec, nil, nil, nil, UnitSex("player"));
+			else
+				specID = -1;
+			end
 		end
 	end
-
-	GameTooltip:SetAnchorType("ANCHOR_RIGHT");
-	GameTooltip:SetHyperlink(link, classID, specID);
-	GameTooltip_ShowCompareItem();
+	local tooltipInfo = CreateBaseTooltipInfo("GetHyperlink", link, classID, specID);
+	tooltipInfo.compareItem = true;
+	tooltip:ProcessInfo(tooltipInfo);
 end
 
 function EncounterJournal_SetFlagIcon(texture, index)
@@ -2025,53 +2180,42 @@ function EncounterJournal_SelectSearch(index)
 	EncounterJournal.searchResults:Hide();
 end
 
-function EncounterJournal_SearchUpdate()
-	local scrollFrame = EncounterJournal.searchResults.scrollFrame;
-	local offset = HybridScrollFrame_GetOffset(scrollFrame);
-	local results = scrollFrame.buttons;
-	local result, index;
+EncounterSearchResultLGMixin = {};
 
-	local numResults = EJ_GetNumSearchResults();
-
-	for i = 1,#results do
-		result = results[i];
-		index = offset + i;
-		if index <= numResults then
-			local spellID, name, icon, path, typeText, displayInfo, itemID, stype, itemLink = EncounterJournal_GetSearchDisplay(index);
-			if stype == EJ_STYPE_INSTANCE then
-				result.icon:SetTexCoord(0.16796875, 0.51171875, 0.03125, 0.71875);
-			else
-				result.icon:SetTexCoord(0, 1, 0, 1);
-			end
-
-			result.spellID = spellID;
-			result.name:SetText(name);
-			result.resultType:SetText(typeText);
-			result.path:SetText(path);
-			result.icon:SetTexture(icon);
-			result.link = itemLink;
-			if displayInfo and displayInfo > 0 then
-				SetPortraitTextureFromCreatureDisplayID(result.icon, displayInfo);
-			end
-			result:SetID(index);
-			result:Show();
-
-			if result.showingTooltip then
-				if itemLink then
-					GameTooltip:SetOwner(result, "ANCHOR_RIGHT");
-					GameTooltip:SetHyperlink(itemLink);
-					GameTooltip_ShowCompareItem();
-				else
-					GameTooltip:Hide();
-				end
-			end
-		else
-			result:Hide();
-		end
+function EncounterSearchResultLGMixin:Init(elementData)
+	local index = elementData.index;
+	local spellID, name, icon, path, typeText, displayInfo, itemID, stype, itemLink = EncounterJournal_GetSearchDisplay(index);
+	if stype == EJ_STYPE_INSTANCE then
+		self.icon:SetTexCoord(0.16796875, 0.51171875, 0.03125, 0.71875);
+	else
+		self.icon:SetTexCoord(0, 1, 0, 1);
 	end
 
-	local totalHeight = numResults * 49;
-	HybridScrollFrame_Update(scrollFrame, totalHeight, 370);
+	self.spellID = spellID;
+	self.name:SetText(name);
+	self.resultType:SetText(typeText);
+	self.path:SetText(path);
+	self.icon:SetTexture(icon);
+	self.link = itemLink;
+	if displayInfo and displayInfo > 0 then
+		SetPortraitTextureFromCreatureDisplayID(self.icon, displayInfo);
+	end
+	self:SetID(index);
+
+	if self.showingTooltip then
+		if itemLink then
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+			EncounterJournal_SetTooltipWithCompare(GameTooltip, itemLink);
+		else
+			GameTooltip:Hide();
+		end
+	end
+end
+
+function EncounterJournal_SearchUpdate()
+	local scrollBox = EncounterJournal.searchResults.ScrollBox;
+	local dataProvider = CreateDataProviderByIndexCount(EJ_GetNumSearchResults());
+	scrollBox:SetDataProvider(dataProvider);
 end
 
 function EncounterJournal_ShowFullSearch()
@@ -2084,7 +2228,6 @@ function EncounterJournal_ShowFullSearch()
 	EncounterJournal.searchResults.TitleText:SetText(string.format(ENCOUNTER_JOURNAL_SEARCH_RESULTS, EncounterJournal.searchBox:GetText(), numResults));
 	EncounterJournal.searchResults:Show();
 	EncounterJournal_SearchUpdate();
-	EncounterJournal.searchResults.scrollFrame.scrollBar:SetValue(0);
 	EncounterJournal_HideSearchPreview();
 	EncounterJournal.searchBox:ClearFocus();
 end
@@ -2405,7 +2548,8 @@ end
 
 function EncounterJournal_OpenToPowerID(powerID)
 	ShowUIPanel(EncounterJournal);
-	EJ_ContentTab_Select(EncounterJournal.instanceSelect.LootJournalTab.id);
+	EJ_ContentTab_Select(EncounterJournal.LootJournalTab:GetID());
+	EncounterJournal_SetLootJournalView(LOOT_JOURNAL_POWERS);
 	EncounterJournal.LootJournal:OpenToPowerID(powerID);
 end
 
@@ -2468,102 +2612,77 @@ function EncounterJournal_DifficultyInit(self, level)
 	end
 end
 
-function EJ_HideInstances(index)
-	if ( not index ) then
-		index = 1;
-	end
-
-	local scrollChild = EncounterJournal.instanceSelect.scroll.child;
-	local instanceButton = scrollChild["instance"..index];
-	while instanceButton do
-		instanceButton:Hide();
-		index = index + 1;
-		instanceButton = scrollChild["instance"..index];
-	end
-end
-
 -- TODO: Fix for Level Squish
 function EJSuggestTab_GetPlayerTierIndex()
 	return GetEJTierDataTableID(GetExpansionForLevel(UnitLevel("player")));
 end
 
 function EJ_ContentTab_OnClick(self)
-	EJ_ContentTab_Select(self.id);
+	EJ_ContentTab_Select(self:GetID());
 end
 
 function EJ_ContentTab_Select(id)
+	PanelTemplates_SetTab(EncounterJournal, id);
 	local instanceSelect = EncounterJournal.instanceSelect;
-
-	local selectedTab = nil;
-	for i = 1, #instanceSelect.Tabs do
-		local tab = instanceSelect.Tabs[i];
-		if ( tab.id ~= id ) then
-			tab:Enable();
-			tab:GetFontString():SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b);
-			tab.selectedGlow:Hide();
-		else
-			tab:GetFontString():SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b);
-			tab:Disable();
-			selectedTab = tab;
-		end
-	end
 
 	EncounterJournal.selectedTab = id;
 
 	-- Setup background
 	local tierData;
-	if ( id == instanceSelect.suggestTab.id ) then
+	if ( id == EncounterJournal.suggestTab:GetID() ) then
 		tierData = GetEJTierData(EJSuggestTab_GetPlayerTierIndex());
 	else
 		tierData = GetEJTierData(EJ_GetCurrentTier());
 	end
-	selectedTab.selectedGlow:SetVertexColor(tierData.r, tierData.g, tierData.b);
-	selectedTab.selectedGlow:Show();
 	instanceSelect.bg:SetAtlas(tierData.backgroundAtlas, true);
 	EncounterJournal.encounter:Hide();
 	EncounterJournal.instanceSelect:Show();
 
-	if ( id == instanceSelect.suggestTab.id ) then
-		EJ_HideInstances();
+	if ( id == EncounterJournal.suggestTab:GetID() ) then
 		EJ_HideLootJournalPanel();
-		instanceSelect.scroll:Hide();
+		instanceSelect.ScrollBox:Hide();
+		instanceSelect.ScrollBar:Hide();
 		EncounterJournal.suggestFrame:Show();
-		if ( not instanceSelect.dungeonsTab.grayBox:IsShown() or not instanceSelect.raidsTab.grayBox:IsShown() ) then
+		if ( not EncounterJournal.dungeonsTab.isDisabled or not EncounterJournal.raidsTab.isDisabled ) then
 			EncounterJournal_DisableTierDropDown(true);
 		else
 			EncounterJournal_EnableTierDropDown();
 		end
-	elseif ( id == instanceSelect.LootJournalTab.id ) then
-		EJ_HideInstances();
+	elseif ( id == EncounterJournal.LootJournalTab:GetID() ) then
 		EJ_HideSuggestPanel();
-		instanceSelect.scroll:Hide();
+		instanceSelect.ScrollBox:Hide();
+		instanceSelect.ScrollBar:Hide();
 		EncounterJournal_DisableTierDropDown(true);
-		EncounterJournal.LootJournal:Show();
-	elseif ( id == instanceSelect.dungeonsTab.id or id == instanceSelect.raidsTab.id ) then
+		EJ_ShowLootJournalPanel();
+	elseif ( id == EncounterJournal.dungeonsTab:GetID() or id == EncounterJournal.raidsTab:GetID() ) then
 		EJ_HideNonInstancePanels();
-		instanceSelect.scroll:Show();
+		instanceSelect.ScrollBox:Show();
+		instanceSelect.ScrollBar:Show();
 		EncounterJournal_ListInstances();
 		EncounterJournal_EnableTierDropDown();
 	end
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON);
+
+    EventRegistry:TriggerEvent("EncounterJournal.TabSet", EncounterJournal, id);
+end
+
+function EJ_ContentTab_SetEnabled(self, enabled)
+	PanelTemplates_SetTabEnabled(EncounterJournal, self:GetID(), enabled);
 end
 
 function EJ_HideSuggestPanel()
 	local instanceSelect = EncounterJournal.instanceSelect;
-	local suggestTab = instanceSelect.suggestTab;
+	local suggestTab = EncounterJournal.suggestTab;
 	if ( not suggestTab:IsEnabled() or EncounterJournal.suggestFrame:IsShown() ) then
 		suggestTab:Enable();
-		suggestTab:GetFontString():SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b);
-		suggestTab.selectedGlow:Hide();
 		EncounterJournal.suggestFrame:Hide();
 
 		EncounterJournal_EnableTierDropDown();
 
 		local tierData = GetEJTierData(EJ_GetCurrentTier());
 		instanceSelect.bg:SetAtlas(tierData.backgroundAtlas, true);
-		instanceSelect.raidsTab.selectedGlow:SetVertexColor(tierData.r, tierData.g, tierData.b);
-		instanceSelect.dungeonsTab.selectedGlow:SetVertexColor(tierData.r, tierData.g, tierData.b);
-		instanceSelect.scroll:Show();
+		instanceSelect.ScrollBox:Show();
+		instanceSelect.ScrollBar:Show();
 
 		EncounterJournal.suggestFrame:Hide();
 	end
@@ -2573,6 +2692,14 @@ function EJ_HideLootJournalPanel()
 	if ( EncounterJournal.LootJournal ) then
 		EncounterJournal.LootJournal:Hide();
 	end
+	if ( EncounterJournal.LootJournalItems ) then
+		EncounterJournal.LootJournalItems:Hide();
+	end
+end
+
+function EJ_ShowLootJournalPanel()
+	local activeLootPanel = EncounterJournal_GetLootJournalPanels();
+	activeLootPanel:Show();
 end
 
 function EJ_HideNonInstancePanels()
@@ -2601,13 +2728,11 @@ end
 function EncounterJournal_TierDropDown_Select(_, tier)
 	EJ_SelectTier(tier);
 	local instanceSelect = EncounterJournal.instanceSelect;
-	instanceSelect.dungeonsTab.grayBox:Hide();
-	instanceSelect.raidsTab.grayBox:Hide();
+	EJ_ContentTab_SetEnabled(EncounterJournal.dungeonsTab, true);
+	EJ_ContentTab_SetEnabled(EncounterJournal.raidsTab, true);
 
 	local tierData = GetEJTierData(tier);
 	instanceSelect.bg:SetAtlas(tierData.backgroundAtlas, true);
-	instanceSelect.raidsTab.selectedGlow:SetVertexColor(tierData.r, tierData.g, tierData.b);
-	instanceSelect.dungeonsTab.selectedGlow:SetVertexColor(tierData.r, tierData.g, tierData.b);
 
 	EncounterJournal_CheckAndDisplayLootTab();
 
@@ -2638,7 +2763,7 @@ function EncounterJournal_RefreshSlotFilterText(self)
 		end
 	end
 
-	EncounterJournal.encounter.info.lootScroll.slotFilter:SetText(text);
+	EncounterJournal.encounter.info.LootContainer.slotFilter:SetText(text);
 end
 
 function EncounterJournal_SetSlotFilter(self, slot)
@@ -2660,13 +2785,16 @@ function EncounterJournal_UpdateFilterString()
 		end
 	end
 
+	local classClearFilter = EncounterJournal.encounter.info.LootContainer.classClearFilter;
+	local scrollBox = EncounterJournal.encounter.info.LootContainer.ScrollBox;
 	if name then
-		EncounterJournal.encounter.info.lootScroll.classClearFilter.text:SetText(string.format(EJ_CLASS_FILTER, name));
-		EncounterJournal.encounter.info.lootScroll.classClearFilter:Show();
-		EncounterJournal.encounter.info.lootScroll:SetHeight(360);
+		classClearFilter.text:SetText(string.format(EJ_CLASS_FILTER, name));
+		classClearFilter:Show();
+
+		scrollBox:SetPoint("TOPLEFT", classClearFilter, "BOTTOMLEFT", 14, 7);
 	else
-		EncounterJournal.encounter.info.lootScroll.classClearFilter:Hide();
-		EncounterJournal.encounter.info.lootScroll:SetHeight(382);
+		classClearFilter:Hide();
+		scrollBox:SetPoint("TOPLEFT", 0, 0);
 	end
 end
 
@@ -2770,14 +2898,37 @@ function EncounterJournal_InitLootSlotFilter(self, level)
 	end
 	C_EncounterJournal.SetSlotFilter(slotFilter);
 
-	for _, filter in pairs(Enum.ItemSlotFilterType) do
-		if ( (isLootSlotPresent[filter] or filter == slotFilter) and filter ~= Enum.ItemSlotFilterType.NoFilter ) then
-			info.text = SlotFilterToSlotName[filter];
+	for filter, name in pairs(SlotFilterToSlotName) do
+		if ( isLootSlotPresent[filter] or filter == slotFilter ) then
+			info.text = name;
 			info.checked = slotFilter == filter;
 			info.arg1 = filter;
 			UIDropDownMenu_AddButton(info);
 		end
 	end
+end
+
+function EncounterJournal_LootTabViewDropDown_OnLoad(self)
+	UIDropDownMenu_JustifyText(self, "LEFT");
+	UIDropDownMenu_Initialize(self, EncounterJournal_LootTabViewDropDown_Init);
+end
+
+function EncounterJournal_LootTabViewDropDown_Init(self)
+	local SetView = function(_, view) EncounterJournal_SetLootJournalView(view); end
+
+	local info = UIDropDownMenu_CreateInfo();
+
+	info.text = LOOT_JOURNAL_POWERS;
+	info.func = SetView;
+	info.checked = EncounterJournal_GetLootJournalView() == LOOT_JOURNAL_POWERS;
+	info.arg1 = LOOT_JOURNAL_POWERS;
+	UIDropDownMenu_AddButton(info, level);
+
+	info.text = LOOT_JOURNAL_ITEM_SETS;
+	info.func = SetView;
+	info.checked = EncounterJournal_GetLootJournalView() == LOOT_JOURNAL_ITEM_SETS;
+	info.arg1 = LOOT_JOURNAL_ITEM_SETS;
+	UIDropDownMenu_AddButton(info, level);
 end
 
 ----------------------------------------
@@ -2839,7 +2990,7 @@ end
 
 function EJSuggestFrame_OnEvent(self, event, ...)
 	if ( event == "AJ_REFRESH_DISPLAY" ) then
-		if self:GetParent().selectedTab == EncounterJournal.instanceSelect.suggestTab.id then
+		if EncounterJournal_IsSuggestTabSelected(EncounterJournal) then
 			EJSuggestFrame_RefreshDisplay();
 			local newAdventureNotice = ...;
 			if ( newAdventureNotice ) then
@@ -2882,7 +3033,7 @@ function EJSuggestFrame_OnMouseWheel( self, value )
 end
 
 function EJSuggestFrame_OpenFrame()
-	EJ_ContentTab_Select(EncounterJournal.instanceSelect.suggestTab.id);
+	EJ_ContentTab_Select(EncounterJournal.suggestTab:GetID());
 	NavBar_Reset(EncounterJournal.navBar);
 end
 
@@ -2919,10 +3070,8 @@ local AdventureJournal_RightDescriptionFonts = {
 
 function EJSuggestFrame_RefreshDisplay()
 	local instanceSelect = EncounterJournal.instanceSelect;
-	local tab = EncounterJournal.instanceSelect.suggestTab;
+	local tab = EncounterJournal.suggestTab;
 	local tierData = GetEJTierData(EJSuggestTab_GetPlayerTierIndex());
-	tab.selectedGlow:SetVertexColor(tierData.r, tierData.g, tierData.b);
-	tab.selectedGlow:Show();
 	instanceSelect.bg:SetAtlas(tierData.backgroundAtlas, true);
 
 	local self = EncounterJournal.suggestFrame;
@@ -3232,8 +3381,7 @@ function AdventureJournal_Reward_OnEnter(self)
 			tooltip:SetOwner(frame.Item1, "ANCHOR_NONE");
 			frame.Item1.UpdateTooltip = function() AdventureJournal_Reward_OnEnter(self) end;
 			if ( rewardData.itemLink ) then
-				tooltip:SetHyperlink(rewardData.itemLink);
-				GameTooltip_ShowCompareItem(tooltip, frame.Item1.tooltip);
+				EncounterJournal_SetTooltipWithCompare(tooltip, rewardData.itemLink);
 
 				local quality = select(3, GetItemInfo(rewardData.itemLink));
 				SetItemButtonQuality(frame.Item1, quality, rewardData.itemLink);
@@ -3332,7 +3480,7 @@ function AdventureJournal_Reward_OnMouseDown(self)
 		-- select the loot tab
 		EncounterJournal.encounter.info[EJ_Tabs[2].button]:Click();
 	elseif ( data.isRandomDungeon ) then
-		EJ_ContentTab_Select(EncounterJournal.instanceSelect.dungeonsTab.id);
+		EJ_ContentTab_Select(EncounterJournal.dungeonsTab:GetID());
 		EncounterJournal_TierDropDown_Select(nil, data.expansionLevel);
 	end
 end
@@ -3390,8 +3538,24 @@ function EncounterJournalBossButtonDefeatedOverlay_OnEnter(self)
 	end
 end
 
-EncounterJournalScrollBarMixin = {};
+EncounterJournalScrollBarOldMixin = {};
 
-function EncounterJournalScrollBarMixin:OnLoad()
+function EncounterJournalScrollBarOldMixin:OnLoad()
 	self.trackBG:SetVertexColor(ENCOUNTER_JOURNAL_SCROLL_BAR_BACKGROUND_COLOR:GetRGBA());
+end
+
+ModifiedInstanceIconMixin = { };
+function ModifiedInstanceIconMixin:OnEnter()
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip_SetTitle(GameTooltip, self.name, HIGHLIGHT_FONT_COLOR);
+	GameTooltip_AddNormalLine(GameTooltip, self.info.description);
+	GameTooltip:Show();
+end
+
+function ModifiedInstanceIconMixin:GetIconTextureAtlas()
+	return GetFinalNameFromTextureKit("%s-large", self.info.uiTextureKit);
+end
+
+function ModifiedInstanceIconMixin:OnLeave()
+	GameTooltip:Hide();
 end

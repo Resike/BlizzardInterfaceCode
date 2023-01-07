@@ -287,9 +287,17 @@ end
 function ChannelRosterButtonMixin:GetMemberChannelRank()
 	local channel = ChannelFrame:GetList():GetSelectedChannelButton();
 	if channel then
-		local ruleset, activePlayerRole = channel:GetChannelRuleset();
+		local ruleset = channel:GetChannelRuleset();
 		if ruleset == Enum.ChatChannelRuleset.Mentor then
-			return nil;
+			local memberStatus = self:IsMemberModerator() and Enum.PlayerMentorshipStatus.Mentor or Enum.PlayerMentorshipStatus.Newcomer;
+			local memberStatus = ChatFrame_GetMentorChannelStatus(memberStatus, Enum.ChatChannelRuleset.Mentor);
+			if memberStatus == Enum.PlayerMentorshipStatus.Mentor then
+				return "mentor";
+			elseif memberStatus == Enum.PlayerMentorshipStatus.Newcomer then
+				return "newcomer";
+			end
+
+			return nil; -- otherwise we don't want status icons in this channel
 		end
 	end
 
@@ -304,6 +312,8 @@ local channelRankImages =
 {
 	owner = { asset = "Interface\\GroupFrame\\UI-Group-LeaderIcon" },
 	moderator = { asset = "Interface\\GroupFrame\\UI-Group-AssistantIcon" },
+	mentor = { asset = "newplayerchat-chaticon-guide", isAtlas = true, width = 15, height = 13, },
+	newcomer = { asset = "newplayerchat-chaticon-newcomer", isAtlas = true, width = 14, height = 14, },
 }
 
 function ChannelRosterButtonMixin:UpdateRankVisibleState()
@@ -318,16 +328,18 @@ function ChannelRosterButtonMixin:UpdateRankVisibleState()
 		else
 			self.Rank:SetTexture(rankImage.asset);
 		end
+
+		self.Rank:SetSize(rankImage.width or 12, rankImage.height or 12);
 	end
 end
 
 function ChannelRosterButtonMixin:UpdateRankPosition()
 	if self.showRank then
-		local nameOffset = self.Name:GetLeft() - self:GetLeft();
-		local nameWidth = self.Name:GetWidth();
-		local nameStringWidth = self.Name:GetStringWidth();
-		local rankOffset = (self.Name:IsTruncated() and nameWidth or (nameStringWidth + 4)) + nameOffset;
-		self.Rank:SetPoint("LEFT", self, "LEFT", rankOffset, 0);
+		if self.Name:IsTruncated() then
+			self.Rank:SetPoint("LEFT", self, "LEFT", 160, 0);
+		else
+			self.Rank:SetPoint("LEFT", self.Name, "LEFT", self.Name:GetStringWidth() + 4, 0);
+		end
 	end
 end
 

@@ -1,13 +1,9 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
-..\FrameXML\UI.xsd">
+..\..\FrameXML\UI.xsd">
   <Script file="PVPMatchTable.lua"/>
 
   <Frame name="PVPTableRowTemplate" mixin="PVPRowMixin" enableMouse="true" virtual="true">
     <Size y="16"/>
-    <Anchors>
-      <Anchor point="TOPLEFT"/>
-      <Anchor point="TOPRIGHT"/>
-    </Anchors>
     <Layers>
       <Layer level="BACKGROUND">
 				<Texture parentKey="backgroundLeft" parentArray="Backgrounds" file="Interface\WorldStateFrame\WorldStateFinalScore-Highlight">
@@ -66,11 +62,24 @@
 		</Scripts>
 	</Frame>
   <Button name="PVPCellNameTemplate" mixin="PVPCellNameMixin" inherits="PVPStringTemplate" parentKey="cell" registerForClicks="LeftButtonUp,RightButtonUp" enableMouse="true" virtual="true">
+    <Frames>
+      <Frame parentKey="DropDown" inherits="UIDropDownMenuTemplate" hidden="true">
+        <Size x="100" y="100"/>
+        <Anchors>
+          <Anchor point="TOPLEFT"/>
+        </Anchors>
+        <Scripts>
+          <OnLoad function="PvpCellNameDropDown_OnLoad"/>
+        </Scripts>
+      </Frame>
+    </Frames>
     <Scripts>
 			<OnEnter method="OnEnter"/>
 			<OnLeave method="OnLeave"/>
+      <OnClick method="OnClick"/>
     </Scripts>
   </Button>
+	<Button name="PVPSoloShuffleCellNameTemplate" mixin="PVPSoloShuffleCellNameMixin" inherits="PVPCellNameTemplate" virtual="true"/>
 	<Frame name="PVPCellStringTemplate" mixin="PVPCellStringMixin" inherits="PVPStringTemplate" parentKey="cell" enableMouse="true" virtual="true">
     <Scripts>
       <OnEnter method="OnEnter"/>
@@ -78,6 +87,8 @@
     </Scripts>
   </Frame>
   <Frame name="PVPCellStatTemplate" mixin="PVPCellStatMixin" inherits="PVPStringTemplate" parentKey="cell" enableMouse="true" virtual="true"/>
+	<Button name="PVPSoloShuffleCellStatTemplate" mixin="PVPSoloShuffleCellStatMixin" inherits="PVPCellStatTemplate" virtual="true"/>
+	
   <Frame name="PVPNewRatingTemplate" mixin="PVPNewRatingMixin" inherits="PVPStringTemplate" parentKey="cell" enableMouse="true" virtual="true"/>
 	<Button name="PVPHeaderStringTemplate" mixin="PVPHeaderStringMixin" inherits="PVPStringTemplate" parentKey="header" enableMouse="true" virtual="true">
     <Scripts>

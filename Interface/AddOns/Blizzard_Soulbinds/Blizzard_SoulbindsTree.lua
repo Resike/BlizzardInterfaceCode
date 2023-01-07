@@ -235,10 +235,6 @@ function SoulbindTreeMixin:StopNodeAnimations()
 	end
 end
 
-local function AreConduitsResettingOrIsUninstalled(nodeFrame)
-	return Soulbinds.IsConduitResetPending() or (C_Soulbinds.GetConduitCharges() > 0 or not C_Soulbinds.IsConduitInstalled(nodeFrame:GetID()));
-end
-
 local function IsInstallingConduitsOrNotPending(soulbindID, nodeFrame)
 	if not Soulbinds.IsConduitCommitPending() then
 		return true;
@@ -259,9 +255,9 @@ function SoulbindTreeMixin:ApplyConduitPickupAnim(conduitType, conduitID)
 			-- evaluable in the sense that their actual state would not match their expected state. 
 			-- For example a commit is in flight, entering the collection would incorrectly animate
 			-- a conduit that is about to be installed. Similarly, if conduits are being reset, entering the 
-			-- collection would incorrect disallow animation because it would still appear installed. 
+			-- collection would incorrect disallow animation because it would still appear installed.
 			return nodeFrame:IsConduit() and nodeFrame:IsConduitType(conduitType) and 
-				AreConduitsResettingOrIsUninstalled(nodeFrame) and IsInstallingConduitsOrNotPending(self.soulbindID, nodeFrame);
+				IsInstallingConduitsOrNotPending(self.soulbindID, nodeFrame);
 		end
 
 		if C_Soulbinds.IsUnselectedConduitPendingInSoulbind(self.soulbindID) then
@@ -384,11 +380,13 @@ function SoulbindTreeMixin:OnCursorChanged(isDefault, newCursorType, oldCursorTy
 end
 
 function SoulbindTreeMixin:GetSelectableCount()
-	return AccumulateIf(self.nodeFrames, 
-		function(nodeFrame)
-			return nodeFrame:IsSelectable();
+	local count = 0;
+	for _, nodeFrame in pairs(self.nodeFrames) do
+		if nodeFrame:IsSelectable() then
+			count = count + 1;
 		end
-	);
+	end
+	return count;
 end
 
 function SoulbindTreeMixin:StopThenApplySelectableAndUnsocketedAnims()
@@ -416,11 +414,6 @@ function SoulbindTreeMixin:StopThenApplySelectableAndUnsocketedAnims()
 end
 
 function SoulbindTreeMixin:TryInstallConduitInSlot(nodeID, conduitID)
-	if C_Soulbinds.GetTotalConduitChargesPending() >= C_Soulbinds.GetConduitCharges() then
-		UIErrorsFrame:AddExternalErrorMessage(CONDUIT_CHARGE_ERROR);	
-		return;
-	end
-
 	local pendingInstallConduitID = C_Soulbinds.GetConduitIDPendingInstall(nodeID);
 	if pendingInstallConduitID and pendingInstallConduitID == conduitID then
 		return;
@@ -498,7 +491,7 @@ function SoulbindTreeMixin:Init(soulbindData)
 			local y = row * cellVerticalDist;
 			local centerColumn = column == 1;
 			if centerColumn then
-				y = y + NegateIf(cellChevronDist, row < 4);
+				y = y + NegateIf(cellChevronDist, row < 6);
 			end
 
 			local coord = {x = x, y = -y};

@@ -17,21 +17,53 @@ StaticPopupDialogs["CONFIRM_SELECT_WEEKLY_REWARD"] = {
 	timeout = 0,
 	hideOnEscape = 1,
 	showAlert = 1,
+	acceptDelay = 5,
 }
 
 local WEEKLY_REWARDS_EVENTS = {
-	"WEEKLY_REWARDS_SHOW",
-	"WEEKLY_REWARDS_HIDE",
 	"WEEKLY_REWARDS_UPDATE",
 	"CHALLENGE_MODE_COMPLETED",
 	"CHALLENGE_MODE_MAPS_UPDATE",
 };
 
+local weeklyRewardsFrameTextureKitRegions = {
+	BackgroundTile = "UI-Frame-%s-BackgroundTile",
+	Divider1 = "%s-weeklyrewards-divider",
+	Divider2 = "%s-weeklyrewards-divider",
+}
+
+local weeklyRewardsSelectRewardButtonTextureKitRegions = {
+	Background = "%s-weeklyrewards-frame-button",
+}
+
+local weeklyRewardsConcessionFrameTextureKitRegions = {
+	Divider1 = "%s-weeklyrewards-divider-currency",
+	Divider2 = "%s-weeklyrewards-divider-currency",
+}
+
+local headerFrameTextureKitRegions = 
+{
+	Left = "UI-Frame-%s-TitleLeft",
+	Right = "UI-Frame-%s-TitleRight",
+	Middle = "_UI-Frame-%s-TitleMiddle",
+}
+
+local weeklyRewardActivityTypeTextureKitRegions = {
+	Border = "%s-weeklyrewards-frame-mode",
+}
+
+local weeklyRewardActivityTextureKitRegions = { 
+	Orb = "%s-weeklyrewards-orb-unlocked",
+}
+
+local rewardUiModelSceneEffectByTextureKit = {
+	["Oribos"] = { effectID = 102, offsetX = -30, offsetY = -20},
+	["Dragonflight"] =  { effectID = 148, offsetX = -40, offsetY = -20},
+}
+
 WeeklyRewardsMixin = { };
 
 function WeeklyRewardsMixin:OnLoad()
-	UIPanelCloseButton_SetBorderAtlas(self.CloseButton, "UI-Frame-Oribos-ExitButtonBorder", -1, 1);
-
 	self:SetUpActivity(self.RaidFrame, RAIDS, "weeklyrewards-background-raid", Enum.WeeklyRewardChestThresholdType.Raid);
 	self:SetUpActivity(self.MythicFrame, MYTHIC_DUNGEONS, "weeklyrewards-background-mythic", Enum.WeeklyRewardChestThresholdType.MythicPlus);
 	self:SetUpActivity(self.PVPFrame, PVP, "weeklyrewards-background-pvp", Enum.WeeklyRewardChestThresholdType.RankedPvP);
@@ -48,7 +80,25 @@ end
 function WeeklyRewardsMixin:OnShow()
 	FrameUtil.RegisterFrameForEvents(self, WEEKLY_REWARDS_EVENTS);
 	PlaySound(SOUNDKIT.UI_WEEKLY_REWARD_OPEN_WINDOW);
+	C_WeeklyRewards.OnUIInteract();
+	WeeklyRewardExpirationWarningDialog:SetShown(C_WeeklyRewards.ShouldShowRetirementMessage() or C_WeeklyRewards.ShouldShowFinalRetirementMessage());
 	self:FullRefresh();
+	self:SetupTextures();
+end
+
+function WeeklyRewardsMixin:SetupTextures()
+	local textureKit = C_WeeklyRewards.GetWeeklyRewardTextureKit(); 
+	if(textureKit) then 
+		SetupTextureKitOnRegions(textureKit, self, weeklyRewardsFrameTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize);
+		SetupTextureKitOnRegions(textureKit, self.HeaderFrame, headerFrameTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize);
+		SetupTextureKitOnRegions(textureKit, self.RaidFrame, weeklyRewardActivityTypeTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize);
+		SetupTextureKitOnRegions(textureKit, self.PVPFrame, weeklyRewardActivityTypeTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize)
+		SetupTextureKitOnRegions(textureKit, self.MythicFrame, weeklyRewardActivityTypeTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize)
+		SetupTextureKitOnRegions(textureKit, self.ConcessionFrame, weeklyRewardsConcessionFrameTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize);
+		SetupTextureKitOnRegions(textureKit, self.SelectRewardButton, weeklyRewardsSelectRewardButtonTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize);
+		self.NineSlice:Show(); 
+		NineSliceUtil.ApplyUniqueCornersLayout(self.NineSlice,textureKit);
+	end
 end
 
 function WeeklyRewardsMixin:OnHide()
@@ -57,14 +107,11 @@ function WeeklyRewardsMixin:OnHide()
 	self.selectedActivity = nil;
 	C_WeeklyRewards.CloseInteraction();
 	StaticPopup_Hide("CONFIRM_SELECT_WEEKLY_REWARD");
+	WeeklyRewardExpirationWarningDialog:Hide(); 
 end
 
 function WeeklyRewardsMixin:OnEvent(event)
-	if event == "WEEKLY_REWARDS_SHOW" then
-		self:FullRefresh();
-	elseif event == "WEEKLY_REWARDS_HIDE" then
-		HideUIPanel(self);
-	elseif event == "WEEKLY_REWARDS_UPDATE" then
+	if event == "WEEKLY_REWARDS_UPDATE" then
 		if not self.hasAvailableRewards and C_WeeklyRewards.HasAvailableRewards() then
 			-- this means the week ticked over with the UI open
 			-- hide the UI so the rewards can be generated when the user reopens it
@@ -145,6 +192,7 @@ function WeeklyRewardsMixin:Refresh(playSheenAnims)
 	self:UpdateTitle();
 	self:UpdateOverlay();
 	self:UpdatePreviousClaim();
+	self:CheckForTutorials();
 
 	local canClaimRewards = C_WeeklyRewards.CanClaimRewards();
 	self.SelectRewardButton:SetShown(canClaimRewards);
@@ -264,11 +312,85 @@ function WeeklyRewardsMixin:SelectReward()
 	self.confirmSelectionFrame:ShowPopup(self.selectedActivity:GetDisplayedItemDBID(), self:GetSelectedActivityInfo());
 end
 
+function WeeklyRewardsMixin:CheckForTutorials()
+	-- Players already expect Class Set items from raids, but not Mythic Plus and PVP
+	if not GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_GREAT_VAULT_CLASS_SETS) then
+		self:TryDisplayingClassSetTutorial();
+	end
+end
+
+function WeeklyRewardsMixin:TryDisplayingClassSetTutorial()
+	local activities = C_WeeklyRewards.GetActivities();	
+	local continuableContainer = ContinuableContainer:Create();
+
+	-- Load relevant items first
+	for _, activity in ipairs(activities) do
+		if activity.type ~= Enum.WeeklyRewardChestThresholdType.Raid then
+			for _, reward in ipairs(activity.rewards) do
+				if reward.type == Enum.CachedRewardType.Item and not C_Item.IsItemKeystoneByID(reward.id) then
+					local item = Item:CreateFromItemID(reward.id);
+					continuableContainer:AddContinuable(item);
+				end
+			end
+		end
+	end
+
+	continuableContainer:ContinueOnLoad(function()
+		local activity = self:FindFirstNonRaidActivityWithClassSetReward(activities);
+		if activity then
+			local endOfRow = self:GetActivityFrame(activity, NUM_COLUMNS);
+			self:ShowClassSetTutorial(endOfRow);
+		end
+	end);
+end
+
+function WeeklyRewardsMixin:FindFirstNonRaidActivityWithClassSetReward(activities)
+	for _, activity in ipairs(activities) do
+		if activity.type ~= Enum.WeeklyRewardChestThresholdType.Raid then
+			for _, reward in ipairs(activity.rewards) do
+				if reward.type == Enum.CachedRewardType.Item and not C_Item.IsItemKeystoneByID(reward.id) then
+					-- We are working under the assumption that a set item which is class specific is a "Class Set"
+					local setID = select(16, GetItemInfo(reward.id));
+					if setID and C_Item.IsItemSpecificToPlayerClass(reward.id) then
+						return activity.type;
+					end
+				end
+			end
+		end
+	end
+end
+
+function WeeklyRewardsMixin:ShowClassSetTutorial(parent)
+	local helpTipInfo = {
+		text = GREAT_VAULT_CLASS_SET_TUTORIAL,
+		buttonStyle = HelpTip.ButtonStyle.Close,
+		cvarBitfield = "closedInfoFrames",
+		bitfieldFlag = LE_FRAME_TUTORIAL_GREAT_VAULT_CLASS_SETS,
+		targetPoint = HelpTip.Point.RightEdgeCenter,
+		alignment = HelpTip.Alignment.Right,
+		offsetX = 10,
+	};
+	HelpTip:Show(parent, helpTipInfo);
+end
+
 WeeklyRewardOverlayMixin = {};
 
+local weeklyRewardOverlayEffects = {
+	["Oribos"] = { effectID = 102, offsetX = 3, offsetY = 0 },
+	["Dragonflight"] =  { effectID = 148, offsetX = 3, offsetY = 0 },
+}
+
+local weeklyRewardOverlayTextureKitRegions = { 
+	BackgroundTile = "UI-Frame-%s-BackgroundTile"
+}
+
 function WeeklyRewardOverlayMixin:OnShow()
-	local effect = { effectID = 102, offsetX = 3, offsetY = 0 };
-	self.activeEffect = self.ModelScene:AddDynamicEffect(effect, self);
+	local textureKit = C_WeeklyRewards.GetWeeklyRewardTextureKit();
+	if textureKit then 
+		self.activeEffect = self.ModelScene:AddDynamicEffect(weeklyRewardOverlayEffects[textureKit], self);
+		SetupTextureKitOnRegions(textureKit, self, weeklyRewardOverlayTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize);
+		NineSliceUtil.ApplyLayoutByName(self.NineSlice, "Dialog");
+	end
 end
 
 function WeeklyRewardOverlayMixin:OnHide()
@@ -301,7 +423,11 @@ end
 function WeeklyRewardsActivityMixin:Refresh(activityInfo)
 	local thresholdString;
 	if activityInfo.type == Enum.WeeklyRewardChestThresholdType.Raid then
-		thresholdString = WEEKLY_REWARDS_THRESHOLD_RAID;
+		if activityInfo.raidString then
+			thresholdString = activityInfo.raidString;
+		else
+			thresholdString = WEEKLY_REWARDS_THRESHOLD_RAID;
+		end
 	elseif activityInfo.type == Enum.WeeklyRewardChestThresholdType.MythicPlus then
 		thresholdString = WEEKLY_REWARDS_THRESHOLD_MYTHIC;
 	elseif activityInfo.type == Enum.WeeklyRewardChestThresholdType.RankedPvP then
@@ -331,9 +457,12 @@ function WeeklyRewardsActivityMixin:Refresh(activityInfo)
 			self.ItemGlow:Show();
 			self:ClearActiveEffect();
 		else
-			self.Orb:SetAtlas("weeklyrewards-orb-unlocked", useAtlasSize);
+			local textureKit = C_WeeklyRewards.GetWeeklyRewardTextureKit(); 
+			if(textureKit) then 
+				SetupTextureKitOnRegions(textureKit, self, weeklyRewardActivityTextureKitRegions, TextureKitConstants.SetVisibility, TextureKitConstants.UseAtlasSize);
+				self:SetActiveEffect(rewardUiModelSceneEffectByTextureKit[textureKit]);
+			end 
 			self.ItemGlow:Hide();
-			self:SetActiveEffect(UNLOCKED_EFFECT_INFO);
 		end
 
 		if self.hasPendingSheenAnim then
@@ -600,7 +729,7 @@ function WeeklyRewardActivityItemMixin:OnLeave()
 end
 
 function WeeklyRewardActivityItemMixin:OnUpdate()
-	if IsModifiedClick("COMPAREITEMS") or GetCVarBool("alwaysCompareItems") then
+	if TooltipUtil.ShouldDoItemComparison() then
 		GameTooltip_ShowCompareItem(GameTooltip);
 	else
 		GameTooltip_HideShoppingTooltips(GameTooltip);
@@ -863,3 +992,14 @@ function WeeklyRewardConfirmSelectionMixin:RefreshRewards()
 	end
 	self:SetHeight(heightUsed);
 end
+
+GreatVaultRetirementWarningFrameMixin = { };
+
+function GreatVaultRetirementWarningFrameMixin:OnShow()
+	local title = _G["EXPANSION_NAME"..LE_EXPANSION_LEVEL_CURRENT]; 
+	if(title) then 
+		local text = C_WeeklyRewards.ShouldShowFinalRetirementMessage() and GREAT_VAULT_RETIRE_WARNING_FINAL_WEEK:format(title) or GREAT_VAULT_RETIRE_WARNING:format(title);
+		self.Description:SetText(text); 
+	end 
+end 
+

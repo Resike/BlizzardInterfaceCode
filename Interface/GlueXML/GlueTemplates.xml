@@ -1,33 +1,18 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
 	<Script file="GlueTemplates.lua"/>
-	<Button name="GlueCloseButton" virtual="true">
-		<Size x="32" y="32"/>
-		<Scripts>
-			<OnClick>
-				self:GetParent():Hide();
-			</OnClick>
-		</Scripts>
-		<NormalTexture file="Interface\Buttons\UI-Panel-MinimizeButton-Up"/>
-		<PushedTexture file="Interface\Buttons\UI-Panel-MinimizeButton-Down"/>
-		<HighlightTexture file="Interface\Buttons\UI-Panel-MinimizeButton-Highlight" alphaMode="ADD"/>
-	</Button>
 	<Texture name="GlueScrollBarButton" virtual="true">
 		<TexCoords left="0.23" right="0.77" top="0.23" bottom="0.77"/>
 	</Texture>
 	<Button name="GlueScrollUpButtonTemplate" virtual="true">
-		<Size>
-			<AbsDimension x="18" y="18"/>
-		</Size>
+		<Size x="18" y="18"/>
 		<NormalTexture inherits="GlueScrollBarButton" file="Interface\Buttons\UI-ScrollBar-ScrollUpButton-Up"/>
 		<PushedTexture inherits="GlueScrollBarButton" file="Interface\Buttons\UI-ScrollBar-ScrollUpButton-Down"/>
 		<DisabledTexture inherits="GlueScrollBarButton" file="Interface\Buttons\UI-ScrollBar-ScrollUpButton-Disabled"/>
 		<HighlightTexture inherits="GlueScrollBarButton" file="Interface\Buttons\UI-ScrollBar-ScrollUpButton-Highlight" alphaMode="ADD"/>
 	</Button>
 	<Button name="GlueScrollDownButtonTemplate" virtual="true">
-		<Size>
-			<AbsDimension x="18" y="18"/>
-		</Size>
+		<Size x="18" y="18"/>
 		<NormalTexture inherits="GlueScrollBarButton" file="Interface\Buttons\UI-ScrollBar-ScrollDownButton-Up"/>
 		<PushedTexture inherits="GlueScrollBarButton" file="Interface\Buttons\UI-ScrollBar-ScrollDownButton-Down"/>
 		<DisabledTexture inherits="GlueScrollBarButton" file="Interface\Buttons\UI-ScrollBar-ScrollDownButton-Disabled"/>
@@ -37,18 +22,12 @@
 		<TexCoords left="0" right="0.625" top="0" bottom="0.6875"/>
 	</Texture>
 	<CheckButton name="GlueCheckButtonTemplate" virtual="true">
-		<Size>
-			<AbsDimension x="32" y="32"/>
-		</Size>
+		<Size x="32" y="32"/>
 		<Layers>
 			<Layer level="ARTWORK">
 				<FontString name="$parentText" inherits="GlueFontNormalSmall">
 					<Anchors>
-						<Anchor point="LEFT" relativePoint="RIGHT">
-							<Offset>
-								<AbsDimension x="-2" y="0"/>
-							</Offset>
-						</Anchor>
+						<Anchor point="LEFT" relativePoint="RIGHT" x="-2" y="0"/>
 					</Anchors>
 				</FontString>
 			</Layer>
@@ -160,9 +139,7 @@
 	</Button>
 
 	<Slider name="GlueScrollBarTemplate" virtual="true">
-		<Size>
-			<AbsDimension x="16" y="0"/>
-		</Size>
+		<Size x="16" y="0"/>
 		<Frames>
 			<Button name="$parentScrollUpButton" parentKey="ScrollUpButton" inherits="GlueScrollUpButtonTemplate">
 				<Anchors>
@@ -203,9 +180,7 @@
 			</OnValueChanged>
 		</Scripts>
 		<ThumbTexture inherits="GlueScrollBarButton" file="Interface\Buttons\UI-ScrollBar-Knob">
-			<Size>
-				<AbsDimension x="18" y="24"/>
-			</Size>
+			<Size x="18" y="24"/>
 			<TexCoords left="0.20" right="0.80" top="0.125" bottom="0.875"/>
 		</ThumbTexture>
 	</Slider>
@@ -213,16 +188,8 @@
 		<Frames>
 			<Slider name="$parentScrollBar" inherits="GlueScrollBarTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT">
-						<Offset>
-							<AbsDimension x="6" y="-16"/>
-						</Offset>
-					</Anchor>
-					<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMRIGHT">
-						<Offset>
-							<AbsDimension x="6" y="16"/>
-						</Offset>
-					</Anchor>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="6" y="-16"/>
+					<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMRIGHT" x="6" y="16"/>
 				</Anchors>
 			</Slider>
 		</Frames>
@@ -310,22 +277,5 @@
 				</Texture>
 			</Layer>
 		</Layers>
-	</Frame>
-	<Frame name="GlueModalFrameTemplate" virtual="true">
-		<Frames>
-			<Frame parentKey="ModalBackground" useParentLevel="true" enableMouse="true">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="GlueParent"/>
-					<Anchor point="BOTTOMRIGHT" relativeTo="GlueParent"/>
-				</Anchors>
-				<Layers>
-					<Layer level="BACKGROUND" textureSubLevel="-10">
-						<Texture setAllPoints="true">
-							<Color a="0.75" r="0" g="0" b="0"/>
-						</Texture>
-					</Layer>
-				</Layers>
-			</Frame>
-		</Frames>
 	</Frame>
 </Ui>

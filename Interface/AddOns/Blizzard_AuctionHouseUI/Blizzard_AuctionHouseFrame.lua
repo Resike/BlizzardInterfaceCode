@@ -7,8 +7,52 @@ StaticPopupDialogs["BUYOUT_AUCTION"] = {
 	text = BUYOUT_AUCTION_CONFIRMATION,
 	button1 = ACCEPT,
 	button2 = CANCEL,
+
 	OnAccept = function(self)
 		C_AuctionHouse.PlaceBid(self.data.auctionID, self.data.buyout);
+		self.button1:Disable();
+		self.button2:Disable();
+
+		local spinnerTimer = C_Timer.NewTimer(2, function()
+			self.DarkOverlay:Show();
+			self.LoadingSpinner:Show();
+			self.SpinnerAnim:Play();
+		end);
+
+		self:RegisterEvent("AUCTION_HOUSE_PURCHASE_COMPLETED");
+		self:RegisterEvent("AUCTION_HOUSE_SHOW_ERROR");
+		local oldOnEvent = self:GetScript("OnEvent");
+		local oldOnHide = self:GetScript("OnHide");
+		local function OnComplete()
+			spinnerTimer:Cancel();
+			self.LoadingSpinner:Hide();
+			self.SpinnerAnim:Stop();
+			self:SetScript("OnEvent", oldOnEvent);
+			self:SetScript("OnHide", oldOnHide);
+			self:Hide();
+		end
+		self:SetScript("OnEvent", function(self, event, ...)
+			if oldOnEvent then
+				oldOnEvent(self, event, ...);
+			end
+
+			if event == "AUCTION_HOUSE_PURCHASE_COMPLETED" then
+				local auctionID = ...;
+				if auctionID == self.data.auctionID then
+					OnComplete();
+				end
+			elseif event == "AUCTION_HOUSE_SHOW_ERROR" then
+				OnComplete();
+			end
+		end);
+		self:SetScript("OnHide", function()
+			if oldOnHide then
+				oldOnHide(self);
+			end
+			OnComplete();
+		end);
+
+		return true;
 	end,
 	OnShow = function(self)
 		MoneyFrame_Update(self.moneyFrame, self.data.buyout);
@@ -37,6 +81,24 @@ StaticPopupDialogs["BID_AUCTION"] = {
 	hideOnEscape = 1
 };
 
+StaticPopupDialogs["PURCHASE_AUCTION_UNIQUE"] = {
+	text = "",
+	button1 = OKAY,
+	button2 = CANCEL,
+	OnShow = function(self, data)
+		self.text:SetText(PURCHASE_UNIQUE_AUCTION_CONFIRMATION:format(data.categoryName));
+	end,
+	OnAccept = function(self, data)
+		data.callback();
+	end,
+
+	showAlert = 1,
+	timeout = 0,
+	exclusive = 1,
+	hideOnEscape = 1,
+	acceptDelay = 3,
+};
+
 StaticPopupDialogs["CANCEL_AUCTION"] = {
 	text = CANCEL_AUCTION_CONFIRMATION,
 	button1 = ACCEPT,
@@ -60,10 +122,43 @@ StaticPopupDialogs["CANCEL_AUCTION"] = {
 	hideOnEscape = 1
 };
 
+StaticPopupDialogs["AUCTION_HOUSE_POST_WARNING"] = {
+	text = NORMAL_FONT_COLOR:WrapTextInColorCode(CONFIRM_AUCTION_POSTING_TEXT),
+	button1 = ACCEPT,
+	button2 = CANCEL,
+	OnAccept = function ()
+		if not AuctionHouseFrame.CommoditiesSellFrame:ConfirmPost() then
+			AuctionHouseFrame.ItemSellFrame:ConfirmPost();
+		end
+	end,
+	OnHide = function()
+		AuctionHouseFrame:SetDialogOverlayShown(false);
+	end,
+
+	showAlert = true,
+	hideOnEscape = 1,
+	timeout = 0,
+	whileDead = 1,
+}
+
+StaticPopupDialogs["AUCTION_HOUSE_POST_ERROR"] = {
+	text = NORMAL_FONT_COLOR:WrapTextInColorCode(AUCTION_POSTING_ERROR_TEXT),
+	button1 = OKAY,
+	OnHide = function()
+		AuctionHouseFrame:SetDialogOverlayShown(false);
+	end,
+	showAlert = true,
+	hideOnEscape = 1,
+	timeout = 0,
+	whileDead = 1,
+}
+
 AUCTION_HOUSE_STATIC_POPUPS = {
 	"BUYOUT_AUCTION",
 	"BID_AUCTION",
 	"CANCEL_AUCTION",
+	"AUCTION_HOUSE_POST_WARNING",
+	"AUCTION_HOUSE_POST_ERROR",
 };
 
 
@@ -75,7 +170,7 @@ AuctionHouseSortOrderState = tInvert({
 	"PrimarySorted",
 	"PrimaryReversed",
 	"Sorted",
-	"Reversed",	
+	"Reversed",
 });
 
 
@@ -136,7 +231,7 @@ local function InitAuctionHouseSortsBySearchContext()
 				g_auctionHouseSortsBySearchContext[searchContext][2] = { sortOrder = Enum.AuctionHouseSortOrder.Price, reverseSort = false };
 			end
 		end
-		
+
 	end
 end
 
@@ -246,6 +341,11 @@ local AUCTION_HOUSE_FRAME_EVENTS = {
 	"BIDS_UPDATED",
 	"BID_ADDED",
 	"OWNED_AUCTIONS_UPDATED",
+	"AUCTION_HOUSE_AUCTION_CREATED",
+	"AUCTION_HOUSE_SHOW_ERROR",
+	"AUCTION_HOUSE_SHOW_NOTIFICATION",
+	"AUCTION_HOUSE_SHOW_FORMATTED_NOTIFICATION",
+	"AUCTION_HOUSE_SHOW_COMMODITY_WON_NOTIFICATION",
 };
 
 local function AuctionHouseFrame_GenerateMaxWidthFunction(self, cacheName, maxPriceFunction, key)
@@ -295,7 +395,9 @@ function AuctionHouseFrameMixin:OnLoad()
 	end
 
 	self:RegisterEvent("ADDON_LOADED");
-	
+	self:RegisterEvent("AUCTION_HOUSE_POST_WARNING");
+	self:RegisterEvent("AUCTION_HOUSE_POST_ERROR");
+
 	PanelTemplates_SetNumTabs(self, #self.Tabs);
 
 	self.tabsForDisplayMode = {};
@@ -313,7 +415,7 @@ end
 
 function AuctionHouseFrameMixin:OnShow()
 	FrameUtil.RegisterFrameForEvents(self, AUCTION_HOUSE_FRAME_EVENTS);
-	
+
 	self:SetPortraitToUnit("npc");
 
 	self:SetDisplayMode(AuctionHouseFrameDisplayMode.Buy);
@@ -323,6 +425,8 @@ function AuctionHouseFrameMixin:OnShow()
 	if C_AuctionHouse.HasFavorites() then
 		self:QueryAll(AuctionHouseSearchContext.AllFavorites);
 	end
+
+	OpenAllBags(self);
 
 	PlaySound(SOUNDKIT.AUCTION_WINDOW_OPEN);
 end
@@ -353,6 +457,21 @@ function AuctionHouseFrameMixin:OnEvent(event, ...)
 	elseif event == "COMMODITY_SEARCH_RESULTS_ADDED" or event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
 		-- Clear the cached values.
 		self.maxUnitPriceWidth = {};
+	elseif event == "AUCTION_HOUSE_AUCTION_CREATED" then
+		Chat_AddSystemMessage(ERR_AUCTION_STARTED);
+	elseif event == "AUCTION_HOUSE_SHOW_ERROR" then
+		local auctionHouseError = ...;
+		UIErrorsFrame:AddExternalErrorMessage(AuctionHouseUtil.GetErrorText(auctionHouseError));
+	elseif (event == "AUCTION_HOUSE_SHOW_NOTIFICATION") or (event == "AUCTION_HOUSE_SHOW_FORMATTED_NOTIFICATION") then
+		local auctionHouseNotification, formatArg = ...;
+		Chat_AddSystemMessage(AuctionHouseUtil.GetNotificationText(auctionHouseNotification, formatArg));
+	elseif event == "AUCTION_HOUSE_SHOW_COMMODITY_WON_NOTIFICATION" then
+		local commodityName, commodityQuantity = ...;
+		Chat_AddSystemMessage(ERR_AUCTION_COMMODITY_WON_S:format(commodityName, commodityQuantity));
+	elseif event == "AUCTION_HOUSE_POST_WARNING" then
+		self:ShowPostConfirmationDialog("AUCTION_HOUSE_POST_WARNING");
+	elseif event == "AUCTION_HOUSE_POST_ERROR" then
+		self:ShowPostConfirmationDialog("AUCTION_HOUSE_POST_ERROR");
 	end
 end
 
@@ -362,12 +481,15 @@ function AuctionHouseFrameMixin:OnHide()
 	AuctionHouseMultisellProgressFrame:Hide();
 
 	self.BrowseResultsFrame:Reset();
+	self:SetDialogOverlayShown(false);
 
 	self:ClearPostItem();
 
 	C_AuctionHouse.CloseAuctionHouse();
 
 	self:CloseStaticPopups();
+
+	CloseAllBags(self);
 
 	PlaySound(SOUNDKIT.AUCTION_WINDOW_CLOSE);
 end
@@ -414,7 +536,7 @@ AuctionHouseFrameDisplayMode = {
 		"SearchBar",
 		"ItemBuyFrame",
 	},
-	
+
 	CommoditiesSell = {
 		"CommoditiesSellFrame",
 		"CommoditiesSellList",
@@ -547,7 +669,7 @@ end
 
 function AuctionHouseFrameMixin:UpdateTitle()
 	local tab = PanelTemplates_GetSelectedTab(self);
-	
+
 	local title = AUCTION_HOUSE_FRAME_TITLE_BUY;
 	if tab == 2 then
 		title = AUCTION_HOUSE_FRAME_TITLE_SELL;
@@ -598,6 +720,7 @@ function AuctionHouseFrameMixin:SelectBrowseResult(browseResult)
 	local searchContext = itemKeyInfo.isCommodity and AuctionHouseSearchContext.BuyCommodities or AuctionHouseSearchContext.BuyItems;
 	if itemKeyInfo.isCommodity then
 		self.CommoditiesBuyFrame:SetItemIDAndPrice(itemKey.itemID, browseResult.minPrice);
+		self.CommoditiesBuyFrame.BuyDisplay.ItemDisplay.FavoriteButton:SetItemKey(itemKey);
 		self:SetDisplayMode(AuctionHouseFrameDisplayMode.CommoditiesBuy);
 	else
 		self.ItemBuyFrame:SetItemKey(itemKey);
@@ -659,7 +782,12 @@ function AuctionHouseFrameMixin:QueryItem(searchContext, itemKey, byItemID)
 	if byItemID then
 		C_AuctionHouse.SendSellSearchQuery(itemKey, sorts, separateOwnerItems);
 	else
-		C_AuctionHouse.SendSearchQuery(itemKey, sorts, separateOwnerItems);
+		if searchContext == AuctionHouseSearchContext.BuyItems then
+			local minLevel, maxLevel = self.SearchBar:GetLevelFilterRange();
+			C_AuctionHouse.SendSearchQuery(itemKey, sorts, separateOwnerItems, minLevel, maxLevel);
+		else
+			C_AuctionHouse.SendSearchQuery(itemKey, sorts, separateOwnerItems);
+		end
 	end
 end
 
@@ -678,6 +806,7 @@ function AuctionHouseFrameMixin:QueryAll(searchContext)
 		C_AuctionHouse.SearchForFavorites(sorts);
 		self:TriggerEvent(AuctionHouseFrameMixin.Event.BrowseSearchStarted);
 		self:SetDisplayMode(AuctionHouseFrameDisplayMode.Buy);
+		self.BrowseResultsFrame:UpdateHeaders();
 	elseif searchContext == AuctionHouseSearchContext.AllAuctions then
 		C_AuctionHouse.QueryOwnedAuctions(sorts);
 	elseif searchContext == AuctionHouseSearchContext.AllBids then
@@ -693,6 +822,7 @@ function AuctionHouseFrameMixin:SendBrowseQuery(searchString, minLevel, maxLevel
 	local browseSearchContext = self:GetCategorySearchContext();
 	self:SendBrowseQueryInternal(browseSearchContext, searchString, minLevel, maxLevel, filtersArray);
 	self:TriggerEvent(AuctionHouseFrameMixin.Event.BrowseSearchStarted);
+	self.BrowseResultsFrame:UpdateHeaders();
 end
 
 function AuctionHouseFrameMixin:SendBrowseQueryInternal(browseSearchContext, searchString, minLevel, maxLevel, filtersArray)
@@ -734,6 +864,9 @@ function AuctionHouseFrameMixin:RefreshSearchResults(searchContext, itemKey)
 		local itemKeyInfo = C_AuctionHouse.GetItemKeyInfo(itemKey);
 		if itemKeyInfo.isCommodity then
 			C_AuctionHouse.RefreshCommoditySearchResults(itemKey.itemID);
+		elseif searchContext == AuctionHouseSearchContext.BuyItems then
+			local minLevel, maxLevel = self.SearchBar:GetLevelFilterRange();
+			C_AuctionHouse.RefreshItemSearchResults(itemKey, minLevel, maxLevel);
 		else
 			C_AuctionHouse.RefreshItemSearchResults(itemKey);
 		end
@@ -749,13 +882,31 @@ function AuctionHouseFrameMixin:StartCommoditiesPurchase(itemID, quantity, unitP
 end
 
 function AuctionHouseFrameMixin:StartItemBid(auctionID, bid)
-	local data = { auctionID = auctionID, bid = bid };
-	StaticPopup_Show("BID_AUCTION", nil, nil, data);
+	local function StartItemBid()
+		local data = { auctionID = auctionID, bid = bid };
+		StaticPopup_Show("BID_AUCTION", nil, nil, data);
+	end
+
+	self:StartItemPurchase(auctionID, StartItemBid);
 end
 
 function AuctionHouseFrameMixin:StartItemBuyout(auctionID, buyout)
-	local data = { auctionID = auctionID, buyout = buyout };
-	StaticPopup_Show("BUYOUT_AUCTION", nil, nil, data);
+	local function StartItemBuyout()
+		local data = { auctionID = auctionID, buyout = buyout };
+		StaticPopup_Show("BUYOUT_AUCTION", nil, nil, data);
+	end
+
+	self:StartItemPurchase(auctionID, StartItemBuyout);
+end
+
+function AuctionHouseFrameMixin:StartItemPurchase(auctionID, callback)
+	local isUniqueShadowlandsCrafted, categoryName = AuctionHouseUtil.IsAuctionIDUniqueShadowlandsCrafted(auctionID);
+	if isUniqueShadowlandsCrafted then
+		local data = { categoryName = categoryName, callback = callback };
+		StaticPopup_Show("PURCHASE_AUCTION_UNIQUE", nil, nil, data);
+	else
+		callback();
+	end
 end
 
 function AuctionHouseFrameMixin:SetSearchText(text)
@@ -788,4 +939,13 @@ function AuctionHouseFrameMixin:GetBidStatus(bidInfo)
 	else
 		return AuctionHouseBidStatus.OtherBid;
 	end
+end
+
+function AuctionHouseFrameMixin:SetDialogOverlayShown(shown)
+	self.DialogOverlay:SetShown(shown);
+end
+
+function AuctionHouseFrameMixin:ShowPostConfirmationDialog(which)
+	self:SetDialogOverlayShown(true);
+	StaticPopup_Show(which);
 end

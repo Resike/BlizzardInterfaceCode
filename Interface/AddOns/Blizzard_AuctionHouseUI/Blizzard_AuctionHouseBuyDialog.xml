@@ -1,7 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\..\FrameXML\UI.xsd">
 	<Script file="Blizzard_AuctionHouseBuyDialog.lua"/>
-	
+
 	<Frame name="AuctionHouseBuyDialogNotificationFrameTemplate" mixin="AuctionHouseBuyDialogNotificationFrameMixin" virtual="true">
 		<Size x="1" y="1"/>
 		<Layers>
@@ -54,13 +54,6 @@
 		<Frames>
 			<Frame parentKey="Border" inherits="DialogBorderDarkTemplate" useParentLevel="true"/>
 
-			<Button parentKey="DialogOverlay" useParentLevel="true">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeKey="$parent.$parent" relativePoint="TOPLEFT" x="0" y="-22"/>
-					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.$parent" relativePoint="BOTTOMRIGHT"/>
-				</Anchors>
-			</Button>
-
 			<Frame parentKey="ItemDisplay" hidden="true">
 				<Size x="1" y="1"/>
 				<Anchors>
@@ -100,6 +93,31 @@
 			<Button parentKey="OkayButton" mixin="AuctionHouseBuyDialogOkayButtonMixin" inherits="AuctionHouseDialogButtonTemplate" text="OKAY" hidden="true"/>
 
 			<Frame parentKey="Notification" inherits="AuctionHouseBuyDialogNotificationFrameTemplate" hidden="true"/>
+
+			<Frame parentKey="DarkOverlay" setAllPoints="true" hidden="true" frameLevel="1500">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="11" y="-11"/>
+					<Anchor point="BOTTOMRIGHT" x="-11" y="11"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture setAllPoints="true">
+							<Color r="0" g="0" b="0" a="0.8"/>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame parentKey="LoadingSpinner" hidden="true" frameLevel="2000">
+				<Size x="60" y="60"/>
+				<Anchors>
+					<Anchor point="CENTER" x="0" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Spinner" setAllPoints="true" atlas="auctionhouse-ui-loadingspinner"/>
+					</Layer>
+				</Layers>
+			</Frame>
 		</Frames>
 		<Layers>
 			<Layer level="OVERLAY">
@@ -111,6 +129,11 @@
 				</FontString>
 			</Layer>
 		</Layers>
+		<Animations>
+			<AnimationGroup parentKey="SpinnerAnim" looping="REPEAT">
+				<Rotation childKey="LoadingSpinner.Spinner" order="1" duration="1" degrees="-360"/>
+			</AnimationGroup>
+		</Animations>
 		<Scripts>
 			<OnShow method="OnShow"/>
 			<OnHide method="OnHide"/>

@@ -1,3 +1,6 @@
+TooltipConstants = {
+	WrapText = true,
+}
 
 --[[ Optionals:
 	headerText - string
@@ -6,6 +9,7 @@
 	atLeastShowAzerite - bool
 	fullItemDescription - bool
 	prioritizeCurrencyOverItem - bool
+	showCollectionText - bool
 --]]
 
 TOOLTIP_QUEST_REWARDS_STYLE_DEFAULT = {
@@ -17,6 +21,15 @@ TOOLTIP_QUEST_REWARDS_STYLE_DEFAULT = {
 	fullItemDescription = true,
 }
 
+TOOLTIP_QUEST_REWARDS_STYLE_WORLD_QUEST = {
+	headerText = QUEST_REWARDS,
+	headerColor = NORMAL_FONT_COLOR,
+	prefixBlankLineCount = 1,
+	postHeaderBlankLineCount = 0,
+	wrapHeaderText = true,
+	fullItemDescription = true,
+	showCollectionText = true,
+}
 
 TOOLTIP_QUEST_REWARDS_STYLE_NO_HEADER = {
 	prefixBlankLineCount = 0,
@@ -158,7 +171,23 @@ end
 
 function GameTooltip_SetDefaultAnchor(tooltip, parent)
 	tooltip:SetOwner(parent, "ANCHOR_NONE");
-	tooltip:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -CONTAINER_OFFSET_X - 13, CONTAINER_OFFSET_Y);
+
+	-- If GameTooltipDefaultContainer isn't corner anchored then find the nearest corner to anchor to
+	local point, relativeTo, relativePoint, offsetX, offsetY = GameTooltipDefaultContainer:GetPoint(1);
+	if not (point == "BOTTOMRIGHT" or point == "BOTTOMLEFT" or point == "TOPRIGHT" or point == "TOPLEFT") then
+		if point == "TOP" or point == "BOTTOM" then
+			point = offsetX > 0 and point.."RIGHT" or point.."LEFT";
+		elseif point =="LEFT" or point == "RIGHT" then
+			point = offsetY > 0 and "TOP"..point or "BOTTOM"..point;
+		else -- CENTER
+			local topBottom = offsetY > 0 and "TOP" or "BOTTOM";
+			local rightLeft = offsetX > 0 and "RIGHT" or "LEFT";
+			point = topBottom..rightLeft;
+		end
+	end
+
+	-- Anchor tooltip to corner
+	tooltip:SetPoint(point, GameTooltipDefaultContainer);
 end
 
 function GameTooltip_SetBasicTooltip(tooltip, text, x, y, wrap)
@@ -167,15 +196,6 @@ function GameTooltip_SetBasicTooltip(tooltip, text, x, y, wrap)
 	tooltip:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y);
 	local r, g, b = HIGHLIGHT_FONT_COLOR:GetRGB();
 	tooltip:SetText(text, r, g, b, 1, wrap);
-end
-
-function GameTooltip_ShowDisabledTooltip(tooltip, owner, text)
-	tooltip:SetOwner(owner);
-
-	local wrap = true;
-	GameTooltip_SetTitle(tooltip, text, RED_FONT_COLOR, wrap);
-
-	tooltip:Show();
 end
 
 function GameTooltip_AddQuestRewardsToTooltip(tooltip, questID, style)
@@ -223,16 +243,25 @@ end
 function GameTooltip_CalculatePadding(tooltip)
 	local itemWidth, itemHeight, bottomFontStringWidth, bottomFontStringHeight = 0, 0, 0, 0;
 
+	local itemTooltip = tooltip.ItemTooltip;
+	local isItemTooltipShown = itemTooltip and itemTooltip:IsShown();
 	local isBottomFontStringShown = tooltip.BottomFontString and tooltip.BottomFontString:IsShown();
+
+	if not isItemTooltipShown and not isBottomFontStringShown then
+		if tooltip.SetPadding then
+			tooltip:SetPadding(0, 0, 0, 0);
+		end
+		return;
+	end
+
 	if isBottomFontStringShown then
 		bottomFontStringWidth, bottomFontStringHeight = tooltip.BottomFontString:GetSize();
 		bottomFontStringHeight = bottomFontStringHeight + 7;
 		bottomFontStringWidth = bottomFontStringWidth + 20; -- extra width padding for this line
 	end
 
-	local itemTooltip = tooltip.ItemTooltip;
 	if itemTooltip then
-		if itemTooltip:IsShown() then
+		if isItemTooltipShown then
 			itemWidth, itemHeight = itemTooltip:GetSize();
 			itemWidth = itemWidth + 9; -- extra padding for this line
 		end
@@ -262,8 +291,10 @@ function GameTooltip_CalculatePadding(tooltip)
 		paddingHeight = extraHeight + 5;
 	end
 
-	if(math.abs(paddingWidth - oldPaddingWidth) > 0.5 or math.abs(paddingHeight - oldPaddingHeight) > 0.5) then
-		tooltip:SetPadding(paddingWidth, paddingHeight);
+	if (math.abs(paddingWidth - oldPaddingWidth) > 0.5) or (math.abs(paddingHeight - oldPaddingHeight) > 0.5) then
+		--if tooltip:IsRectValid() then
+			tooltip:SetPadding(paddingWidth, paddingHeight, 0, 0);
+		--end
 	end
 end
 
@@ -277,12 +308,15 @@ end
 
 function GameTooltip_OnLoad(self)
 	SharedTooltip_OnLoad(self);
-	self.needsReset = true;
 	self.updateTooltipTimer = TOOLTIP_UPDATE_TIME;
+
+	if self.supportsDataRefresh then
+		self:RegisterEvent("TOOLTIP_DATA_UPDATE");
+	end
 end
 
 function GameTooltip_OnTooltipAddMoney(self, cost, maxcost)
-	if( not maxcost ) then --We just have 1 price to display
+	if( not maxcost or maxcost < 1 ) then --We just have 1 price to display
 		SetTooltipMoney(self, cost, nil, string.format("%s:", SELL_PRICE));
 	else
 		GameTooltip_AddColoredLine(self, ("%s:"):format(SELL_PRICE), HIGHLIGHT_FONT_COLOR);
@@ -309,8 +343,8 @@ function SetTooltipMoney(frame, money, type, prefixText, suffixText)
 		name = moneyFrame:GetName();
 		MoneyFrame_SetType(moneyFrame, "STATIC");
 	end
-	_G[name.."PrefixText"]:SetText(prefixText);
-	_G[name.."SuffixText"]:SetText(suffixText);
+	moneyFrame.PrefixText:SetText(prefixText);
+	moneyFrame.SuffixText:SetText(suffixText);
 	if ( type ) then
 		MoneyFrame_SetType(moneyFrame, type);
 	end
@@ -352,107 +386,88 @@ function GameTooltip_ClearMoney(self)
 	self.shownMoneyFrames = nil;
 end
 
-GAME_TOOLTIP_BACKDROP_STYLE_EMBEDDED = {
-	-- Nothing
+GAME_TOOLTIP_BACKDROP_STYLE_DEFAULT_DARK = {
+	layoutType = "TooltipDefaultDarkLayout",
 };
 
 GAME_TOOLTIP_BACKDROP_STYLE_AZERITE_ITEM = {
-	bgFile = "Interface/Tooltips/UI-Tooltip-Background-Azerite",
-	edgeFile = "Interface/Tooltips/UI-Tooltip-Border-Azerite",
-	tile = true,
-	tileEdge = false,
-	tileSize = 16,
-	edgeSize = 19,
-	insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	layoutType = "TooltipAzeriteLayout",
 
-	backdropBorderColor = TOOLTIP_DEFAULT_COLOR,
-	backdropColor = WHITE_FONT_COLOR,
-
-	overlayAtlasTop = "AzeriteTooltip-Topper";
+	overlayAtlasTop = "AzeriteTooltip-Topper",
 	overlayAtlasTopScale = .75,
-	overlayAtlasTopYOffset = 1;
-	overlayAtlasBottom = "AzeriteTooltip-Bottom";
-	overlayAtlasBottomYOffset = 2;
+	overlayAtlasTopYOffset = 1,
+	overlayAtlasBottom = "AzeriteTooltip-Bottom",
+	overlayAtlasBottomYOffset = 2,
 
-	padding = { left = 3, right = 3, top = 3, bottom = 3 },
+	padding = { left = 6, right = 6, top = 6, bottom = 6 },
 };
 
 GAME_TOOLTIP_BACKDROP_STYLE_CORRUPTED_ITEM = {
-	bgFile = "Interface/Tooltips/UI-Tooltip-Background-Corrupted",
-	edgeFile = "Interface/Tooltips/UI-Tooltip-Border-Corrupted",
-	tile = true,
-	tileEdge = false,
-	tileSize = 16,
-	edgeSize = 19,
-	insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	layoutType = "TooltipCorruptedLayout",
 
-	backdropBorderColor = TOOLTIP_DEFAULT_COLOR,
-	backdropColor = WHITE_FONT_COLOR,
-
-	overlayAtlasTop = "Nzoth-tooltip-topper";
+	overlayAtlasTop = "Nzoth-tooltip-topper",
 	overlayAtlasTopScale = .75,
-	overlayAtlasTopYOffset = -2;
+	overlayAtlasTopYOffset = -2,
 
-	padding = { left = 3, right = 3, top = 3, bottom = 3 },
+	padding = { left = 6, right = 6, top = 6, bottom = 6 },
 };
 
 GAME_TOOLTIP_BACKDROP_STYLE_RUNEFORGE_LEGENDARY = {
-	bgFile = "Interface/Tooltips/UI-Tooltip-Background-Maw",
-	edgeFile = "Interface/Tooltips/UI-Tooltip-Border-Maw",
-	tile = true,
-	tileEdge = false,
-	tileSize = 16,
-	edgeSize = 19,
-	insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	layoutType = "TooltipMawLayout",
 
-	backdropBorderColor = TOOLTIP_DEFAULT_COLOR,
-	backdropColor = WHITE_FONT_COLOR,
-
-	overlayAtlasTop = "Maw-tooltip-topper";
+	overlayAtlasTop = "Maw-tooltip-topper",
 	overlayAtlasTopScale = .75,
-	overlayAtlasTopYOffset = -2;
+	overlayAtlasTopYOffset = -2,
 
-	padding = { left = 3, right = 3, top = 3, bottom = 3 },
+	padding = { left = 6, right = 6, top = 6, bottom = 6 },
+};
+
+GAME_TOOLTIP_BACKDROP_STYLE_CLASS_TALENT = {
+	layoutType = "TooltipDefaultDarkLayout",
 };
 
 GAME_TOOLTIP_TEXTUREKIT_BACKDROP_STYLES = {
 	["jailerstower"] = GAME_TOOLTIP_BACKDROP_STYLE_RUNEFORGE_LEGENDARY;
 };
 
+function GameTooltip_OnShow(self)
+	-- Do not show HUD tooltips when in edit mode with the HUD tooltip section enabled, to prevent layering issues.
+	if (EditModeManagerFrame:IsEditModeActive() and GameTooltipDefaultContainer:IsShown()) then
+		local relativeTo = select(2, self:GetPoint());
+		if (relativeTo == GameTooltipDefaultContainer) then
+			self:Hide();
+			return;
+		end
+	end
+
+	GameTooltip_CalculatePadding(self);
+end
+
 function GameTooltip_OnHide(self)
-	self.needsReset = true;
 	self.waitingForData = false;
-	SharedTooltip_SetBackdropStyle(self, self.IsEmbedded and GAME_TOOLTIP_BACKDROP_STYLE_EMBEDDED or TOOLTIP_BACKDROP_STYLE_DEFAULT);
+	local style = nil;
+	SharedTooltip_SetBackdropStyle(self, style, self.IsEmbedded);
 	GameTooltip_ClearMoney(self);
 	GameTooltip_ClearStatusBars(self);
 	GameTooltip_ClearProgressBars(self);
 	GameTooltip_ClearWidgetSet(self);
-	if ( self.shoppingTooltips ) then
-		for _, frame in pairs(self.shoppingTooltips) do
-			frame:Hide();
-		end
-	end
-	self.comparing = false;
+	TooltipComparisonManager:Clear(self);
 
-	ShoppingTooltip1:Hide();
-	ShoppingTooltip2:Hide();
-	if (BattlePetTooltip) then
-		BattlePetTooltip:Hide();
-	end
+	GameTooltip_HideBattlePetTooltip();
 
 	if self.ItemTooltip then
 		EmbeddedItemTooltip_Hide(self.ItemTooltip);
 	end
 	self:SetPadding(0, 0, 0, 0);
+
+	self.info = nil;
+	if self.StatusBar then
+		self.StatusBar:ClearWatch();
+	end
 end
 
 function GameTooltip_CycleSecondaryComparedItem(self)
-	GameTooltip_AdvanceSecondaryCompareItem(self);
-
-	local shoppingTooltip1, shoppingTooltip2 = unpack(self.shoppingTooltips);
-	if ( shoppingTooltip1:IsShown() ) then
-		GameTooltip_ShowCompareItem(self);
-	end
+	TooltipComparisonManager:CycleItem();
 end
 
 function GameTooltip_SetTooltipWaitingForData(self, waitingForData)
@@ -478,17 +493,13 @@ function GameTooltip_OnUpdate(self, elapsed)
 		return;
 	end
 
-	local shoppingTooltip1 = self.shoppingTooltips[1];
-
-	if ( not shoppingTooltip1:IsShown() ) then
-		self.needsReset = true;
-	end
-
 	local owner = self:GetOwner();
 	if ( owner and owner.UpdateTooltip ) then
 		owner:UpdateTooltip();
 	elseif self.UpdateTooltip then
 		self:UpdateTooltip();
+	elseif self.shouldRefreshData then
+		self:RefreshData();
 	end
 end
 
@@ -504,235 +515,26 @@ function GameTooltip_HideShoppingTooltips(self)
 	shoppingTooltip2:Hide()
 end
 
-function GameTooltip_OnTooltipSetUnit(self)
-	if self:IsUnit("mouseover") then
-		_G[self:GetName().."TextLeft1"]:SetTextColor(GameTooltip_UnitColor("mouseover"));
-	end
-	GameTooltip_HideBattlePetTooltip();
-end
-
-function GameTooltip_UpdateStyle(self)
-	local backdropStyle = TOOLTIP_BACKDROP_STYLE_DEFAULT;
-	local _, itemLink = self:GetItem();
-	if itemLink then
-		if C_AzeriteEmpoweredItem.IsAzeriteEmpoweredItemByID(itemLink) or C_AzeriteItem.IsAzeriteItemByID(itemLink) then
-			backdropStyle = GAME_TOOLTIP_BACKDROP_STYLE_AZERITE_ITEM;
-		elseif IsCorruptedItem(itemLink) then
-			backdropStyle = GAME_TOOLTIP_BACKDROP_STYLE_CORRUPTED_ITEM;
-		end
-	end
-
+function GameTooltip_ClearStyle(self)
+	local backdropStyle = nil;
 	SharedTooltip_SetBackdropStyle(self, backdropStyle);
 end
 
-function GameTooltip_OnTooltipSetItem(self)
-	if IsModifiedClick("COMPAREITEMS") or (GetCVarBool("alwaysCompareItems") and not self:IsEquippedItem()) then
-		GameTooltip_ShowCompareItem(self);
-	else
-		GameTooltip_HideShoppingTooltips(self);
-	end
-	GameTooltip_HideBattlePetTooltip();
-
-	GameTooltip_UpdateStyle(self);
-end
-
-function GameTooltip_OnTooltipSetShoppingItem(self)
-	GameTooltip_UpdateStyle(self);
-end
-
-function GameTooltip_OnTooltipSetSpell(self)
-	if (not IsModifiedClick("COMPAREITEMS") and not GetCVarBool("alwaysCompareItems")) or not GameTooltip_ShowCompareSpell(self) then
-		GameTooltip_HideShoppingTooltips(self);
-	end
-	GameTooltip_HideBattlePetTooltip();
-end
-
-function GameTooltip_InitializeComparisonTooltips(self, anchorFrame)
-	if not self then
-		self = GameTooltip;
-	end
-
-	anchorFrame = anchorFrame or self;
-
-	if self.needsReset then
-		self:ResetSecondaryCompareItem();
-		GameTooltip_AdvanceSecondaryCompareItem(self);
-		self.needsReset = false;
-	end
-
-	return self, anchorFrame, unpack(self.shoppingTooltips);
-end
-
-function GameTooltip_AnchorComparisonTooltips(self, anchorFrame, shoppingTooltip1, shoppingTooltip2, primaryItemShown, secondaryItemShown)
-	local sideAnchorFrame = anchorFrame;
-	if anchorFrame.IsEmbedded then
-		sideAnchorFrame = anchorFrame:GetParent():GetParent();
-	end
-
-	local leftPos = sideAnchorFrame:GetLeft();
-	local rightPos = sideAnchorFrame:GetRight();
-
-	local selfLeftPos = self:GetLeft();
-	local selfRightPos = self:GetRight();
-
-	-- if we get the Left, we have the Right
-	if ( leftPos and selfLeftPos) then
-		leftPos = math.min(selfLeftPos, leftPos);-- get the left most bound
-		rightPos = math.max(selfRightPos, rightPos);-- get the right most bound
-	else
-		leftPos = leftPos or selfLeftPos or 0;
-		rightPos = rightPos or selfRightPos or 0;
-	end
-
-	-- sometimes the sideAnchorFrame is an actual tooltip, and sometimes it's a script region, so make sure we're getting the actual anchor type
-	local anchorType = sideAnchorFrame.GetAnchorType and sideAnchorFrame:GetAnchorType() or self:GetAnchorType();
-
-	local totalWidth = 0;
-	if ( primaryItemShown  ) then
-		totalWidth = totalWidth + shoppingTooltip1:GetWidth();
-	end
-	if ( secondaryItemShown  ) then
-		totalWidth = totalWidth + shoppingTooltip2:GetWidth();
-	end
-
-	local rightDist = 0;
-	local screenWidth = GetScreenWidth();
-	rightDist = screenWidth - rightPos;
-
-	-- find correct side
-	local side;
-	if ( anchorType and (totalWidth < leftPos) and (anchorType == "ANCHOR_LEFT" or anchorType == "ANCHOR_TOPLEFT" or anchorType == "ANCHOR_BOTTOMLEFT") ) then
-		side = "left";
-	elseif ( anchorType and (totalWidth < rightDist) and (anchorType == "ANCHOR_RIGHT" or anchorType == "ANCHOR_TOPRIGHT" or anchorType == "ANCHOR_BOTTOMRIGHT") ) then
-		side = "right";
-	elseif ( rightDist < leftPos ) then
-		side = "left";
-	else
-		side = "right";
-	end
-
-	-- see if we should slide the tooltip
-	if ( totalWidth > 0 and (anchorType and anchorType ~= "ANCHOR_PRESERVE") ) then --we never slide a tooltip with a preserved anchor
-		local slideAmount = 0;
-		if ( (side == "left") and (totalWidth > leftPos) ) then
-			slideAmount = totalWidth - leftPos;
-		elseif ( (side == "right") and (rightPos + totalWidth) >  screenWidth ) then
-			slideAmount = screenWidth - (rightPos + totalWidth);
-		end
-
-		if (slideAmount ~= 0) then -- if we calculated a slideAmount, we need to slide
-			if ( sideAnchorFrame.SetAnchorType ) then
-				sideAnchorFrame:SetAnchorType(anchorType, slideAmount, 0);
-			else
-				self:SetAnchorType(anchorType, slideAmount, 0);
-			end
-		end
-	end
-
-	if ( secondaryItemShown ) then
-		shoppingTooltip2:SetOwner(self, "ANCHOR_NONE");
-		shoppingTooltip2:ClearAllPoints();
-		shoppingTooltip1:SetOwner(self, "ANCHOR_NONE");
-		shoppingTooltip1:ClearAllPoints();
-
-		shoppingTooltip1:SetPoint("TOP", anchorFrame, 0, -10);
-		shoppingTooltip2:SetPoint("TOP", anchorFrame, 0, -10);
-		if ( side and side == "left" ) then
-			shoppingTooltip1:SetPoint("RIGHT", sideAnchorFrame, "LEFT");
-		else
-			shoppingTooltip2:SetPoint("LEFT", sideAnchorFrame, "RIGHT");
-		end
-
-		if ( side and side == "left" ) then
-			shoppingTooltip2:SetPoint("TOPRIGHT", shoppingTooltip1, "TOPLEFT");
-		else
-			shoppingTooltip1:SetPoint("TOPLEFT", shoppingTooltip2, "TOPRIGHT");
-		end
-	else
-		shoppingTooltip1:SetOwner(self, "ANCHOR_NONE");
-		shoppingTooltip1:ClearAllPoints();
-
-		shoppingTooltip1:SetPoint("TOP", anchorFrame, 0, -10);
-		if ( side and side == "left" ) then
-			shoppingTooltip1:SetPoint("RIGHT", sideAnchorFrame, "LEFT");
-		else
-			shoppingTooltip1:SetPoint("LEFT", sideAnchorFrame, "RIGHT");
-		end
-
-		shoppingTooltip2:Hide();
-	end
-end
-
-function GameTooltip_ShowCompareSpell(self, anchorFrame)
-	local azeritePowerID, owningItemLink = self:GetAzeritePowerID();
-	if not azeritePowerID or not owningItemLink then
-		return false;
-	end
-
-	local owningItemSource = AzeriteEmpoweredItemDataSource:CreateFromFromItemLink(owningItemLink);
-	local sourceItem = owningItemSource:GetItem();
-	if not sourceItem:IsItemDataCached() then
-		-- We'll try again later
-		return false;
-	end
-
-	local equippedItemLocation = ItemLocation:CreateFromEquipmentSlot(sourceItem:GetInventoryType());
-	if not C_Item.DoesItemExist(equippedItemLocation) or not C_AzeriteEmpoweredItem.IsAzeriteEmpoweredItem(equippedItemLocation) then
-		return false;
-	end
-
-	local equippedItemSource = AzeriteEmpoweredItemDataSource:CreateFromItemLocation(equippedItemLocation);
-	local equippedItem = equippedItemSource:GetItem(equippedItemLocation);
-	if not equippedItem:IsItemDataCached() then
-		-- We'll try again later
-		return false;
-	end
-
-	local powerTierIndex = AzeriteUtil.FindAzeritePowerTier(owningItemSource, azeritePowerID);
-	if not powerTierIndex then
-		return false;
-	end
-
-	local comparisonPowerID = AzeriteUtil.GetSelectedAzeritePowerInTier(equippedItemSource, powerTierIndex);
-	if not comparisonPowerID then
-		return false;
-	end
-
-	local tooltip, anchorFrame, shoppingTooltip1, shoppingTooltip2 = GameTooltip_InitializeComparisonTooltips(self, anchorFrame);
-
-	local itemID = equippedItem:GetItemID();
-	local itemLevel = equippedItem:GetCurrentItemLevel();
-	shoppingTooltip1:SetAzeritePower(itemID, itemLevel, comparisonPowerID);
-
-	local primaryItemShown = true;
-	local secondaryItemShown = false;
-	GameTooltip_AnchorComparisonTooltips(tooltip, anchorFrame, shoppingTooltip1, shoppingTooltip2, primaryItemShown, secondaryItemShown);
-
-	shoppingTooltip1:SetCompareAzeritePower(itemID, itemLevel, comparisonPowerID);
-	shoppingTooltip1:Show();
-
-	return true;
-end
-
 function GameTooltip_ShowCompareItem(self, anchorFrame)
-	local tooltip, anchorFrame, shoppingTooltip1, shoppingTooltip2 = GameTooltip_InitializeComparisonTooltips(self, anchorFrame);
-
-	local primaryItemShown, secondaryItemShown = shoppingTooltip1:SetCompareItem(shoppingTooltip2, tooltip);
-
-	GameTooltip_AnchorComparisonTooltips(tooltip, anchorFrame, shoppingTooltip1, shoppingTooltip2, primaryItemShown, secondaryItemShown);
-
-	-- We have to call this again because :SetOwner clears the tooltip.
-	shoppingTooltip1:SetCompareItem(shoppingTooltip2, tooltip);
-	shoppingTooltip1:Show();
+	local tooltip = self or GameTooltip;
+	local tooltipData = tooltip.info and tooltip.info.tooltipData;
+	local comparisonItem = TooltipComparisonManager:CreateComparisonItem(tooltipData);
+	TooltipComparisonManager:CompareItem(comparisonItem, tooltip, anchorFrame);
 end
 
-function GameTooltip_AdvanceSecondaryCompareItem(self)
-	if ( not self ) then
-		self = GameTooltip;
-	end
+function GameTooltip_ShowEventHyperlink(hyperlink)
+	GameTooltip_SetDefaultAnchor(GameTooltip, UIParent);
+	GameTooltip:SetHyperlink(hyperlink);
+end
 
-	if ( GetCVarBool("allowCompareWithToggle") ) then
-		self:AdvanceSecondaryCompareItem();
+function GameTooltip_HideEventHyperlink()
+	if GameTooltip.tooltipData and GameTooltip.tooltipData.getterName == "GetHyperlink" then
+		GameTooltip:Hide();
 	end
 end
 
@@ -798,7 +600,9 @@ function GameTooltip_ShowHyperlink(self, hyperlinkString, classID, specID, clear
 		-- quest reward hyperlinks are handled in lua
 		GameTooltip_AddQuestRewardsToTooltip(self, questRewardID, TOOLTIP_QUEST_REWARDS_STYLE_NO_HEADER);
 	else
-		self:SetHyperlink(hyperlinkString, classID, specID, clearTooltip);
+		local tooltipInfo = CreateBaseTooltipInfo("GetHyperlink", hyperlinkString, classID, specID);
+		tooltipInfo.append = not clearTooltip;
+		self:ProcessInfo(tooltipInfo);
 	end
 end
 
@@ -845,6 +649,112 @@ function GameTooltip_HideResetCursor()
 	ResetCursor();
 end
 
+function GameTooltip_AddQuest(self, questID)
+	local questID = self.questID or questID;
+	if ( not HaveQuestData(questID) ) then
+		GameTooltip_SetTitle(GameTooltip, RETRIEVING_DATA, RED_FONT_COLOR);
+		GameTooltip_SetTooltipWaitingForData(GameTooltip, true);
+		GameTooltip:Show();
+		return;
+	end
+
+	local widgetSetAdded = false;
+	local widgetSetID = C_TaskQuest.GetUIWidgetSetIDFromQuestID(questID);
+
+	local title, factionID, capped = C_TaskQuest.GetQuestInfoByQuestID(questID);
+	if ( self.worldQuest or C_QuestLog.IsWorldQuest(questID)) then
+		self.worldQuest = true;
+		local tagInfo = C_QuestLog.GetQuestTagInfo(self.questID);
+		local quality = tagInfo and tagInfo.quality or Enum.WorldQuestQuality.Common;
+		local color = WORLD_QUEST_QUALITY_COLORS[quality].color;
+		GameTooltip_SetTitle(GameTooltip, title, color);
+		QuestUtils_AddQuestTypeToTooltip(GameTooltip, questID, NORMAL_FONT_COLOR);
+
+		local factionName = factionID and GetFactionInfoByID(factionID);
+		if (factionName) then
+			local reputationYieldsRewards = (not capped) or C_Reputation.IsFactionParagon(factionID);
+			if (reputationYieldsRewards) then
+				GameTooltip:AddLine(factionName);
+			else
+				GameTooltip:AddLine(factionName, GRAY_FONT_COLOR:GetRGB());
+			end
+		end
+
+		GameTooltip_AddQuestTimeToTooltip(GameTooltip, questID);
+	elseif ( self.isThreat or C_QuestLog.IsThreatQuest(questID)) then
+		GameTooltip_SetTitle(GameTooltip, title);
+		GameTooltip_AddQuestTimeToTooltip(GameTooltip, questID);
+	else
+		GameTooltip_SetTitle(GameTooltip, title);
+	end
+
+	if (self.isCombatAllyQuest or C_QuestLog.GetQuestType(questID) == Enum.QuestTag.CombatAlly) then
+		GameTooltip_AddColoredLine(GameTooltip, AVAILABLE_FOLLOWER_QUEST, HIGHLIGHT_FONT_COLOR, true);
+		GameTooltip_AddColoredLine(GameTooltip, GRANTS_FOLLOWER_XP, GREEN_FONT_COLOR, true);
+	elseif (self.isQuestStart) then
+		GameTooltip_AddColoredLine(GameTooltip, AVAILABLE_QUEST, HIGHLIGHT_FONT_COLOR, true);
+	else
+		local questDescription = "";
+		local questCompleted = C_QuestLog.IsComplete(questID);
+
+		if (questCompleted and self.shouldShowObjectivesAsStatusBar) then
+			questDescription = QUEST_WATCH_QUEST_READY;
+			GameTooltip_AddColoredLine(GameTooltip, QUEST_DASH .. questDescription, HIGHLIGHT_FONT_COLOR);
+		elseif (not questCompleted and self.shouldShowObjectivesAsStatusBar) then
+			local questLogIndex = C_QuestLog.GetLogIndexForQuestID(questID);
+			if (questLogIndex) then 
+				questDescription = select(2, GetQuestLogQuestText(questLogIndex));
+				GameTooltip_AddColoredLine(GameTooltip, QUEST_DASH .. questDescription, HIGHLIGHT_FONT_COLOR);
+			end
+		end
+		local numObjectives = self.numbObjectives or C_QuestLog.GetNumQuestObjectives(questID);
+		for objectiveIndex = 1, numObjectives do
+			local objectiveText, objectiveType, finished, numFulfilled, numRequired = GetQuestObjectiveInfo(questID, objectiveIndex, false);
+			local showObjective = not (finished and self.isThreat);
+			if showObjective then
+				if(self.shouldShowObjectivesAsStatusBar) then
+					local percent = math.floor((numFulfilled/numRequired) * 100);
+					GameTooltip_ShowProgressBar(GameTooltip, 0, numRequired, numFulfilled, PERCENTAGE_STRING:format(percent));
+				elseif ( objectiveText and #objectiveText > 0 ) then
+					local color = finished and GRAY_FONT_COLOR or HIGHLIGHT_FONT_COLOR;
+					GameTooltip:AddLine(QUEST_DASH .. objectiveText, color.r, color.g, color.b, true);
+				end
+			end
+		end
+		local objectiveText, objectiveType, finished, numFulfilled, numRequired = GetQuestObjectiveInfo(questID, 1, false);
+		if (objectiveType == "progressbar") then
+			local percent = C_TaskQuest.GetQuestProgressBarInfo(questID);
+			local showObjective = not (finished and self.isThreat);
+			if ( percent  and showObjective ) then
+				GameTooltip_ShowProgressBar(GameTooltip, 0, 100, percent, PERCENTAGE_STRING:format(percent));
+			end
+		end
+
+		if (widgetSetID) then
+			widgetSetAdded = true;
+			GameTooltip_AddWidgetSet(GameTooltip, widgetSetID);
+		end
+
+		GameTooltip_AddQuestRewardsToTooltip(GameTooltip, questID, self.questRewardTooltipStyle or TOOLTIP_QUEST_REWARDS_STYLE_DEFAULT);
+
+		if ( self.worldQuest and C_TooltipInfo.GM ) then
+			local tooltipData = C_TooltipInfo.GM.GetDebugWorldQuestInfo(questID);
+			if tooltipData then
+				local tooltipInfo = { tooltipData = tooltipData, append = true };
+				GameTooltip:ProcessInfo(tooltipInfo);
+				GameTooltip:Show();
+			end
+		end
+	end
+
+
+	if (not widgetSetAdded and widgetSetID) then
+		GameTooltip_AddWidgetSet(GameTooltip, widgetSetID);
+	end
+
+	GameTooltip:Show();
+end
+
 function EmbeddedItemTooltip_UpdateSize(self)
 	local itemTooltipExtraBorderHeight = 22;
 	if ( self.Tooltip:IsShown() ) then
@@ -856,15 +766,6 @@ function EmbeddedItemTooltip_UpdateSize(self)
 	end
 
 	GameTooltip_CalculatePadding(self:GetParent());
-end
-
-function EmbeddedItemTooltip_OnTooltipSetItem(self)
-	if (self.itemID and not self.itemTextureSet) then
-		local _, _, _, _, _, _, _, _, _, itemTexture = GetItemInfo(self.itemID);
-		if (itemTexture) then
-			self.Icon:SetTexture(itemTexture);
-		end
-	end
 end
 
 function EmbeddedItemTooltip_Hide(self)
@@ -913,7 +814,7 @@ function EmbeddedItemTooltip_SetItemByID(self, id, count)
 	EmbeddedItemTooltip_UpdateSize(self);
 end
 
-function EmbeddedItemTooltip_SetItemByQuestReward(self, questLogIndex, questID, rewardType)
+function EmbeddedItemTooltip_SetItemByQuestReward(self, questLogIndex, questID, rewardType, showCollectionText)
 	if not questLogIndex then
 		return false;
 	end
@@ -934,7 +835,7 @@ function EmbeddedItemTooltip_SetItemByQuestReward(self, questLogIndex, questID, 
 		self:Show();
 		EmbeddedItemTooltip_PrepareForItem(self);
 		self.Tooltip:SetOwner(self, "ANCHOR_NONE");
-		self.Tooltip:SetQuestLogItem(rewardType, questLogIndex, questID);
+		self.Tooltip:SetQuestLogItem(rewardType, questLogIndex, questID, showCollectionText);
 		SetItemButtonQuality(self, quality, itemID);
 		SetItemButtonCount(self, quantity);
 		self.Icon:SetTexture(itemTexture);
@@ -982,7 +883,8 @@ function EmbeddedItemTooltip_SetSpellWithTextureByID(self, spellID, texture)
 		self:Show();
 		EmbeddedItemTooltip_PrepareForSpell(self);
 		self.Tooltip:SetOwner(self, "ANCHOR_NONE");
-		self.Tooltip:AddSpellByID(spellID);
+		local tooltipInfo = CreateBaseTooltipInfo("GetSpellByID", spellID);
+		GameTooltip:ProcessInfo(tooltipInfo);
 		SetItemButtonQuality(self, Enum.ItemQuality.Common);
 		SetItemButtonCount(self, 0);
 		self.Icon:SetTexture(texture);
@@ -1018,4 +920,117 @@ function EmbeddedItemTooltip_SetCurrencyByID(self, currencyID, quantity)
 		return true;
 	end
 	return false;
+end
+
+GameTooltipDataMixin = CreateFromMixins(TooltipDataHandlerMixin);
+
+function GameTooltipDataMixin:OnLoad()
+	GameTooltip_OnLoad(self);
+	self.shoppingTooltips = { ShoppingTooltip1, ShoppingTooltip2 };
+	GameTooltip_HideBattlePetTooltip();
+end
+
+function GameTooltipDataMixin:RefreshData()
+	if self.info and self.info.getterName then
+		self.info.tooltipData = nil;
+		self:ProcessInfo(self.info);
+	end
+	self.shouldRefreshData = false;
+end
+
+function GameTooltipDataMixin:RefreshDataNextUpdate()
+	self.updateTooltipTimer = 0;
+	self.shouldRefreshData = true;
+end
+
+function GameTooltipDataMixin:OnEvent(event, ...)
+	if event == "TOOLTIP_DATA_UPDATE" then
+		self:RefreshDataNextUpdate();
+	end
+end
+
+function GameTooltipDataMixin:SetWorldCursor(anchorType)
+	if anchorType == Enum.WorldCursorAnchorType.Default then
+		GameTooltip_SetDefaultAnchor(self, UIParent);
+	elseif anchorType == Enum.WorldCursorAnchorType.Cursor then
+		self:SetOwner(UIParent, "ANCHOR_CURSOR");
+	elseif anchorType == Enum.WorldCursorAnchorType.Nameplate then
+		self:SetOwner(UIParent);
+		self:SetObjectTooltipPosition();
+	end
+
+	local oldInfo = self.info;
+	local tooltipData = C_TooltipInfo.GetWorldCursor();
+	if tooltipData then
+		local tooltipInfo = {
+			getterName = "GetWorldCursor",
+			tooltipData = tooltipData,
+			fadeOut = anchorType == Enum.WorldCursorAnchorType.Default,
+		};
+		self:ProcessInfo(tooltipInfo);
+	elseif oldInfo and oldInfo.getterName == "GetWorldCursor" then
+		-- user just moused off an in-world object, either fade or hide
+		if oldInfo.fadeOut then
+			-- clear the info so we don't touch this tooltip again
+			self.info = nil;
+			self:FadeOut();
+		else
+			self:Hide();
+		end
+	end
+end
+
+-- Temp replacements for GetX API that's been removed
+-- TODO: Evaluate for removal
+
+function GameTooltipDataMixin:GetItem()
+	return TooltipUtil.GetDisplayedItem(self);
+end
+
+function GameTooltipDataMixin:GetSpell()
+	return TooltipUtil.GetDisplayedSpell(self);
+end
+
+function GameTooltipDataMixin:GetUnit()
+	return TooltipUtil.GetDisplayedUnit(self);
+end
+
+GameTooltipUnitHealthBarMixin = { };
+
+function GameTooltipUnitHealthBarMixin:OnLoad()
+	self:SetMinMaxValues(0, 1);
+end
+
+function GameTooltipUnitHealthBarMixin:SetWatch(guid)
+	self.guid = guid;
+	self:SetValue(0);
+	self:Show();
+	self:UpdateUnitHealth();
+end
+
+function GameTooltipUnitHealthBarMixin:StopUpdates()
+	-- get the current health, last update might have been right before killing blow
+	self:UpdateUnitHealth();
+
+	self.guid = nil;
+end
+
+function GameTooltipUnitHealthBarMixin:ClearWatch()
+	self:StopUpdates();
+	self:Hide();
+end
+
+function GameTooltipUnitHealthBarMixin:UpdateUnitHealth()
+	if not self.guid then
+		return;
+	end
+
+	local percentHealth = UnitPercentHealthFromGUID(self.guid);
+	if percentHealth then
+		self:SetValue(percentHealth);
+	end
+end
+
+function GameTooltipUnitHealthBarMixin:OnUpdate()
+	self:UpdateUnitHealth();
 end

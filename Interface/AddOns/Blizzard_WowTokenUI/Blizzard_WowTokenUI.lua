@@ -17,6 +17,7 @@ Import("C_Timer");
 Import("C_StoreSecure");
 Import("C_RecruitAFriend");
 
+Import("assert");
 Import("math");
 Import("string");
 Import("pairs");
@@ -81,6 +82,10 @@ Import("BLIZZARD_STORE_CURRENCY_FORMAT_AUD");
 Import("BLIZZARD_STORE_CURRENCY_FORMAT_JPY");
 Import("BLIZZARD_STORE_CURRENCY_FORMAT_CAD");
 Import("BLIZZARD_STORE_CURRENCY_FORMAT_NZD");
+Import("BLIZZARD_STORE_CURRENCY_FORMAT_GEL");
+Import("BLIZZARD_STORE_CURRENCY_FORMAT_TRY");
+Import("BLIZZARD_STORE_CURRENCY_FORMAT_KZT");
+Import("BLIZZARD_STORE_CURRENCY_FORMAT_UAH");
 Import("BLIZZARD_STORE_CURRENCY_RAW_ASTERISK");
 Import("BLIZZARD_STORE_CURRENCY_BETA");
 
@@ -140,6 +145,10 @@ local CURRENCY_BETA = 16;
 local CURRENCY_JPY = 28;
 local CURRENCY_CAD = 29;
 local CURRENCY_NZD = 30;
+local CURRENCY_GEL = 31;
+local CURRENCY_TRY = 32;
+local CURRENCY_KZT = 33;
+local CURRENCY_UAH = 34;
 
 local currencyMult = 100;
 
@@ -236,6 +245,22 @@ local function currencyFormatNZD(dollars, cents)
 	return string.format(BLIZZARD_STORE_CURRENCY_FORMAT_NZD, formatCurrency(dollars, cents, false));
 end
 
+local function currencyFormatGEL(dollars, cents)
+	return string.format(BLIZZARD_STORE_CURRENCY_FORMAT_GEL, formatCurrency(dollars, cents, false));
+end
+
+local function currencyFormatTRY(dollars, cents)
+	return string.format(BLIZZARD_STORE_CURRENCY_FORMAT_TRY, formatCurrency(dollars, cents, false));
+end
+
+local function currencyFormatKZT(dollars, cents)
+	return string.format(BLIZZARD_STORE_CURRENCY_FORMAT_KZT, formatCurrency(dollars, cents, false));
+end
+
+local function currencyFormatUAH(dollars, cents)
+	return string.format(BLIZZARD_STORE_CURRENCY_FORMAT_UAH, formatCurrency(dollars, cents, false));
+end
+
 local currencySpecific = {
 	[CURRENCY_USD] = {
 		["currencyFormat"] = currencyFormatUSD,
@@ -285,11 +310,24 @@ local currencySpecific = {
 	[CURRENCY_NZD] = {
 		["currencyFormat"] = currencyFormatNZD,
 	},
+	[CURRENCY_GEL] = {
+		["currencyFormat"] = currencyFormatGEL,
+	},
+	[CURRENCY_TRY] = {
+		["currencyFormat"] = currencyFormatTRY,
+	},
+	[CURRENCY_KZT] = {
+		["currencyFormat"] = currencyFormatKZT,
+	},
+	[CURRENCY_UAH] = {
+		["currencyFormat"] = currencyFormatUAH,
+	},
 };
 
 local function currencyInfo()
 	local currency = C_StoreSecure.GetCurrencyID();
 	local info = currencySpecific[currency];
+	assert(info ~= nil, ("Missing currency info for currency ID '%d'"):format(currency));
 	return info;
 end
 
@@ -577,42 +615,6 @@ function GetSecureMoneyString(money, separateThousands)
 
 	return moneyString;
 end
-
-------------------------------------------------------------------------------------------------------------------------------------------------------
-
-------------------------------------------------------------------------------------------------------------------------------------------------------
--- This code is replicated from C_TimerAugment.lua to ensure that the timers are secure.
-------------------------------------------------------------------------------------------------------------------------------------------------------
---Cancels a ticker or timer. May be safely called within the ticker's callback in which
---case the ticker simply won't be started again.
---Cancel is guaranteed to be idempotent.
-function SecureCancelTicker(ticker)
-	ticker._cancelled = true;
-end
-
-function NewSecureTicker(duration, callback, iterations)
-	local ticker = {};
-	ticker._remainingIterations = iterations;
-	ticker._callback = function()
-		if ( not ticker._cancelled ) then
-			callback(ticker);
-
-			--Make sure we weren't cancelled during the callback
-			if ( not ticker._cancelled ) then
-				if ( ticker._remainingIterations ) then
-					ticker._remainingIterations = ticker._remainingIterations - 1;
-				end
-				if ( not ticker._remainingIterations or ticker._remainingIterations > 0 ) then
-					C_Timer.After(duration, ticker._callback);
-				end
-			end
-		end
-	end;
-
-	C_Timer.After(duration, ticker._callback);
-	return ticker;
-end
------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function GetTimeLeftString()
 	local _, duration = C_WowTokenPublic.GetCurrentMarketPrice();
@@ -1016,9 +1018,9 @@ function WowTokenDialog_SetDialog(self, dialogName)
 	if (dialog.timed) then
 		remainingDialogTime = C_WowTokenSecure.GetPriceLockDuration();
 		if (not currentTicker) then
-			currentTicker = NewSecureTicker(1, function()
+			currentTicker = C_Timer.NewTicker(1, function()
 				if (remainingDialogTime == 0) then
-					SecureCancelTicker(currentTicker);
+					currentTicker:Cancel();
 					if (dialog.onCancelled) then
 						dialog.onCancelled(WowTokenDialog);
 					end
@@ -1056,7 +1058,7 @@ function WowTokenDialog_SetDialog(self, dialogName)
 		end
 	else
 		if (currentTicker) then
-			SecureCancelTicker(currentTicker);
+			currentTicker:Cancel();
 			currentTicker = nil;
 		end
 	end
@@ -1176,7 +1178,7 @@ function WowTokenDialogButton_OnClick(self)
 	end
 
 	if (currentTicker) then
-		SecureCancelTicker(currentTicker);
+		currentTicker:Cancel();
 		currentTicker = nil;
 	end
 end
